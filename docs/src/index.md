@@ -1,8 +1,5 @@
 # AbstractOperators.jl
 
-[![Build status](https://github.com/kul-forbes/AbstractOperators.jl/workflows/CI/badge.svg)](https://github.com/kul-forbes/AbstractOperators.jl/actions?query=workflow%3ACI)
-[![codecov](https://codecov.io/gh/kul-forbes/AbstractOperators.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/kul-forbes/AbstractOperators.jl)
-
 ## Description
 
 Abstract operators extend the syntax typically used for matrices to linear mappings of arbitrary dimensions and nonlinear functions. Unlike matrices however, abstract operators apply the mappings with specific efficient algorithms that minimize memory requirements. 
