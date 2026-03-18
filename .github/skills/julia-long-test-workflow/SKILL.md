@@ -64,3 +64,10 @@ benchpkgtable \
 - JET coverage remains complete for public API touched.
 - Benchmark deltas are measured and reported.
 - Logs are saved under `.temp/`.
+
+## Session Lessons (AbstractOperators GPU migration)
+
+- Julia package extensions can only `import` the parent package, trigger package(s), and stdlib; if extension code needs a parent dependency API, expose it from the parent module first.
+- For FFT plans, prefer `inv(plan)` (AbstractFFTs-generic) over backend-specific `FFTW.plan_inv(...)` to keep CUDA/AMDGPU compatibility.
+- With JLArrays/GPUArrays, avoid `copyto!(gpu, cpu_view)` where source is a `SubArray`; materialize first (for example `src[1:n]`) or copy from a plain array.
+- During large rebases, resolve conflicts by preserving known-good behavior first, then run focused `TestItemRunner` filters before full-suite reruns.
