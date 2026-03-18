@@ -108,7 +108,7 @@ end
 
 @testitem "NFFTOp (CUDA)" tags = [:nfft, :gpu, :cuda] setup = [TestUtils] begin
     using NFFTOperators, Random
-    b = get_backend(:cuda)
+    b = backend_by_tag(:cuda)
     if b === nothing
         @test_skip "CUDA not functional"
     else
@@ -126,7 +126,7 @@ end
 
 @testitem "NFFTOp (AMDGPU)" tags = [:nfft, :gpu, :amdgpu] setup = [TestUtils] begin
     using NFFTOperators, Random
-    b = get_backend(:amdgpu)
+    b = backend_by_tag(:amdgpu)
     if b === nothing
         @test_skip "AMDGPU not functional"
     else

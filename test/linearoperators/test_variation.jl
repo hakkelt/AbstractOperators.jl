@@ -9,10 +9,8 @@
         test_op(op, conv(randn(n, m)), conv(randn(n * m, 2)), verb)
     end
 
-    for (name, conv) in GPU_CONV_FUNCTIONS
-        begin # formerly @testset "$name"
-            test_variation_mul(conv, conv == identity && verb)
-        end
+    for (name, _, conv) in active_backends()
+        test_variation_mul(conv, name == "CPU" && verb)
     end
 
     for threaded in (false, true)

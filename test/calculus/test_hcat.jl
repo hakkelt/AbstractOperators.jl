@@ -254,58 +254,57 @@
     verb && println(size(J, 1))
     y, grad = test_NLop(opP, xp, r, verb)
 
-    # Test HCAT constructor error paths
-    begin # formerly @testset "HCAT constructor errors"
-        # DimensionMismatch: operators with different codomain dimensions
-        A1 = MatrixOp(randn(4, 3))
-        A2 = MatrixOp(randn(5, 2))  # Different codomain dimension (5 vs 4)
-        @test_throws DimensionMismatch HCAT(A1, A2)
+end
 
-        # codomain_type mismatch: real vs complex
-        A1 = MatrixOp(randn(4, 3))
-        A2 = MatrixOp(randn(ComplexF64, 4, 2))
-        @test_throws Exception HCAT(A1, A2)
-    end
+@testitem "HCAT constructor errors" tags = [:calculus, :HCAT] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
 
-    # Test HCAT with nested HCAT (flattening behavior)
-    begin # formerly @testset "HCAT flattening"
-        m, n1, n2, n3 = 4, 3, 2, 5
-        A1 = MatrixOp(randn(m, n1))
-        A2 = MatrixOp(randn(m, n2))
-        A3 = MatrixOp(randn(m, n3))
+    A1 = MatrixOp(randn(4, 3))
+    A2 = MatrixOp(randn(5, 2))
+    @test_throws DimensionMismatch HCAT(A1, A2)
 
-        # Create nested HCAT
-        H1 = HCAT(A1, A2)
-        H2 = HCAT(H1, A3)  # This should flatten
+    A1 = MatrixOp(randn(4, 3))
+    A2 = MatrixOp(randn(ComplexF64, 4, 2))
+    @test_throws Exception HCAT(A1, A2)
+end
 
-        # Test that it works correctly
-        x1, x2, x3 = randn(n1), randn(n2), randn(n3)
-        y = H2 * ArrayPartition(x1, x2, x3)
-        y_expected = A1 * x1 + A2 * x2 + A3 * x3
-        @test norm(y - y_expected) < 1.0e-12
+@testitem "HCAT flattening" tags = [:calculus, :HCAT] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
 
-        # Test adjoint also works
-        y_test = randn(m)
-        x_adj = H2' * y_test
-        @test length(x_adj.x) == 3  # ArrayPartition has .x field
+    m, n1, n2, n3 = 4, 3, 2, 5
+    A1 = MatrixOp(randn(m, n1))
+    A2 = MatrixOp(randn(m, n2))
+    A3 = MatrixOp(randn(m, n3))
+    H1 = HCAT(A1, A2)
+    H2 = HCAT(H1, A3)
 
-        # More complex nesting: HCAT(HCAT(...), HCAT(...))
-        H3 = HCAT(A1, A2)
-        H4 = HCAT(A2, A3)
-        H5 = HCAT(H3, H4)  # Should flatten all
+    x1, x2, x3 = randn(n1), randn(n2), randn(n3)
+    y = H2 * ArrayPartition(x1, x2, x3)
+    y_expected = A1 * x1 + A2 * x2 + A3 * x3
+    @test norm(y - y_expected) < 1.0e-12
 
-        x_full = ArrayPartition(x1, x2, x2, x3)
-        y2 = H5 * x_full
-        y2_expected = A1 * x1 + A2 * x2 + A2 * x2 + A3 * x3
-        @test norm(y2 - y2_expected) < 1.0e-12
-    end
+    y_test = randn(m)
+    x_adj = H2' * y_test
+    @test length(x_adj.x) == 3
 
-    # Test single operator HCAT (should return the operator itself)
-    begin # formerly @testset "HCAT single operator"
-        A = MatrixOp(randn(4, 3))
-        H_single = HCAT(A)
-        @test H_single === A  # Should return the same operator
-    end
+    H3 = HCAT(A1, A2)
+    H4 = HCAT(A2, A3)
+    H5 = HCAT(H3, H4)
+    x_full = ArrayPartition(x1, x2, x2, x3)
+    y2 = H5 * x_full
+    y2_expected = A1 * x1 + A2 * x2 + A2 * x2 + A3 * x3
+    @test norm(y2 - y2_expected) < 1.0e-12
+end
+
+@testitem "HCAT single operator" tags = [:calculus, :HCAT] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
+
+    A = MatrixOp(randn(4, 3))
+    H_single = HCAT(A)
+    @test H_single === A
 end
 
 @testitem "HCAT (GPU)" tags = [:gpu, :calculus, :HCAT] setup=[TestUtils] begin

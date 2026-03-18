@@ -10,10 +10,8 @@
         test_op(op, conv(randn(n, m)), conv(randn(n)), verb)
     end
 
-    for (name, conv) in GPU_CONV_FUNCTIONS
-        begin # formerly @testset "$name"
-            test_lmatrixop_mul(conv, conv == identity && verb)
-        end
+    for (name, _, conv) in active_backends()
+        test_lmatrixop_mul(conv, name == "CPU" && verb)
     end
 
     n, m = 5, 6

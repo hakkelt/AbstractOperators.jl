@@ -12,10 +12,8 @@
         @test to_cpu(y1) == zeros(Float64, m)
     end
 
-    for (name, conv) in GPU_CONV_FUNCTIONS
-        begin # formerly @testset "$name"
-            test_zeros_mul(conv, conv == identity && verb)
-        end
+    for (name, _, conv) in active_backends()
+        test_zeros_mul(conv, name == "CPU" && verb)
     end
 
     n = (3, 4)

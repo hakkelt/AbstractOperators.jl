@@ -269,79 +269,77 @@
     Y = (opS * x) .* ones(n, l)
     @test norm(Y - y) < 1.0e-8
 
-    # Additional coverage tests
-    begin # formerly @testset "BroadCast error cases and edge paths"
-        m, n = 4, 3
-        A = MatrixOp(randn(m, n))
+end
 
-        # Error: dim_out that doesn't match broadcast rules
-        @test_throws DimensionMismatch BroadCast(A, (2,))
+@testitem "BroadCast error cases and edge paths" tags = [:calculus, :BroadCast] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
 
-        # NoOperatorBroadCast equality
-        E1 = Eye(3)
-        E2 = Eye(3)
-        B1 = BroadCast(E1, (3, 2); threaded = false)
-        B2 = BroadCast(E2, (3, 2); threaded = false)
-        B3 = BroadCast(E1, (3, 3); threaded = false)
-        @test B1 == B2
-        @test B1 != B3
+    m, n = 4, 3
+    A = MatrixOp(randn(m, n))
+    @test_throws DimensionMismatch BroadCast(A, (2,))
 
-        # opnorm for OperatorBroadCast
-        @test AbstractOperators.has_fast_opnorm(B1) == AbstractOperators.has_fast_opnorm(E1)
-        A_op = MatrixOp(randn(3, 2))
-        B_op = BroadCast(A_op, (3, 4); threaded = false)
-        @test opnorm(B_op) ≈ opnorm(A_op)
+    E1 = Eye(3)
+    E2 = Eye(3)
+    B1 = BroadCast(E1, (3, 2); threaded = false)
+    B2 = BroadCast(E2, (3, 2); threaded = false)
+    B3 = BroadCast(E1, (3, 3); threaded = false)
+    @test B1 == B2
+    @test B1 != B3
 
-        if Threads.nthreads() > 1
-            B_op_t = BroadCast(A_op, (3, 4); threaded = true)
-            @test opnorm(B_op_t) ≈ opnorm(A_op)
-        end
+    @test AbstractOperators.has_fast_opnorm(B1) == AbstractOperators.has_fast_opnorm(E1)
+    A_op = MatrixOp(randn(3, 2))
+    B_op = BroadCast(A_op, (3, 4); threaded = false)
+    @test opnorm(B_op) ≈ opnorm(A_op)
 
-        # wrong output size
-        A = DiagOp(rand(4, 3, 2))
-        @test_throws ErrorException BroadCast(A, (4, 2))
+    if Threads.nthreads() > 1
+        B_op_t = BroadCast(A_op, (3, 4); threaded = true)
+        @test opnorm(B_op_t) ≈ opnorm(A_op)
     end
 
-    begin # formerly @testset "Threaded NoOperatorBroadCast"
-        if Threads.nthreads() > 1
-            m = 1000
-            E = Eye(m)
-            B_threaded = BroadCast(E, (m, 100); threaded = true)
-            @test B_threaded isa AbstractOperators.NoOperatorBroadCast
+    A = DiagOp(rand(4, 3, 2))
+    @test_throws ErrorException BroadCast(A, (4, 2))
+end
 
-            x = randn(m)
-            y = B_threaded * x
+@testitem "Threaded NoOperatorBroadCast" tags = [:calculus, :BroadCast] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
 
-            for i in 1:100
-                @test y[:, i] ≈ x
-            end
-
-            y_adj = randn(m, 100)
-            x_back = B_threaded' * y_adj
-            @test x_back ≈ dropdims(sum(y_adj, dims = 2), dims = 2)
+    if Threads.nthreads() > 1
+        m = 1000
+        E = Eye(m)
+        B_threaded = BroadCast(E, (m, 100); threaded = true)
+        @test B_threaded isa AbstractOperators.NoOperatorBroadCast
+        x = randn(m)
+        y = B_threaded * x
+        for i in 1:100
+            @test y[:, i] ≈ x
         end
+        y_adj = randn(m, 100)
+        x_back = B_threaded' * y_adj
+        @test x_back ≈ dropdims(sum(y_adj, dims = 2), dims = 2)
     end
+end
 
-    begin # formerly @testset "Non-compact threaded OperatorBroadCast"
-        if Threads.nthreads() > 1
-            m, n = 3, 2
-            A = reshape(MatrixOp(randn(m, n)), 1, m)
-            dim_out = (4, m, 5)
-            B_noncompact = BroadCast(A, dim_out; threaded = true)
+@testitem "Non-compact threaded OperatorBroadCast" tags = [:calculus, :BroadCast] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
 
-            x = randn(n)
-            y = B_noncompact * x
-
-            ref = A * x
-            for i in 1:4, j in 1:5
-                @test y[i, :, j] ≈ vec(ref)
-            end
-
-            y_test = randn(dim_out)
-            x_back = B_noncompact' * y_test
-            @test size(x_back) == (n,)
-            @test x_back ≈ A' * dropdims(sum(y_test, dims = (1, 3)), dims = 3)
+    if Threads.nthreads() > 1
+        m, n = 3, 2
+        A = reshape(MatrixOp(randn(m, n)), 1, m)
+        dim_out = (4, m, 5)
+        B_noncompact = BroadCast(A, dim_out; threaded = true)
+        x = randn(n)
+        y = B_noncompact * x
+        ref = A * x
+        for i in 1:4, j in 1:5
+            @test y[i, :, j] ≈ vec(ref)
         end
+        y_test = randn(dim_out)
+        x_back = B_noncompact' * y_test
+        @test size(x_back) == (n,)
+        @test x_back ≈ A' * dropdims(sum(y_test, dims = (1, 3)), dims = 3)
     end
 end
 

@@ -463,7 +463,7 @@ end
 
 @testitem "DFT/RDFT/IRDFT (CUDA)" tags = [:fftw, :gpu, :cuda] setup=[TestUtils] begin
     using FFTWOperators, Random
-    b = get_backend(:cuda)
+    b = backend_by_tag(:cuda)
     if b === nothing
         @test_skip "CUDA not functional"
     else
@@ -492,7 +492,7 @@ end
 
 @testitem "DFT/RDFT/IRDFT (AMDGPU)" tags = [:fftw, :gpu, :amdgpu] setup=[TestUtils] begin
     using FFTWOperators, Random
-    b = get_backend(:amdgpu)
+    b = backend_by_tag(:amdgpu)
     if b === nothing
         @test_skip "AMDGPU not functional"
     else

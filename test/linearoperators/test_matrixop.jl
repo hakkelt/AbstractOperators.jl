@@ -14,10 +14,8 @@
         test_op(op, conv(randn(m) + im * randn(m)), conv(randn(n) + im * randn(n)), verb)
     end
 
-    for (name, conv) in GPU_CONV_FUNCTIONS
-        begin # formerly @testset "$name"
-            test_matrixop_mul(conv, conv == identity && verb)
-        end
+    for (name, _, conv) in active_backends()
+        test_matrixop_mul(conv, name == "CPU" && verb)
     end
 
     # real matrix, real input

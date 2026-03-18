@@ -6,58 +6,66 @@ using RecursiveArrayTools: ArrayPartition
 using LinearAlgebra
 using Random
 using JLArrays
+try
+    import CUDA
+catch
+end
+try
+    import AMDGPU
+catch
+end
 
 export verb, test_op, test_NLop, gradient_fd, ArrayPartition, norm, dot, diag, opnorm
-export jl, to_cpu, GPU_CONV_FUNCTIONS, test_NLop_gpu
-export ALL_BACKENDS, GPU_BACKENDS, GPU_BACKENDS_TAGGED, HAS_CUDA, HAS_AMDGPU, true_gpu_backends, get_backend
+export jl, to_cpu, test_NLop_gpu
+export CPU_BACKEND, JLARRAY_BACKEND, CUDA_BACKEND, AMDGPU_BACKEND
+export ALL_BACKENDS, GPU_BACKENDS, GPU_BACKENDS_TAGGED, HAS_CUDA, HAS_AMDGPU
+export active_backends, active_gpu_backends, backend_by_tag
+export has_cuda_backend, has_amdgpu_backend
+export assert_cpu_approx, assert_adjoint_invariant
 
-const verb = false
+const verb = get(ENV, "ABSTRACTOPERATORS_TEST_VERBOSE", "false") == "true"
 
 to_cpu(x::AbstractArray) = collect(x)
 to_cpu(x::RecursiveArrayTools.ArrayPartition) = RecursiveArrayTools.ArrayPartition(collect.(x.x)...)
 
-const GPU_CONV_FUNCTIONS = [("CPU", identity), ("GPU (JLArray)", jl)]
-const ALL_BACKENDS = Tuple{String, Function}[("CPU", identity), ("JLArray", jl)]
+const HAS_CUDA = (@isdefined CUDA) && CUDA.functional()
+const HAS_AMDGPU = (@isdefined AMDGPU) && AMDGPU.functional()
 
-const HAS_CUDA = Ref(false)
-const HAS_AMDGPU = Ref(false)
+const CPU_BACKEND = ("CPU", :cpu, identity)
+const JLARRAY_BACKEND = ("JLArray", :jlarray, jl)
+const CUDA_BACKEND = ("CuArray", :cuda, x -> CUDA.cu(x))
+const AMDGPU_BACKEND = ("ROCArray", :amdgpu, x -> AMDGPU.ROCArray(x))
 
-# GPU_BACKENDS: (name, conversion_fn) for existing tests.
-const GPU_BACKENDS = Tuple{String, Function}[("JLArray", jl)]
-# GPU_BACKENDS_TAGGED: (name, tag, conversion_fn) for backend-aware test dispatch.
-const GPU_BACKENDS_TAGGED = Tuple{String, Symbol, Function}[("JLArray", :jlarray, jl)]
-
-function __init__()
-    try
-        cuda = Base.require(Main, :CUDA)
-        if cuda.functional()
-            HAS_CUDA[] = true
-            push!(GPU_BACKENDS, ("CuArray", cuda.cu))
-            push!(GPU_BACKENDS_TAGGED, ("CuArray", :cuda, cuda.cu))
-            push!(ALL_BACKENDS, ("CuArray", cuda.cu))
-        end
-    catch
-    end
-    try
-        amdgpu = Base.require(Main, :AMDGPU)
-        if amdgpu.functional()
-            HAS_AMDGPU[] = true
-            push!(GPU_BACKENDS, ("ROCArray", amdgpu.ROCArray))
-            push!(GPU_BACKENDS_TAGGED, ("ROCArray", :amdgpu, amdgpu.ROCArray))
-            push!(ALL_BACKENDS, ("ROCArray", amdgpu.ROCArray))
-        end
-    catch
-    end
+const ALL_BACKENDS = begin
+    backends = Any[CPU_BACKEND, JLARRAY_BACKEND]
+    HAS_CUDA && push!(backends, CUDA_BACKEND)
+    HAS_AMDGPU && push!(backends, AMDGPU_BACKEND)
+    Tuple(backends)
 end
 
-true_gpu_backends() = filter(b -> b[2] in (:cuda, :amdgpu), GPU_BACKENDS_TAGGED)
-function get_backend(tag::Symbol)
-    for (name, backend_tag, conv) in GPU_BACKENDS_TAGGED
-        if backend_tag == tag
-            return (name, backend_tag, conv)
-        end
+const GPU_BACKENDS_TAGGED = filter(b -> b[2] != :cpu, ALL_BACKENDS)
+const GPU_BACKENDS = map(b -> (b[1], b[3]), GPU_BACKENDS_TAGGED)
+
+active_backends() = ALL_BACKENDS
+active_gpu_backends() = GPU_BACKENDS_TAGGED
+has_cuda_backend() = HAS_CUDA
+has_amdgpu_backend() = HAS_AMDGPU
+
+function backend_by_tag(tag::Symbol)
+    for backend in ALL_BACKENDS
+        backend[2] == tag && return backend
     end
     return nothing
+end
+
+function assert_cpu_approx(x, y; atol = 1.0e-8)
+    @test norm(to_cpu(x) .- to_cpu(y)) <= atol
+end
+
+function assert_adjoint_invariant(x, Ax, y, Acy; atol = 1.0e-8)
+    s1 = real(dot(to_cpu(Ax), to_cpu(y)))
+    s2 = real(dot(to_cpu(x), to_cpu(Acy)))
+    @test abs(s1 - s2) < atol
 end
 
 function test_NLop_gpu(A::AbstractOperator, x, y, verb::Bool = false)
@@ -66,7 +74,7 @@ function test_NLop_gpu(A::AbstractOperator, x, y, verb::Bool = false)
     Ax = A * x
     Ax2 = similar(Ax)
     mul!(Ax2, A, x)
-    @test norm(to_cpu(Ax) .- to_cpu(Ax2)) <= 1.0e-8
+    assert_cpu_approx(Ax, Ax2)
 
     @test_throws ErrorException A'
 
@@ -75,7 +83,7 @@ function test_NLop_gpu(A::AbstractOperator, x, y, verb::Bool = false)
     mul!(Ax2, A, x)  # redo forward
     grad2 = similar(grad)
     mul!(grad2, J', y)
-    @test norm(to_cpu(grad) .- to_cpu(grad2)) < 1.0e-8
+    assert_cpu_approx(grad, grad2; atol = 1.0e-8)
 
     return Ax, grad
 end
@@ -90,7 +98,7 @@ function test_op(A::AbstractOperator, x, y, verb::Bool = false)
     mul!(Ax2, A, x) #verify in-place linear operator works
     verb && @time mul!(Ax2, A, x)
 
-    @test norm(to_cpu(Ax) .- to_cpu(Ax2)) <= 1.0e-8
+    assert_cpu_approx(Ax, Ax2)
 
     Acy = A' * y
     Acy2 = similar(Acy)
@@ -99,11 +107,8 @@ function test_op(A::AbstractOperator, x, y, verb::Bool = false)
     mul!(Acy2, At, y) #verify in-place linear operator works
     verb && @time mul!(Acy2, At, y)
 
-    @test norm(to_cpu(Acy) .- to_cpu(Acy2)) <= 1.0e-8
-
-    s1 = real(dot(to_cpu(Ax2), to_cpu(y)))
-    s2 = real(dot(to_cpu(x), to_cpu(Acy2)))
-    @test abs(s1 - s2) < 1.0e-8
+    assert_cpu_approx(Acy, Acy2)
+    assert_adjoint_invariant(x, Ax2, y, Acy2)
 
     return Ax
 end
