@@ -1,4 +1,5 @@
 @testitem "Syntax" tags = [:misc, :Syntax] setup = [TestUtils] begin
+    using AbstractOperators
     verb && println(" --- Testing Syntax --- ")
     ###### ' ######
     n, m = 5, 3

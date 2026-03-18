@@ -98,3 +98,30 @@
     @test Axt_mul_Bx(A, B) == Axt_mul_Bx(A, B)
     @test Jacobian(Axt_mul_Bx(A, B), x) == Jacobian(Axt_mul_Bx(A, B), x)
 end
+
+@testitem "Axt_mul_Bx (GPU)" tags = [:gpu, :calculus, :Axt_mul_Bx] setup=[TestUtils] begin
+    using Random, AbstractOperators, JLArrays, LinearAlgebra
+    Random.seed!(0)
+
+    n, m = 3, 4
+    AL = jl(randn(n, m))
+    BL = jl(randn(n, m))
+    A, B = MatrixOp(AL), MatrixOp(BL)
+    P = Axt_mul_Bx(A, B)
+    x = jl(randn(m))
+    y = jl(zeros(1))
+    mul!(y, P, x)
+    Acpu, Bcpu, xcpu = Array(AL), Array(BL), Array(x)
+    @test Array(y)[1] ≈ dot(Acpu * xcpu, Bcpu * xcpu)
+
+    # matrix case
+    n, m, l = 3, 5, 4
+    A2, B2 = MatrixOp(jl(randn(n, m)), l), MatrixOp(jl(randn(n, m)), l)
+    P2 = Axt_mul_Bx(A2, B2)
+    x2 = jl(randn(m, l))
+    y2 = jl(zeros(l, l))
+    mul!(y2, P2, x2)
+    Ax = Array(A2.A) * Array(x2)
+    Bx = Array(B2.A) * Array(x2)
+    @test Array(y2) ≈ Ax' * Bx
+end

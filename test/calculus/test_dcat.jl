@@ -191,3 +191,28 @@
     Y = ArrayPartition(A * x.x[1], B * x.x[2])
     @test norm(Y - y) < 1.0e-8
 end
+
+@testitem "DCAT (GPU)" tags = [:gpu, :calculus, :DCAT] setup=[TestUtils] begin
+    using Random, AbstractOperators, JLArrays
+    Random.seed!(0)
+
+    n1, n2 = 3, 4
+    opD = DCAT(DiagOp(jl(ones(n1))), DiagOp(jl(2 * ones(n2))))
+    test_op(
+        opD,
+        ArrayPartition(jl(randn(n1)), jl(randn(n2))),
+        ArrayPartition(jl(randn(n1)), jl(randn(n2))),
+        false,
+    )
+
+    m1, n1, m2, n2 = 4, 7, 5, 2
+    A1 = jl(randn(m1, n1))
+    A2 = jl(randn(m2, n2))
+    opD2 = DCAT(MatrixOp(A1), MatrixOp(A2))
+    test_op(
+        opD2,
+        ArrayPartition(jl(randn(n1)), jl(randn(n2))),
+        ArrayPartition(jl(randn(m1)), jl(randn(m2))),
+        false,
+    )
+end

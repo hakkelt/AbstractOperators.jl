@@ -1,5 +1,6 @@
 @testitem "CR: AffineAdd Combinations" tags = [:calculus, :CombinationRules] begin
     using LinearAlgebra
+    using AbstractOperators
     using AbstractOperators: can_be_combined, combine
 
     n = 5
@@ -39,6 +40,7 @@ end
 
 @testitem "CR: Compose Combinations" tags = [:calculus, :CombinationRules] begin
     using LinearAlgebra
+    using AbstractOperators
     using AbstractOperators: can_be_combined, combine
 
     n = 3
@@ -86,6 +88,7 @@ end
 
 @testitem "CR: DCAT Combinations" tags = [:calculus, :CombinationRules] begin
     using LinearAlgebra
+    using AbstractOperators
     using AbstractOperators: can_be_combined, combine
 
     n = 4
@@ -105,6 +108,7 @@ end
 
 @testitem "CR: HCAT Combinations" tags = [:calculus, :CombinationRules] begin
     using LinearAlgebra
+    using AbstractOperators
     using AbstractOperators: can_be_combined, combine
 
     n = 3
@@ -126,6 +130,7 @@ end
 
 @testitem "CR: Scale+Matrix Combinations" tags = [:calculus, :CombinationRules] begin
     using LinearAlgebra
+    using AbstractOperators
     using AbstractOperators: can_be_combined, combine
 
     n = 4
@@ -180,6 +185,7 @@ end
 
 @testitem "CR: Sum Combinations" tags = [:calculus, :CombinationRules] begin
     using LinearAlgebra
+    using AbstractOperators
     using AbstractOperators: can_be_combined, combine
 
     n = 3
@@ -199,6 +205,7 @@ end
 
 @testitem "CR: MatrixOp Combinations" tags = [:calculus, :CombinationRules] begin
     using LinearAlgebra
+    using AbstractOperators
     using AbstractOperators: can_be_combined, combine
 
     n = 4
@@ -233,6 +240,7 @@ end
 
 @testitem "CR: Scale+Eye/DiagOp Combinations" tags = [:calculus, :CombinationRules] begin
     using LinearAlgebra
+    using AbstractOperators
     using AbstractOperators: can_be_combined, combine
 
     n = 3
@@ -267,6 +275,7 @@ end
 
 @testitem "CR: Zeros Combinations" tags = [:calculus, :CombinationRules] begin
     using LinearAlgebra
+    using AbstractOperators
     using AbstractOperators: can_be_combined, combine
 
     n = 4
@@ -310,6 +319,7 @@ end
 
 @testitem "CR: DiagOp Combinations" tags = [:calculus, :CombinationRules] begin
     using LinearAlgebra
+    using AbstractOperators
     using AbstractOperators: can_be_combined, combine
 
     n = 5
@@ -343,6 +353,7 @@ end
 
 @testitem "CR: Eye Combinations" tags = [:calculus, :CombinationRules] begin
     using LinearAlgebra
+    using AbstractOperators
     using AbstractOperators: can_be_combined, combine
 
     n = 4
@@ -374,6 +385,7 @@ end
 
 @testitem "CR: Mixed Combinations" tags = [:calculus, :CombinationRules] begin
     using LinearAlgebra
+    using AbstractOperators
     using AbstractOperators: can_be_combined, combine
 
     # Helper square matrices
@@ -575,6 +587,7 @@ end
 
 @testitem "CR: Fallback and Null cases" tags = [:calculus, :CombinationRules] begin
     using LinearAlgebra
+    using AbstractOperators
     using AbstractOperators: can_be_combined, combine
 
     # Fallback combine path should error for unsupported nonlinear pair

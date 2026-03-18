@@ -89,3 +89,19 @@
 
     @test opA1' == opA1'
 end
+
+@testitem "AdjointOperator (GPU)" tags = [:gpu, :calculus, :AdjointOperator] setup=[TestUtils] begin
+    using Random, AbstractOperators, JLArrays
+    Random.seed!(0)
+
+    # Construct from GPU arrays to get GPU storage type
+    n = 5
+    op = FiniteDiff(jl(zeros(Float64, n)))
+    opT = AdjointOperator(op)
+    test_op(opT, jl(randn(n - 1)), jl(randn(n)), false)
+
+    n = 4
+    op = DiagOp(jl(randn(n)))
+    opT = AdjointOperator(op)
+    test_op(opT, jl(randn(n)), jl(randn(n)), false)
+end

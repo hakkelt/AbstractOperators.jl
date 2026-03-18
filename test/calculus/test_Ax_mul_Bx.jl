@@ -101,3 +101,21 @@
     @test Ax_mul_Bx(A, B) == Ax_mul_Bx(A, B)
     @test Jacobian(Ax_mul_Bx(A, B), x) == Jacobian(Ax_mul_Bx(A, B), x)
 end
+
+@testitem "Ax_mul_Bx (GPU)" tags = [:gpu, :calculus, :Ax_mul_Bx] setup=[TestUtils] begin
+    using Random, AbstractOperators, JLArrays
+    Random.seed!(0)
+
+    # Use GPU-typed Eye so forward output is GPU
+    n = 3
+    P = Ax_mul_Bx(Eye(Float64, (n, n), JLArray{Float64}), Eye(Float64, (n, n), JLArray{Float64}))
+    x = jl(randn(n, n))
+    r = jl(randn(n, n))
+    test_NLop_gpu(P, x, r, false)
+
+    n2 = 3
+    P2 = Ax_mul_Bx(Sin(jl(zeros(n2, n2))), Cos(jl(zeros(n2, n2))))
+    x2 = jl(randn(n2, n2))
+    r2 = jl(randn(n2, n2))
+    test_NLop_gpu(P2, x2, r2, false)
+end

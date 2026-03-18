@@ -1,7 +1,24 @@
-@testitem "GetIndex" tags = [:linearoperator, :GetIndex] setup = [TestUtils] begin
-    using Random, LinearAlgebra, AbstractOperators
+@testitem "GetIndex" tags = [:linearoperator, :GetIndex] setup=[TestUtils] begin
+    using Random, LinearAlgebra, AbstractOperators, JLArrays
     Random.seed!(0)
     verb && println(" --- Testing GetIndex --- ")
+
+    function test_getindex_mul(conv, verb)
+        n, k = 5, 3
+        op = GetIndex(conv(zeros(Float64, n)), (1:k,))
+        test_op(op, conv(randn(n)), conv(randn(k)), verb)
+
+        n, m = 5, 4
+        k = 3
+        op = GetIndex(conv(zeros(Float64, n, m)), (1:k, :))
+        test_op(op, conv(randn(n, m)), conv(randn(k, m)), verb)
+    end
+
+    for (name, conv) in GPU_CONV_FUNCTIONS
+        @testset "$name" begin
+            test_getindex_mul(conv, conv == identity && verb)
+        end
+    end
 
     n, m = 5, 4
     k = 3

@@ -1,7 +1,19 @@
-@testitem "Variation" tags = [:linearoperator, :Variation] setup = [TestUtils] begin
-    using Random, SparseArrays, LinearAlgebra, AbstractOperators
+@testitem "Variation" tags = [:linearoperator, :Variation] setup=[TestUtils] begin
+    using Random, SparseArrays, LinearAlgebra, AbstractOperators, JLArrays
     Random.seed!(0)
     verb && println(" --- Testing Variation --- ")
+
+    function test_variation_mul(conv, verb)
+        n, m = 10, 5
+        op = Variation(conv(zeros(Float64, n, m)); threaded = false)
+        test_op(op, conv(randn(n, m)), conv(randn(n * m, 2)), verb)
+    end
+
+    for (name, conv) in GPU_CONV_FUNCTIONS
+        @testset "$name" begin
+            test_variation_mul(conv, conv == identity && verb)
+        end
+    end
 
     for threaded in (false, true)
         n, m = 10, 5

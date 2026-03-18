@@ -307,3 +307,18 @@
         @test H_single === A  # Should return the same operator
     end
 end
+
+@testitem "HCAT (GPU)" tags = [:gpu, :calculus, :HCAT] setup=[TestUtils] begin
+    using Random, AbstractOperators, JLArrays
+    Random.seed!(0)
+
+    n = 4
+    opH = HCAT(DiagOp(jl(ones(n))), DiagOp(jl(2 * ones(n))))
+    test_op(opH, ArrayPartition(jl(randn(n)), jl(randn(n))), jl(randn(n)), false)
+
+    m, n1, n2 = 4, 7, 5
+    A1 = jl(randn(m, n1))
+    A2 = jl(randn(m, n2))
+    opH2 = HCAT(MatrixOp(A1), MatrixOp(A2))
+    test_op(opH2, ArrayPartition(jl(randn(n1)), jl(randn(n2))), jl(randn(m)), false)
+end

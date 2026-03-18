@@ -155,3 +155,132 @@ end
     @test is_full_row_rank(op) == true
     @test is_full_column_rank(op) == true
 end
+
+@testitem "Conv (GPU)" tags = [:dsp, :gpu, :Conv] setup=[TestUtils] begin
+    using DSPOperators, DSP, LinearAlgebra, Random
+    Random.seed!(0)
+
+    for (backend_name, conv) in GPU_BACKENDS
+        n, m = 20, 6
+        h_cpu = randn(m)
+        x_cpu = randn(n)
+        h = conv(h_cpu)
+
+        # Construct operator natively with GPU array h — plans are created on the appropriate device
+        op = Conv(Float64, (n,), h)
+        x = conv(x_cpu)
+        y = conv(zeros(n + m - 1))
+        mul!(y, op, x)
+
+        # Reference on CPU
+        op_cpu = Conv(Float64, (n,), h_cpu)
+        y_cpu = zeros(n + m - 1)
+        mul!(y_cpu, op_cpu, x_cpu)
+
+        @test collect(y) ≈ y_cpu  atol=1e-10  # "$backend_name"
+
+        # Adjoint
+        b_cpu = randn(n + m - 1)
+        b = conv(b_cpu)
+        z = conv(zeros(n))
+        z_cpu = zeros(n)
+        mul!(z_cpu, op_cpu', b_cpu)
+        mul!(z, op', b)
+        @test collect(z) ≈ z_cpu  atol=1e-10
+    end
+end
+
+@testitem "Xcorr (GPU)" tags = [:dsp, :gpu, :Xcorr] setup=[TestUtils] begin
+    using DSPOperators, DSP, LinearAlgebra, Random
+    Random.seed!(0)
+
+    for (backend_name, conv) in GPU_BACKENDS
+        n, m = 15, 5
+        h_cpu = randn(m)
+        x_cpu = randn(n)
+        h = conv(h_cpu)
+        outlen = 2 * max(n, m) - 1
+
+        op = Xcorr(Float64, (n,), h)
+        x = conv(x_cpu)
+        y = conv(zeros(outlen))
+        mul!(y, op, x)
+
+        op_cpu = Xcorr(Float64, (n,), h_cpu)
+        y_cpu = zeros(outlen)
+        mul!(y_cpu, op_cpu, x_cpu)
+
+        @test collect(y) ≈ y_cpu  atol=1e-10
+
+        # Adjoint
+        b_cpu = randn(outlen)
+        b = conv(b_cpu)
+        z = conv(zeros(n))
+        z_cpu = zeros(n)
+        mul!(z_cpu, op_cpu', b_cpu)
+        mul!(z, op', b)
+        @test collect(z) ≈ z_cpu  atol=1e-10
+    end
+end
+
+@testitem "Filt (GPU, FIR)" tags = [:dsp, :gpu, :Filt] setup=[TestUtils] begin
+    using DSPOperators, DSP, LinearAlgebra, Random
+    Random.seed!(42)
+
+    for (backend_name, conv) in GPU_BACKENDS
+        n = 20
+        b = randn(5)
+        x_cpu = randn(n)
+
+        # FIR operator (a=[1.0])
+        op_cpu = Filt(Float64, (n,), b)
+        y_cpu = zeros(n)
+        mul!(y_cpu, op_cpu, x_cpu)
+
+        x = conv(x_cpu)
+        y = conv(zeros(n))
+        op = Filt(Float64, (n,), b)
+        mul!(y, op, x)
+        @test collect(y) ≈ y_cpu  atol=1e-10
+
+        # Adjoint
+        r_cpu = randn(n)
+        z_cpu = zeros(n)
+        mul!(z_cpu, op_cpu', r_cpu)
+        r = conv(r_cpu)
+        z = conv(zeros(n))
+        mul!(z, op', r)
+        @test collect(z) ≈ z_cpu  atol=1e-10
+    end
+end
+
+@testitem "MIMOFilt (GPU, FIR)" tags = [:dsp, :gpu, :MIMOFilt] setup=[TestUtils] begin
+    using DSPOperators, DSP, LinearAlgebra, Random
+    Random.seed!(7)
+
+    for (backend_name, conv) in GPU_BACKENDS
+        m, n = 10, 3
+        b = [randn(5), randn(3), randn(4), randn(5), randn(3), randn(4)]
+        a = [[1.0] for _ in b]
+
+        op_cpu = MIMOFilt(Float64, (m, n), b, a)
+        x_cpu = randn(m, n)
+        y_cpu = zeros(m, 2)
+        mul!(y_cpu, op_cpu, x_cpu)
+
+        x = conv(x_cpu)
+        y = conv(zeros(m, 2))
+        op = MIMOFilt(Float64, (m, n), b, a)
+        mul!(y, op, x)
+        @test collect(y) ≈ y_cpu  atol=1e-10
+
+        # Adjoint
+        r_cpu = randn(m, 2)
+        z_cpu = zeros(m, n)
+        mul!(z_cpu, op_cpu', r_cpu)
+        r = conv(r_cpu)
+        z = conv(zeros(m, n))
+        mul!(z, op', r)
+        @test collect(z) ≈ z_cpu  atol=1e-10
+    end
+end

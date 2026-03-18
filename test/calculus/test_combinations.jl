@@ -351,3 +351,18 @@
     y, grad = test_NLop(T, x, r, verb)
     @test norm(y - (sin.(exp.(x + d1) - d2) .+ d3)) < 1.0e-8
 end
+
+@testitem "Combinations (GPU)" tags = [:gpu, :calculus, :Combinations] setup=[TestUtils] begin
+    using Random, AbstractOperators, JLArrays
+    Random.seed!(0)
+
+    # Compose of HCAT with GPU matrices
+    m1, m2, m3, m4 = 4, 7, 3, 2
+    A1 = jl(randn(m3, m1))
+    A2 = jl(randn(m3, m2))
+    A3 = jl(randn(m4, m3))
+    opH = HCAT(MatrixOp(A1), MatrixOp(A2))
+    opC = Compose(MatrixOp(A3), opH)
+    x1, x2 = jl(randn(m1)), jl(randn(m2))
+    test_op(opC, ArrayPartition(x1, x2), jl(randn(m4)), false)
+end

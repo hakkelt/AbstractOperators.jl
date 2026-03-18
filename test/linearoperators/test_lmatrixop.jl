@@ -1,7 +1,20 @@
-@testitem "LMatrixOp" tags = [:linearoperator, :LMatrixOp] setup = [TestUtils] begin
-    using Random, AbstractOperators
+@testitem "LMatrixOp" tags = [:linearoperator, :LMatrixOp] setup=[TestUtils] begin
+    using Random, AbstractOperators, JLArrays
     Random.seed!(0)
     verb && println(" --- Testing LMatrixOp --- ")
+
+    function test_lmatrixop_mul(conv, verb)
+        n, m = 5, 6
+        b = randn(m)
+        op = LMatrixOp(Float64, (n, m), conv(b))
+        test_op(op, conv(randn(n, m)), conv(randn(n)), verb)
+    end
+
+    for (name, conv) in GPU_CONV_FUNCTIONS
+        @testset "$name" begin
+            test_lmatrixop_mul(conv, conv == identity && verb)
+        end
+    end
 
     n, m = 5, 6
     b = randn(m)

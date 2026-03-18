@@ -1,7 +1,30 @@
-@testitem "FiniteDiff" tags = [:linearoperator, :FiniteDiff] setup = [TestUtils] begin
-    using Random, SparseArrays, AbstractOperators
+@testmodule FiniteDiffTestHelper begin
+using Test, AbstractOperators, LinearAlgebra
+
+export test_finitediff_mul
+
+function test_finitediff_mul(conv, verb, test_op)
+    n = 10
+    op = FiniteDiff(conv(zeros(Float64, n)))
+    test_op(op, conv(randn(n)), conv(randn(n - 1)), verb)
+
+    n, m = 10, 5
+    op = FiniteDiff(conv(zeros(Float64, n, m)))
+    test_op(op, conv(randn(n, m)), conv(randn(n - 1, m)), verb)
+
+    n, m = 10, 5
+    op = FiniteDiff(conv(zeros(Float64, n, m)), 2)
+    test_op(op, conv(randn(n, m)), conv(randn(n, m - 1)), verb)
+end
+
+end  # @testmodule FiniteDiffTestHelper
+
+@testitem "FiniteDiff" tags = [:linearoperator, :FiniteDiff] setup=[TestUtils, FiniteDiffTestHelper] begin
+    using Random, SparseArrays, AbstractOperators, JLArrays
     Random.seed!(0)
     verb && println(" --- Testing FiniteDiff --- ")
+
+    test_finitediff_mul(identity, verb, test_op)
 
     n = 10
     op = FiniteDiff(Float64, (n,))
@@ -126,4 +149,10 @@
     # size correctness for higher-dim
     F3 = FiniteDiff(Float64, (3, 4, 5), 2)
     @test size(F3) == ((3, 3, 5), (3, 4, 5))
+end
+
+@testitem "FiniteDiff (GPU)" tags = [:gpu, :linearoperator, :FiniteDiff] setup=[TestUtils, FiniteDiffTestHelper] begin
+    using Random, AbstractOperators, JLArrays
+    Random.seed!(0)
+    test_finitediff_mul(jl, false, test_op)
 end

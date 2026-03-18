@@ -157,3 +157,29 @@
     @test JJ isa HCAT
     @test length(JJ.A) == 2
 end
+
+@testitem "Jacobian (GPU)" tags = [:gpu, :calculus, :Jacobian] setup=[TestUtils] begin
+    using AbstractOperators, JLArrays
+
+    # Construct Sin from GPU array to get GPU storage type
+    n = 5
+    A = Sin(jl(zeros(n)))
+    x = jl(randn(n))
+    J = Jacobian(A, x)
+    # Test adjoint Jacobian mul! (J' * y is the gradient direction)
+    y = jl(randn(n))
+    grad = J' * y
+    grad2 = similar(grad)
+    mul!(grad2, J', y)
+    @test collect(grad) ≈ collect(grad2)
+
+    # Exp Jacobian adjoint
+    A2 = Exp(jl(zeros(n)))
+    x2 = jl(randn(n))
+    J2 = Jacobian(A2, x2)
+    y2 = jl(randn(n))
+    grad3 = J2' * y2
+    grad4 = similar(grad3)
+    mul!(grad4, J2', y2)
+    @test collect(grad3) ≈ collect(grad4)
+end

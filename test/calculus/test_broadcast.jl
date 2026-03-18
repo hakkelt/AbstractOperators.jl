@@ -344,3 +344,21 @@
         end
     end
 end
+
+@testitem "BroadCast (GPU)" tags = [:gpu, :calculus, :BroadCast] setup=[TestUtils] begin
+    using Random, AbstractOperators, JLArrays
+    Random.seed!(0)
+
+    # threaded=true may conflict with GPU dispatch; test with threaded=false only
+    m, n = 8, 4
+    dim_out = (m, 10)
+    A1 = jl(randn(m, n))
+    opR = BroadCast(MatrixOp(A1), dim_out; threaded=false)
+    test_op(opR, jl(randn(n)), jl(randn(dim_out)), false)
+
+    # Use GPU-typed Eye so NoOperatorBroadCast gets GPU storage
+    m2, n2 = 3, 3
+    dim_out2 = (m2, n2, 5)
+    opR2 = BroadCast(Eye(Float64, (m2, n2), JLArray{Float64}), dim_out2; threaded=false)
+    test_op(opR2, jl(randn(m2, n2)), jl(randn(dim_out2)), false)
+end

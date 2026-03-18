@@ -1,4 +1,5 @@
 @testitem "NFFTOp" tags = [:nfft, :NFFTOp] setup = [TestUtils] begin
+    using AbstractOperators
     using LinearAlgebra, Random, NFFT, NFFTOperators
 
     function test_nufft_op(op, plan, image, dcf)

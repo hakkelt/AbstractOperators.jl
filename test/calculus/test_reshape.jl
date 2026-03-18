@@ -197,3 +197,19 @@
     Y = reshape(opS * x, 2, 2)
     @test norm(Y - y) < 1.0e-8
 end
+
+@testitem "Reshape (GPU)" tags = [:gpu, :calculus, :Reshape] setup=[TestUtils] begin
+    using Random, AbstractOperators, JLArrays
+    Random.seed!(0)
+
+    m, n = 8, 4
+    dim_out = (2, 2, 2)
+    A1 = jl(randn(m, n))
+    opR = Reshape(MatrixOp(A1), dim_out)
+    test_op(opR, jl(randn(n)), jl(randn(dim_out)), false)
+
+    # Reshape of DiagOp
+    n2 = 6
+    opR2 = Reshape(DiagOp(jl(randn(n2))), (2, 3))
+    test_op(opR2, jl(randn(n2)), jl(randn(2, 3)), false)
+end

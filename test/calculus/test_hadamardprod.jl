@@ -105,3 +105,21 @@
     Prd = remove_displacement(Pdisp)
     @test remove_displacement(Prd) == Prd
 end
+
+@testitem "HadamardProd (GPU)" tags = [:gpu, :calculus, :HadamardProd] setup=[TestUtils] begin
+    using AbstractOperators, JLArrays
+
+    # Use GPU-typed Eye so output is GPU
+    n = 3
+    P = HadamardProd(Eye(Float64, (n, n), JLArray{Float64}), Eye(Float64, (n, n), JLArray{Float64}))
+    x = jl(randn(n, n))
+    r = jl(randn(n, n))
+    test_NLop_gpu(P, x, r, false)
+
+    # Sin .* Cos (both element-wise, GPU-typed via array constructor)
+    n2, l = 3, 2
+    P2 = HadamardProd(Sin(jl(zeros(n2, l))), Cos(jl(zeros(n2, l))))
+    x2 = jl(randn(n2, l))
+    r2 = jl(randn(n2, l))
+    test_NLop_gpu(P2, x2, r2, false)
+end

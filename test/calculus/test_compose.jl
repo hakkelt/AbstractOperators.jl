@@ -542,3 +542,19 @@
         end
     end
 end
+
+@testitem "Compose (GPU)" tags = [:gpu, :calculus, :Compose] setup=[TestUtils] begin
+    using Random, AbstractOperators, JLArrays
+    Random.seed!(0)
+
+    # Both operators need matching GPU storage types for Compose
+    m1, m2 = 4, 7
+    A1 = jl(randn(m2, m1))
+    opC = Compose(FiniteDiff(jl(zeros(Float64, m2))), MatrixOp(A1))
+    test_op(opC, jl(randn(m1)), jl(randn(m2 - 1)), false)
+
+    # Chain of DiagOps
+    n = 5
+    opC2 = DiagOp(jl(randn(n))) * DiagOp(jl(randn(n)))
+    test_op(opC2, jl(randn(n)), jl(randn(n)), false)
+end

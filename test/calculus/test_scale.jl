@@ -318,3 +318,17 @@
         @test y ≈ α * (A * x)
     end
 end
+
+@testitem "Scale (GPU)" tags = [:gpu, :calculus, :Scale] setup=[TestUtils] begin
+    using Random, AbstractOperators, JLArrays
+    Random.seed!(0)
+
+    # Construct FiniteDiff from GPU array to get GPU storage type
+    m = 8
+    op = Scale(pi, FiniteDiff(jl(zeros(Float64, m))))
+    test_op(op, jl(randn(m)), jl(randn(m - 1)), false)
+
+    n = 4
+    op = Scale(2.0, DiagOp(jl(randn(n))))
+    test_op(op, jl(randn(n)), jl(randn(n)), false)
+end

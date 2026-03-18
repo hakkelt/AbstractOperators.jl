@@ -228,3 +228,26 @@
         @test sign(Tminus) == -1
     end
 end
+
+@testitem "AffineAdd (GPU)" tags = [:gpu, :calculus, :AffineAdd] setup=[TestUtils] begin
+    using Random, AbstractOperators, JLArrays
+    Random.seed!(0)
+
+    n, m = 5, 6
+    A = randn(n, m)
+    d = randn(n)
+    # AffineAdd is affine (not linear), so we test mul! directly rather than test_op
+    T = AffineAdd(MatrixOp(jl(A)), jl(d))
+    x1 = jl(randn(m))
+    y1 = T * x1
+    y1_buf = similar(y1)
+    mul!(y1_buf, T, x1)
+    @test collect(y1) ≈ collect(y1_buf)
+
+    # adjoint (adjoint of AffineAdd is adjoint of linear part)
+    r = jl(randn(n))
+    r_adj = T' * r
+    r_adj2 = similar(r_adj)
+    mul!(r_adj2, T', r)
+    @test collect(r_adj) ≈ collect(r_adj2)
+end

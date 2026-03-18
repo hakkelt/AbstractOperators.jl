@@ -1,4 +1,5 @@
 @testitem "FFTShift/IFFTShift Operators" tags = [:fftw, :FFTShift] setup = [TestUtils] begin
+    using AbstractOperators
     using LinearAlgebra, Random, FFTWOperators
     # 1D even length
     n = 4
@@ -39,6 +40,7 @@
 end
 
 @testitem "SignAlternation Operator" tags = [:fftw, :SignAlternation] setup = [TestUtils] begin
+    using AbstractOperators
     using LinearAlgebra, Random, FFTWOperators
     # 1D
     n = 6
@@ -133,6 +135,7 @@ end
 end
 
 @testitem "Combination rules: FFTShift/IFFTShift with DFT/IDFT" tags = [:fftw, :CombinationRules] setup = [TestUtils] begin
+    using AbstractOperators
     using LinearAlgebra, Random, FFTWOperators
     using AbstractOperators: can_be_combined, combine
 
@@ -182,4 +185,51 @@ end
     c5 = combine(dft2, sh2)
     X = randn(ComplexF64, n, m)
     @test (c5 * X) ≈ ((dft2 * sh2) * X)
+end
+
+@testitem "FFTShift/IFFTShift (GPU)" tags = [:gpu, :fftw, :FFTShift] setup=[TestUtils] begin
+    using LinearAlgebra, FFTWOperators, JLArrays
+
+    # Test mul! directly since allocate_in_codomain is CPU for these operators
+    n = 4
+    x = jl(collect(1.0:n))
+    A = FFTShift((n,), (1,))
+    y = similar(x)
+    mul!(y, A, x)
+    @test collect(y) == [3.0, 4.0, 1.0, 2.0]
+    # adjoint
+    z = similar(x)
+    mul!(z, A', y)
+    @test collect(z) ≈ collect(x)
+
+    # 2D
+    n2, m2 = 2, 4
+    X = jl(ones(n2, m2))
+    A2 = FFTShift((n2, m2), (1, 2))
+    Y = similar(X)
+    mul!(Y, A2, X)
+    @test collect(Y) ≈ ones(n2, m2)  # shifting all-ones stays all-ones
+end
+
+@testitem "SignAlternation (GPU)" tags = [:gpu, :fftw, :SignAlternation] setup=[TestUtils] begin
+    using LinearAlgebra, FFTWOperators, JLArrays
+
+    # Test mul! directly; AdjointOperator{SignAlternation} has no mul! defined
+    n = 6
+    x = jl(ones(n))
+    S = SignAlternation((n,), (1,))
+    y = similar(x)
+    mul!(y, S, x)
+    @test collect(y) == [1.0, -1.0, 1.0, -1.0, 1.0, -1.0]
+    # SignAlternation is involutory: S*S*x == x
+    z = similar(x)
+    mul!(z, S, y)
+    @test collect(z) ≈ collect(x)
+
+    # 2D
+    X2 = jl(ones(2, 2))
+    S2 = SignAlternation((2, 2), (1, 2))
+    Y2 = similar(X2)
+    mul!(Y2, S2, X2)
+    @test collect(Y2) == [1.0 -1.0; -1.0 1.0]
 end

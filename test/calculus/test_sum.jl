@@ -158,3 +158,18 @@
     Y = A * x + opB * x
     @test norm(Y - y) < 1.0e-8
 end
+
+@testitem "Sum (GPU)" tags = [:gpu, :calculus, :Sum] setup=[TestUtils] begin
+    using Random, AbstractOperators, JLArrays
+    Random.seed!(0)
+
+    n = 5
+    opS = Sum(DiagOp(jl(ones(n))), DiagOp(jl(2 * ones(n))))
+    test_op(opS, jl(randn(n)), jl(randn(n)), false)
+
+    m, n2 = 5, 7
+    A1 = jl(randn(m, n2))
+    A2 = jl(randn(m, n2))
+    opS2 = Sum(MatrixOp(A1), MatrixOp(A2))
+    test_op(opS2, jl(randn(n2)), jl(randn(m)), false)
+end

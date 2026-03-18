@@ -292,3 +292,18 @@
     y2 = V2 * x
     @test size.(y.x) == size.(y2.x)
 end
+
+@testitem "VCAT (GPU)" tags = [:gpu, :calculus, :VCAT] setup=[TestUtils] begin
+    using Random, AbstractOperators, JLArrays
+    Random.seed!(0)
+
+    n = 4
+    opV = VCAT(DiagOp(jl(ones(n))), DiagOp(jl(2 * ones(n))))
+    test_op(opV, jl(randn(n)), ArrayPartition(jl(randn(n)), jl(randn(n))), false)
+
+    m1, m2, n = 4, 7, 5
+    A1 = jl(randn(m1, n))
+    A2 = jl(randn(m2, n))
+    opV2 = VCAT(MatrixOp(A1), MatrixOp(A2))
+    test_op(opV2, jl(randn(n)), ArrayPartition(jl(randn(m1)), jl(randn(m2))), false)
+end

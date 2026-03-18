@@ -1,7 +1,22 @@
-@testitem "Zeros" tags = [:linearoperator, :Zeros] setup = [TestUtils] begin
-    using Random, AbstractOperators
+@testitem "Zeros" tags = [:linearoperator, :Zeros] setup=[TestUtils] begin
+    using Random, AbstractOperators, JLArrays
     Random.seed!(0)
     verb && println(" --- Testing Zeros --- ")
+
+    function test_zeros_mul(conv, verb)
+        n = (3, 4)
+        m = (5, 2)
+        ST = Base.typename(typeof(conv(zeros(Float64, 1)))).wrapper
+        op = Zeros(Float64, n, Float64, m; storage_type = ST)
+        y1 = test_op(op, conv(randn(n)), conv(randn(m)), verb)
+        @test to_cpu(y1) == zeros(Float64, m)
+    end
+
+    for (name, conv) in GPU_CONV_FUNCTIONS
+        @testset "$name" begin
+            test_zeros_mul(conv, conv == identity && verb)
+        end
+    end
 
     n = (3, 4)
     D = Float64

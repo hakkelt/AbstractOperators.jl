@@ -1,7 +1,24 @@
-@testitem "MatrixOp" tags = [:linearoperator, :MatrixOp] setup = [TestUtils] begin
-    using Random, SparseArrays, LinearAlgebra, AbstractOperators
+@testitem "MatrixOp" tags = [:linearoperator, :MatrixOp] setup=[TestUtils] begin
+    using Random, SparseArrays, LinearAlgebra, AbstractOperators, JLArrays
     Random.seed!(0)
     verb && println(" --- Testing MatrixOp --- ")
+
+    function test_matrixop_mul(conv, verb)
+        n, m = 5, 4
+        A = randn(n, m)
+        op = MatrixOp(conv(A))
+        test_op(op, conv(randn(m)), conv(randn(n)), verb)
+
+        A = randn(n, m) + im * randn(n, m)
+        op = MatrixOp(conv(A))
+        test_op(op, conv(randn(m) + im * randn(m)), conv(randn(n) + im * randn(n)), verb)
+    end
+
+    for (name, conv) in GPU_CONV_FUNCTIONS
+        @testset "$name" begin
+            test_matrixop_mul(conv, conv == identity && verb)
+        end
+    end
 
     # real matrix, real input
     n, m = 5, 4
