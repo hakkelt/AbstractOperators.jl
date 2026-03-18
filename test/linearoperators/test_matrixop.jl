@@ -15,7 +15,7 @@
     end
 
     for (name, conv) in GPU_CONV_FUNCTIONS
-        @testset "$name" begin
+        begin # formerly @testset "$name"
             test_matrixop_mul(conv, conv == identity && verb)
         end
     end

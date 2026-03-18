@@ -20,6 +20,12 @@
     x_gpu = jl(randn(4))
     y_cpu = zeros(3)
     @test_throws ArgumentError mul!(y_cpu, op_gi, x_gpu)
+
+    # Storage type and allocation checks for GPU operators
+    @test domain_storage_type(op) <: JLArrays.JLArray
+    @test codomain_storage_type(op) <: JLArrays.JLArray
+    y_alloc = op * x
+    @test y_alloc isa JLArrays.JLArray
 end
 
 @testitem "GpuExt JET" tags = [:jet, :gpu] begin
@@ -52,4 +58,36 @@ end
     # _should_thread dispatches to false for GPU arrays
     @test AbstractOperators._should_thread(typeof(d)) == false
     @test AbstractOperators._should_thread(Array{Float64}) == true
+end
+
+@testitem "Gpu storage type (CUDA)" tags = [:quality, :gpu, :cuda] setup = [TestUtils] begin
+    using AbstractOperators
+    b = get_backend(:cuda)
+    if b === nothing
+        @test_skip "CUDA not functional"
+    else
+        _, _, conv = b
+        x = conv(randn(8))
+        op = DiagOp(x)
+        @test domain_storage_type(op) <: typeof(x).name.wrapper
+        @test codomain_storage_type(op) <: typeof(x).name.wrapper
+        y = op * x
+        @test y isa typeof(x)
+    end
+end
+
+@testitem "Gpu storage type (AMDGPU)" tags = [:quality, :gpu, :amdgpu] setup = [TestUtils] begin
+    using AbstractOperators
+    b = get_backend(:amdgpu)
+    if b === nothing
+        @test_skip "AMDGPU not functional"
+    else
+        _, _, conv = b
+        x = conv(randn(8))
+        op = DiagOp(x)
+        @test domain_storage_type(op) <: typeof(x).name.wrapper
+        @test codomain_storage_type(op) <: typeof(x).name.wrapper
+        y = op * x
+        @test y isa typeof(x)
+    end
 end

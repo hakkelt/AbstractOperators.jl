@@ -141,7 +141,7 @@ op = DiagOp(rand(1000)) + DiagOp(rand(1000))  # Sum with mutable buffers
 op2 = copy_operator(op)  # shares immutable data, copies buffers only
 ```
 
-See the [Performance documentation](performance.md) for more details on threading, FastBroadcast optimizations, and memory allocation.
+See [Performance](performance.md) for user-facing tips and [Custom Operators](custom.md) for developer internals (threading/storage/backend guidance).
 
 ## Credits
 

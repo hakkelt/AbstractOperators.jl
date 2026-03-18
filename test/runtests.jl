@@ -1,13 +1,18 @@
 using TestItemRunner
 
-# Run all tests. Tags enable selective filtering for interactive development:
-#
-#   julia --project=test -e '
-#       using TestItemRunner
-#       TestItemRunner.run_tests(pwd(); filter = ti -> :calculus in ti.tags)
-#   '
-#
-# Available tags: :calculus, :linearoperator, :nonlinearoperator,
-#                 :batching, :misc, :quality, :jet
+function _backend_functional(mod::Symbol)
+    try
+        m = Base.require(Main, mod)
+        return getproperty(m, :functional)()
+    catch
+        return false
+    end
+end
 
-@run_package_tests
+const HAS_CUDA = _backend_functional(:CUDA)
+const HAS_AMDGPU = _backend_functional(:AMDGPU)
+const FILTER = ti ->
+    (!(:cuda in ti.tags) || HAS_CUDA) &&
+    (!(:amdgpu in ti.tags) || HAS_AMDGPU)
+
+@run_package_tests filter = FILTER

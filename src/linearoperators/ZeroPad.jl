@@ -45,7 +45,7 @@ function ZeroPad(x::AbstractArray{T}, zp::Vararg{Int, N}) where {T, N}
 end
 
 # Mappings
-@generated function mul!(y, L::ZeroPad{N, T}, b) where {N, T}
+@generated function mul!(y::AbstractArray, L::ZeroPad{N, T}, b::AbstractArray) where {N, T}
     z = zero(T)  # compile-time literal zero for type T
     vars = [Symbol("i$i") for i in 1:N]
     # Condition: i1 <= size(b,1) && i2 <= size(b,2) && ...
@@ -68,7 +68,7 @@ end
     end
 end
 
-function mul!(y, L::AdjointOperator{<:ZeroPad}, b)
+function mul!(y::AbstractArray, L::AdjointOperator{<:ZeroPad}, b::AbstractArray)
     check(y, L, b)
     copyto!(y, view(b, ntuple(i -> 1:L.A.dim_in[i], length(L.A.dim_in))...))
     return y

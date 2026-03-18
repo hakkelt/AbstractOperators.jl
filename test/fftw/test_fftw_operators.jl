@@ -364,11 +364,11 @@ end
     @test collect(z_gpu) ≈ idct(collect(b_gpu))
 end
 
-@testitem "DFT (GPU)" tags = [:fftw, :gpu, :DFT] setup=[TestUtils] begin
+@testitem "DFT (JLArray)" tags = [:fftw, :gpu, :DFT] setup=[TestUtils] begin
     using FFTW, LinearAlgebra, Random, FFTWOperators
     Random.seed!(1)
 
-    for (backend_name, conv) in GPU_BACKENDS
+    for (backend_name, conv) in filter(b -> b[1] == "JLArray", GPU_BACKENDS)
         # Complex input
         n = 8
         x_cpu = randn(ComplexF64, n)
@@ -405,11 +405,11 @@ end
     end
 end
 
-@testitem "RDFT (GPU)" tags = [:fftw, :gpu, :RDFT] setup=[TestUtils] begin
+@testitem "RDFT (JLArray)" tags = [:fftw, :gpu, :RDFT] setup=[TestUtils] begin
     using FFTW, LinearAlgebra, Random, FFTWOperators
     Random.seed!(2)
 
-    for (backend_name, conv) in GPU_BACKENDS
+    for (backend_name, conv) in filter(b -> b[1] == "JLArray", GPU_BACKENDS)
         n = 8
         x_cpu = randn(Float64, n)
         op_cpu = RDFT(x_cpu)
@@ -433,11 +433,11 @@ end
     end
 end
 
-@testitem "IRDFT (GPU)" tags = [:fftw, :gpu, :IRDFT] setup=[TestUtils] begin
+@testitem "IRDFT (JLArray)" tags = [:fftw, :gpu, :IRDFT] setup=[TestUtils] begin
     using FFTW, LinearAlgebra, Random, FFTWOperators
     Random.seed!(3)
 
-    for (backend_name, conv) in GPU_BACKENDS
+    for (backend_name, conv) in filter(b -> b[1] == "JLArray", GPU_BACKENDS)
         n = 8
         x_cpu = randn(ComplexF64, n÷2+1)
         op_cpu = IRDFT(x_cpu, n)
@@ -458,5 +458,63 @@ end
         z = conv(zeros(ComplexF64, n÷2+1))
         mul!(z, op', b)
         @test collect(z) ≈ z_cpu  atol=1e-10
+    end
+end
+
+@testitem "DFT/RDFT/IRDFT (CUDA)" tags = [:fftw, :gpu, :cuda] setup=[TestUtils] begin
+    using FFTWOperators, Random
+    b = get_backend(:cuda)
+    if b === nothing
+        @test_skip "CUDA not functional"
+    else
+        _, _, conv = b
+    Random.seed!(11)
+
+    n = 8
+    x = conv(randn(ComplexF64, n))
+    op = DFT(x)
+    y = conv(zeros(ComplexF64, n))
+    mul!(y, op, x)
+    @test y isa typeof(x)
+
+    xr = conv(randn(Float64, n))
+    rop = RDFT(xr)
+    ry = conv(zeros(ComplexF64, n ÷ 2 + 1))
+    mul!(ry, rop, xr)
+    @test ry isa typeof(ry)
+
+    ir = IRDFT(ry, n)
+    out = conv(zeros(Float64, n))
+    mul!(out, ir, ry)
+    @test out isa typeof(xr)
+    end
+end
+
+@testitem "DFT/RDFT/IRDFT (AMDGPU)" tags = [:fftw, :gpu, :amdgpu] setup=[TestUtils] begin
+    using FFTWOperators, Random
+    b = get_backend(:amdgpu)
+    if b === nothing
+        @test_skip "AMDGPU not functional"
+    else
+        _, _, conv = b
+    Random.seed!(12)
+
+    n = 8
+    x = conv(randn(ComplexF64, n))
+    op = DFT(x)
+    y = conv(zeros(ComplexF64, n))
+    mul!(y, op, x)
+    @test y isa typeof(x)
+
+    xr = conv(randn(Float64, n))
+    rop = RDFT(xr)
+    ry = conv(zeros(ComplexF64, n ÷ 2 + 1))
+    mul!(ry, rop, xr)
+    @test ry isa typeof(ry)
+
+    ir = IRDFT(ry, n)
+    out = conv(zeros(Float64, n))
+    mul!(out, ir, ry)
+    @test out isa typeof(xr)
     end
 end

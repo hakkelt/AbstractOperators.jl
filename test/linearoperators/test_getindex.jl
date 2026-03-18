@@ -15,7 +15,7 @@
     end
 
     for (name, conv) in GPU_CONV_FUNCTIONS
-        @testset "$name" begin
+        begin # formerly @testset "$name"
             test_getindex_mul(conv, conv == identity && verb)
         end
     end
@@ -148,7 +148,7 @@
 
     # Additional coverage-focused tests for uncovered GetIndex / NormalGetIndex branches
 
-    @testset "GetIndex scalar Int... specialized path" begin
+    begin # formerly @testset "GetIndex scalar Int... specialized path"
         n, m = 6, 7
         op = GetIndex(Float64, (n, m), (2, 3))  # both indices scalar Int → get_dim_out(::Dims, Int...) method
         x = randn(n, m)
@@ -158,7 +158,7 @@
         @test y[1] == x[2, 3]
     end
 
-    @testset "GetIndex boolean mask inside tuple branch" begin
+    begin # formerly @testset "GetIndex boolean mask inside tuple branch"
         n, m, l = 5, 4, 3
         mask_first = falses(n); mask_first[2:4] .= true  # Boolean vector for first dimension
         op = GetIndex(Float64, (n, m, l), (mask_first, :, 2))  # mask used as one index among others
@@ -169,7 +169,7 @@
         @test y == expected
     end
 
-    @testset "GetIndex AbstractArray of Int indices (multi-dim)" begin
+    begin # formerly @testset "GetIndex AbstractArray of Int indices (multi-dim)"
         n = 10
         arr_idx = reshape([1, 2, 3, 4], 2, 2)  # proper reshape with dimensions
         op = GetIndex(Float64, (n,), (arr_idx,))  # index array inside tuple triggers AbstractArray branch
@@ -179,12 +179,12 @@
         @test y == x[arr_idx]
     end
 
-    @testset "GetIndex unsupported index type error path" begin
+    begin # formerly @testset "GetIndex unsupported index type error path"
         n, m = 5, 4
         @test_throws ArgumentError GetIndex(Float64, (n, m), (1:2, "bad"))
     end
 
-    @testset "NormalGetIndex non-tuple idx conversion" begin
+    begin # formerly @testset "NormalGetIndex non-tuple idx conversion"
         n = 8
         N1 = AbstractOperators.NormalGetIndex(Float64, Array{Float64}, (n,), 3:3)
         @test size(N1) == ((n,), (n,))
@@ -196,7 +196,7 @@
         @test d == expected
     end
 
-    @testset "NormalGetIndex vector idx conversion" begin
+    begin # formerly @testset "NormalGetIndex vector idx conversion"
         n = 9
         idx_vec = [2, 4, 5]
         N2 = AbstractOperators.NormalGetIndex(Float64, Array{Float64}, (n,), idx_vec)
@@ -206,7 +206,7 @@
         @test sum(d) == length(idx_vec)
     end
 
-    @testset "GetIndex get_idx accessor" begin
+    begin # formerly @testset "GetIndex get_idx accessor"
         n = 7
         op = GetIndex(Float64, (n,), (2:5,))
         idx_back = AbstractOperators.get_idx(op)
@@ -214,7 +214,7 @@
     end
 
     # Cover x::AbstractArray overloads and BitArray-specific slicing mask
-    @testset "GetIndex array-first overloads and BitArray mask" begin
+    begin # formerly @testset "GetIndex array-first overloads and BitArray mask"
         # Tuple indices equal to full dims -> Eye path in x::Tuple overload
         x2 = randn(4, 3)
         op_eye_x = GetIndex(x2, (:, :))
@@ -241,19 +241,19 @@
     end
 
     # Small utility error path in get_dim_out(::Dims)
-    @testset "get_dim_out missing indices error" begin
+    begin # formerly @testset "get_dim_out missing indices error"
         @test_throws ErrorException AbstractOperators.get_dim_out((2, 3))
     end
 
     # Specialized adjoint for NormalGetIndex returns itself
-    @testset "AdjointOperator(NormalGetIndex) identity" begin
+    begin # formerly @testset "AdjointOperator(NormalGetIndex) identity"
         n = 5
         N = AbstractOperators.NormalGetIndex(Float64, Array{Float64}, (n,), 2:3)
         @test AbstractOperators.AdjointOperator(N) === N
         @test AbstractOperators.codomain_storage_type(N) == Array{Float64}
     end
 
-    @testset "GetIndex vector of CartesianIndex via tuple (hits get_dim_out branch)" begin
+    begin # formerly @testset "GetIndex vector of CartesianIndex via tuple (hits get_dim_out branch)"
         n, m = 6, 5
         cart = collect(CartesianIndices((n, m))[1:6])
         # Wrap as a tuple to force the GetIndex(domain_type, dim_in, idx::Tuple) constructor,

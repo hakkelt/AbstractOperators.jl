@@ -9,7 +9,7 @@ using JLArrays
 
 export verb, test_op, test_NLop, gradient_fd, ArrayPartition, norm, dot, diag, opnorm
 export jl, to_cpu, GPU_CONV_FUNCTIONS, test_NLop_gpu
-export GPU_BACKENDS
+export ALL_BACKENDS, GPU_BACKENDS, GPU_BACKENDS_TAGGED, HAS_CUDA, HAS_AMDGPU, true_gpu_backends, get_backend
 
 const verb = false
 
@@ -17,28 +17,47 @@ to_cpu(x::AbstractArray) = collect(x)
 to_cpu(x::RecursiveArrayTools.ArrayPartition) = RecursiveArrayTools.ArrayPartition(collect.(x.x)...)
 
 const GPU_CONV_FUNCTIONS = [("CPU", identity), ("GPU (JLArray)", jl)]
+const ALL_BACKENDS = Tuple{String, Function}[("CPU", identity), ("JLArray", jl)]
 
-# GPU_BACKENDS: list of (name, array_constructor_fn) pairs for all available GPU backends.
-# JLArrays is always available (CPU-backed simulation of the GPU interface).
-# CUDA and AMDGPU are included only when installed and functional.
-# Usage: for (name, conv) in GPU_BACKENDS; x = conv(cpu_array); ...
+const HAS_CUDA = Ref(false)
+const HAS_AMDGPU = Ref(false)
+
+# GPU_BACKENDS: (name, conversion_fn) for existing tests.
 const GPU_BACKENDS = Tuple{String, Function}[("JLArray", jl)]
+# GPU_BACKENDS_TAGGED: (name, tag, conversion_fn) for backend-aware test dispatch.
+const GPU_BACKENDS_TAGGED = Tuple{String, Symbol, Function}[("JLArray", :jlarray, jl)]
 
 function __init__()
     try
         cuda = Base.require(Main, :CUDA)
         if cuda.functional()
+            HAS_CUDA[] = true
             push!(GPU_BACKENDS, ("CuArray", cuda.cu))
+            push!(GPU_BACKENDS_TAGGED, ("CuArray", :cuda, cuda.cu))
+            push!(ALL_BACKENDS, ("CuArray", cuda.cu))
         end
     catch
     end
     try
         amdgpu = Base.require(Main, :AMDGPU)
         if amdgpu.functional()
+            HAS_AMDGPU[] = true
             push!(GPU_BACKENDS, ("ROCArray", amdgpu.ROCArray))
+            push!(GPU_BACKENDS_TAGGED, ("ROCArray", :amdgpu, amdgpu.ROCArray))
+            push!(ALL_BACKENDS, ("ROCArray", amdgpu.ROCArray))
         end
     catch
     end
+end
+
+true_gpu_backends() = filter(b -> b[2] in (:cuda, :amdgpu), GPU_BACKENDS_TAGGED)
+function get_backend(tag::Symbol)
+    for (name, backend_tag, conv) in GPU_BACKENDS_TAGGED
+        if backend_tag == tag
+            return (name, backend_tag, conv)
+        end
+    end
+    return nothing
 end
 
 function test_NLop_gpu(A::AbstractOperator, x, y, verb::Bool = false)

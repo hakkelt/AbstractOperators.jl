@@ -167,7 +167,7 @@
     Y = -A * x
     @test norm(Y - y) < 1.0e-8
 
-    @testset "Scale constructors and basic mapping" begin
+    begin # formerly @testset "Scale constructors and basic mapping"
         # Base operator
         A = MatrixOp(randn(6, 4))
         α = 2.5
@@ -185,7 +185,7 @@
         @test S' * z ≈ α * (A' * z)
     end
 
-    @testset "Scale special constructor scale-of-scale" begin
+    begin # formerly @testset "Scale special constructor scale-of-scale"
         A = FiniteDiff((10, 2))
         α = 3.0
         β = -2.0
@@ -199,7 +199,7 @@
         @test v2 ≈ (β * α) * (A * x)
     end
 
-    @testset "Scale coeff==1 returns original" begin
+    begin # formerly @testset "Scale coeff==1 returns original"
         A = MatrixOp(randn(5, 5))
         S = Scale(1.0, A)
         @test S === A || S == A
@@ -208,7 +208,7 @@
         @test (S * x) ≈ (A * x)
     end
 
-    @testset "Scale properties delegation" begin
+    begin # formerly @testset "Scale properties delegation"
         A = Eye(7)
         α = 4.2
         S = Scale(α, A)
@@ -230,13 +230,13 @@
         @test is_full_column_rank(S) == is_full_column_rank(A)
     end
 
-    @testset "Scale real vs complex coefficient error path" begin
+    begin # formerly @testset "Scale real vs complex coefficient error path"
         A = Eye(5)  # real codomain
         αc = 1.0 + 2.0im
         @test_throws ErrorException Scale(αc, A)  # triggers codomain real + complex coeff error
     end
 
-    @testset "Scale get_normal_op paths" begin
+    begin # formerly @testset "Scale get_normal_op paths"
         # Linear operator case: Eye has optimized normal op
         A = Eye(8)
         α = 2.0
@@ -254,7 +254,7 @@
         @test_throws ErrorException AbstractOperators.get_normal_op(S2)
     end
 
-    @testset "Scale equality and remove_displacement" begin
+    begin # formerly @testset "Scale equality and remove_displacement"
         A = AffineAdd(Eye(6), randn(6))  # has displacement
         α = 1.5
         S1 = Scale(α, A)
@@ -266,7 +266,7 @@
         @test Srd.coeff == α
     end
 
-    @testset "Scale slicing and remove_slicing" begin
+    begin # formerly @testset "Scale slicing and remove_slicing"
         # Use Eye so that slicing puts GetIndex first in the Compose chain (required by remove_slicing)
         A = Eye(11)
         α = 2.0
@@ -280,7 +280,7 @@
         @test Sr == Scale(α, AbstractOperators.remove_slicing(As))
     end
 
-    @testset "Scale opnorm and estimate_opnorm" begin
+    begin # formerly @testset "Scale opnorm and estimate_opnorm"
         A = MatrixOp(randn(7, 4))
         α = -1.2
         S = Scale(α, A)
@@ -289,7 +289,7 @@
         @test estimate_opnorm(S) ≈ opnorm(S) rtol = 0.05
     end
 
-    @testset "Scale permute utility" begin
+    begin # formerly @testset "Scale permute utility"
         # Use HCAT of two Eyes so underlying operator supports permute
         A = HCAT(Eye(5), Eye(5))
         α = 2.2
@@ -308,7 +308,7 @@
         @test y_original ≈ y_permuted
     end
 
-    @testset "Scale threaded behavior" begin
+    begin # formerly @testset "Scale threaded behavior"
         # Force threading decision by large output length
         A = MatrixOp(randn(20000, 5))
         α = 0.75

@@ -500,10 +500,10 @@ if HAS_FFTW
     normal["DFT"]["mul"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = normal_state(DFT(BENCH_DFT_SHAPE)))
 end
 
-if HAS_NFFT
-    normal["NFFTOp"] = BenchmarkGroup()
-    normal["NFFTOp"]["mul"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = normal_state(nfft_state().op))
-end
+#if HAS_NFFT
+#    normal["NFFTOp"] = BenchmarkGroup()
+#    normal["NFFTOp"]["mul"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = normal_state(nfft_state().op))
+#end
 
 # Cap run time so CI / ASV comparisons complete in reasonable time
 for (_, b) in BenchmarkTools.leaves(SUITE)

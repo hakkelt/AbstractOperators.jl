@@ -132,7 +132,7 @@
 
     # Additional coverage-focused tests for uncovered AffineAdd branches
 
-    @testset "AffineAdd equality operator" begin
+    begin # formerly @testset "AffineAdd equality operator"
         n, m = 5, 6
         A = randn(n, m)
         opA = MatrixOp(A)
@@ -145,7 +145,7 @@
         @test !(T1 == T3)
     end
 
-    @testset "AffineAdd property delegations (invertible, rank, diagonal)" begin
+    begin # formerly @testset "AffineAdd property delegations (invertible, rank, diagonal)"
         n = 5
         # is_invertible delegation
         E = Eye(n)
@@ -174,7 +174,7 @@
         @test diag_AAc(TD2) == diag_AAc(D2)
     end
 
-    @testset "AffineAdd slicing property delegation" begin
+    begin # formerly @testset "AffineAdd slicing property delegation"
         n = 10
         G = GetIndex(Float64, (n,), 2:5)
         TG = AffineAdd(G, randn(4))
@@ -186,7 +186,7 @@
         @test Gremoved isa Eye
     end
 
-    @testset "AffineAdd normal operator" begin
+    begin # formerly @testset "AffineAdd normal operator"
         n, m = 5, 6
         G = GetIndex(Float64, (n, m), (1:3, :))
         d = randn(3, m)
@@ -199,7 +199,7 @@
         @test N * x ≈ expected
     end
 
-    @testset "AffineAdd is_thread_safe delegation" begin
+    begin # formerly @testset "AffineAdd is_thread_safe delegation"
         # DiagOp is thread-safe, so AffineAdd(DiagOp, d) should be thread-safe
         D = DiagOp(randn(5))
         d = randn(5)
@@ -213,7 +213,7 @@
         @test is_thread_safe(TC) == false
     end
 
-    @testset "AffineAdd sign function" begin
+    begin # formerly @testset "AffineAdd sign function"
         n, m = 5, 6
         A = randn(n, m)
         opA = MatrixOp(A)

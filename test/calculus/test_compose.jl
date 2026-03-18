@@ -258,14 +258,14 @@
 
     # --- Additional coverage for Compose internals and edge branches ---
 
-    @testset "Compose internal buffer mismatch" begin
+    begin # formerly @testset "Compose internal buffer mismatch"
         A = MatrixOp(randn(3, 3))
         B = MatrixOp(randn(3, 3))
         # Using the low-level constructor with wrong buffer length should throw
         @test_throws DimensionMismatch AbstractOperators.Compose((B, A), ())
     end
 
-    @testset "Adjacent adjoint optimized normal (GetIndex*GetIndex')" begin
+    begin # formerly @testset "Adjacent adjoint optimized normal (GetIndex*GetIndex')"
         G = GetIndex((5,), 2:4)
         # Provide a dummy buffer (won't be used because it reduces to a single op)
         L = AbstractOperators.Compose((G, G'), (randn(size(G, 1)),))
@@ -276,7 +276,7 @@
         @test is_diagonal(L)
     end
 
-    @testset "Combine branch producing nested Compose is inlined" begin
+    begin # formerly @testset "Combine branch producing nested Compose is inlined"
         M = MatrixOp(randn(3, 3))
         S = Scale(2.0, Eye(3))
         # Order (S, M) triggers combine(MatrixOp, Scale) which returns a Compose
@@ -287,7 +287,7 @@
         @test L isa AbstractOperator
     end
 
-    @testset "remove_slicing: first op is GetIndex, compose of three operators" begin
+    begin # formerly @testset "remove_slicing: first op is GetIndex, compose of three operators"
         # First operator is GetIndex, removing slicing should keep equivalent mapping on reduced domain
         G = GetIndex((5,), 2:4)      # 5 -> 3
         A2 = FiniteDiff((3,))   # 3 -> 2
@@ -304,7 +304,7 @@
         @test y1 ≈ y2
     end
 
-    @testset "remove_slicing: sliced first op not GetIndex (Scale(GetIndex))" begin
+    begin # formerly @testset "remove_slicing: sliced first op not GetIndex (Scale(GetIndex))"
         # First operator is Scale(GetIndex), removing slicing should keep equivalent mapping on reduced domain
         G = GetIndex((5,), 2:4)      # 5 -> 3
         S = 3.0 * G                  # still 5 -> 3, sliced true
@@ -334,7 +334,7 @@
         @test y1 ≈ y2
     end
 
-    @testset "remove_slicing error path (first not GetIndex nor sliced)" begin
+    begin # formerly @testset "remove_slicing error path (first not GetIndex nor sliced)"
         # Build a Compose manually where the first operator is not sliced and not a GetIndex
         op1 = MyLinOp(Float64, (3,), Float64, (3,), (y, x) -> (y .= x), (y, x) -> (y .= x))
         op2 = MatrixOp(randn(2, 3))
@@ -342,7 +342,7 @@
         @test_throws ArgumentError AbstractOperators.remove_slicing(L)
     end
 
-    @testset "diag_AAc on Compose (ok and error)" begin
+    begin # formerly @testset "diag_AAc on Compose (ok and error)"
         d = randn(5)
         sel = 1:3
         L_ok = Compose(DiagOp(d[sel]), GetIndex((length(d),), sel))
@@ -354,7 +354,7 @@
         @test_throws ErrorException AbstractOperators.diag_AAc(L_bad)
     end
 
-    @testset "get_normal_op on Compose (fallback path)" begin
+    begin # formerly @testset "get_normal_op on Compose (fallback path)"
         # Last operator without optimized normal => else branch in get_normal_op(Compose)
         L = Compose(FiniteDiff((3,)), MatrixOp(randn(3, 3)))
         N = AbstractOperators.get_normal_op(L)
@@ -363,7 +363,7 @@
         @test N * x ≈ L' * (L * x)
     end
 
-    @testset "Scale(coeff, L::Compose) specialized paths" begin
+    begin # formerly @testset "Scale(coeff, L::Compose) specialized paths"
         # Linear case with combinable ops: returns a Compose (not a top-level Scale)
         Llin = FiniteDiff((3,)) * MatrixOp(randn(3, 3)) * FiniteDiff((4,))
         Slin = Scale(1.7, Llin)
@@ -379,7 +379,7 @@
         @test Snl * x ≈ 2.0 * (Lnl * x)
     end
 
-    @testset "get_normal_op(Compose) else branch (no optimized normal)" begin
+    begin # formerly @testset "get_normal_op(Compose) else branch (no optimized normal)"
         # FiniteDiff and Variation lack optimized normal operators => hit the else path
         F1 = FiniteDiff((5,))  # domain 5, codomain 4
         F2 = FiniteDiff((6,))  # domain 6, codomain 5
@@ -391,7 +391,7 @@
         @test N * x ≈ L' * (L * x)
     end
 
-    @testset "Buffer reuse in 4-operator chain (FiniteDiff)" begin
+    begin # formerly @testset "Buffer reuse in 4-operator chain (FiniteDiff)"
         # Chain 4 FiniteDiff operators to exercise buffer reuse adjacency detection
         F1 = FiniteDiff((10,))  # domain 10, codomain 9
         F2 = MatrixOp(rand(10, 9))  # domain 9, codomain 10
@@ -410,7 +410,7 @@
     end
 
     # Enable DEBUG_COMPOSE for combination logging branches
-    @testset "DEBUG_COMPOSE logging branches" begin
+    begin # formerly @testset "DEBUG_COMPOSE logging branches"
         old_debug = AbstractOperators.DEBUG_COMPOSE[]
         try
             AbstractOperators.DEBUG_COMPOSE[] = true
@@ -440,8 +440,7 @@
         end
     end
 
-    @testset "Triple combination path (requires 3-arg combine specialization)" begin
-
+    begin # formerly @testset "Triple combination path (requires 3-arg combine specialization)"
         struct TripleCombTestOp <: LinearOperator end
         LinearAlgebra.size(::TripleCombTestOp) = ((5,), (5,))
         AbstractOperators.domain_type(::TripleCombTestOp) = Float64

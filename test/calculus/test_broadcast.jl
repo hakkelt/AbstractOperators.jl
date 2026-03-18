@@ -96,8 +96,8 @@
         @test is_full_column_rank(opR) == false
     end
 
-    @testset "non-threaded" test_broadcast_op(verb, false)
-    @testset "threaded" test_broadcast_op(verb, true)
+    test_broadcast_op(verb, false)
+    test_broadcast_op(verb, true)
 
     # NoOperatorBroadCast path (Eye case returning NoOperatorBroadCast rather than OperatorBroadCast)
     # Use dim_out that differs to avoid early return of original operator
@@ -270,7 +270,7 @@
     @test norm(Y - y) < 1.0e-8
 
     # Additional coverage tests
-    @testset "BroadCast error cases and edge paths" begin
+    begin # formerly @testset "BroadCast error cases and edge paths"
         m, n = 4, 3
         A = MatrixOp(randn(m, n))
 
@@ -302,7 +302,7 @@
         @test_throws ErrorException BroadCast(A, (4, 2))
     end
 
-    @testset "Threaded NoOperatorBroadCast" begin
+    begin # formerly @testset "Threaded NoOperatorBroadCast"
         if Threads.nthreads() > 1
             m = 1000
             E = Eye(m)
@@ -322,7 +322,7 @@
         end
     end
 
-    @testset "Non-compact threaded OperatorBroadCast" begin
+    begin # formerly @testset "Non-compact threaded OperatorBroadCast"
         if Threads.nthreads() > 1
             m, n = 3, 2
             A = reshape(MatrixOp(randn(m, n)), 1, m)

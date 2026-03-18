@@ -255,7 +255,7 @@
     y, grad = test_NLop(opP, xp, r, verb)
 
     # Test HCAT constructor error paths
-    @testset "HCAT constructor errors" begin
+    begin # formerly @testset "HCAT constructor errors"
         # DimensionMismatch: operators with different codomain dimensions
         A1 = MatrixOp(randn(4, 3))
         A2 = MatrixOp(randn(5, 2))  # Different codomain dimension (5 vs 4)
@@ -268,7 +268,7 @@
     end
 
     # Test HCAT with nested HCAT (flattening behavior)
-    @testset "HCAT flattening" begin
+    begin # formerly @testset "HCAT flattening"
         m, n1, n2, n3 = 4, 3, 2, 5
         A1 = MatrixOp(randn(m, n1))
         A2 = MatrixOp(randn(m, n2))
@@ -301,7 +301,7 @@
     end
 
     # Test single operator HCAT (should return the operator itself)
-    @testset "HCAT single operator" begin
+    begin # formerly @testset "HCAT single operator"
         A = MatrixOp(randn(4, 3))
         H_single = HCAT(A)
         @test H_single === A  # Should return the same operator

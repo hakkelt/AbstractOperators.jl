@@ -137,56 +137,56 @@ function other_spreadingbatchop_tests(threaded)
     return @test_throws AssertionError BatchOp(bad_ops, 4)
 end
 
-@testset "SpreadingBatchOp" begin
-    @testset "Shape-keeping op (DiagOp)" begin
-        @testset "non-threaded" begin
+begin # formerly @testset "SpreadingBatchOp"
+    begin # formerly @testset "Shape-keeping op (DiagOp)"
+        begin # formerly @testset "non-threaded"
             test_shape_keeping_threadsafe_spreading_batch_op(false)
         end
         if Threads.nthreads() > 1
-            @testset "threaded (thread-safe)" begin
+            begin # formerly @testset "threaded (thread-safe)"
                 test_shape_keeping_threadsafe_spreading_batch_op(true)
             end
         end
     end
-    @testset "Shape-changing op (Variation)" begin
-        @testset "non-threaded" begin
+    begin # formerly @testset "Shape-changing op (Variation)"
+        begin # formerly @testset "non-threaded"
             test_shape_changing_threadsafe_spreading_batch_op(false)
         end
         if Threads.nthreads() > 1
-            @testset "threaded (thread-safe)" begin
+            begin # formerly @testset "threaded (thread-safe)"
                 test_shape_changing_threadsafe_spreading_batch_op(true)
             end
         end
     end
-    @testset "Non-threadsafe op (Compose)" begin
-        @testset "non-threaded" begin
+    begin # formerly @testset "Non-threadsafe op (Compose)"
+        begin # formerly @testset "non-threaded"
             test_nonthreadsafe_spreading_batch_op(false, ThreadingStrategy.AUTO)
         end
         if Threads.nthreads() > 1
-            @testset "threaded (copying)" begin
+            begin # formerly @testset "threaded (copying)"
                 test_nonthreadsafe_spreading_batch_op(true, ThreadingStrategy.COPYING)
             end
-            @testset "threaded (locking)" begin
+            begin # formerly @testset "threaded (locking)"
                 test_nonthreadsafe_spreading_batch_op(true, ThreadingStrategy.LOCKING)
             end
-            @testset "threaded (fixed operator)" begin
+            begin # formerly @testset "threaded (fixed operator)"
                 test_nonthreadsafe_spreading_batch_op(true, ThreadingStrategy.FIXED_OPERATOR)
                 test_failing_nonthreadsafe_spreading_batch_op()
             end
         end
     end
-    @testset "Other tests" begin
-        @testset "non-threaded" begin
+    begin # formerly @testset "Other tests"
+        begin # formerly @testset "non-threaded"
             other_spreadingbatchop_tests(false)
         end
         if Threads.nthreads() > 1
-            @testset "threaded (thread-safe)" begin
+            begin # formerly @testset "threaded (thread-safe)"
                 other_spreadingbatchop_tests(true)
             end
         end
     end
     if Threads.nthreads() >= 4 && get(ENV, "CI", "false") == "false"
-        @testset "Benchmark" begin
+        begin # formerly @testset "Benchmark"
             t_single_threaded = benchmark_threading_strategy(false, ThreadingStrategy.AUTO)
             t_copying = benchmark_threading_strategy(true, ThreadingStrategy.COPYING)
             t_fixed_operator = benchmark_threading_strategy(true, ThreadingStrategy.FIXED_OPERATOR)
@@ -195,7 +195,7 @@ end
         end
     end
 
-    @testset "SpreadingBatchOpCopying property delegations" begin
+    begin # formerly @testset "SpreadingBatchOpCopying property delegations"
         if Threads.nthreads() > 1
             # Create non-threadsafe operators to trigger COPYING strategy
             ops = [DiagOp(rand(5)) * FiniteDiff((6,)) for i in 1:3]
@@ -244,7 +244,7 @@ end
         end
     end
 
-    @testset "Locking get_normal_op and reused operators" begin
+    begin # formerly @testset "Locking get_normal_op and reused operators"
         if Threads.nthreads() > 1
             # Create scenario with reused operator to trigger haskey branch
             op = DiagOp(rand(6)) * FiniteDiff((7,))
@@ -258,7 +258,7 @@ end
         end
     end
 
-    @testset "FixedOperator get_normal_op and get_spreading_dims" begin
+    begin # formerly @testset "FixedOperator get_normal_op and get_spreading_dims"
         if Threads.nthreads() > 1
             ops = [DiagOp(rand(6)) * FiniteDiff((7,)) for i in 1:3]
             bop = BatchOp(ops, 4, (:_, :s, :b); threaded = true, threading_strategy = ThreadingStrategy.FIXED_OPERATOR)
@@ -270,7 +270,7 @@ end
         end
     end
 
-    @testset "Orthogonal property for SpreadingBatchOp" begin
+    begin # formerly @testset "Orthogonal property for SpreadingBatchOp"
         # Use Identity operators which are orthogonal
         ops = [Eye(Float64, 5) for i in 1:3]
         bop = BatchOp(ops, 4; threaded = false)
@@ -289,7 +289,7 @@ end
         end
     end
 
-    @testset "AUTO threading strategy triggering" begin
+    begin # formerly @testset "AUTO threading strategy triggering"
         if Threads.nthreads() > 1
             # Create scenario where AUTO should pick a strategy
             # Small operators with FiniteDiff (non-threadsafe)
@@ -303,7 +303,7 @@ end
         end
     end
 
-    @testset "Scalar diagonal return paths" begin
+    begin # formerly @testset "Scalar diagonal return paths"
         # Create operators where all have identical scalar diagonals
         scale_val = 2.0
         ops = [scale_val * Eye(Float64, 5) for i in 1:3]
@@ -322,7 +322,7 @@ end
         @test daac isa Number  # Expect scalar
         @test daac == scale_val^2
     end
-    @testset "GPU (JLArray)" begin
+    begin # formerly @testset "GPU (JLArray)"
         ops = [DiagOp(jl([1.0, 2.0])) for _ in 1:4]
         bop = BatchOp(ops, 3, (:_, :s, :b))
         x = jl(ones(2, 4, 3))

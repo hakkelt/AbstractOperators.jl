@@ -128,55 +128,55 @@ function other_tests(threaded)
     return
 end
 
-@testset "SimpleBatchOp" begin
-    @testset "Shape-keeping op (DiagOp)" begin
-        @testset "non-threaded" begin
+begin # formerly @testset "SimpleBatchOp"
+    begin # formerly @testset "Shape-keeping op (DiagOp)"
+        begin # formerly @testset "non-threaded"
             test_shape_keeping_simple_batch_op(false)
         end
         if Threads.nthreads() > 1
-            @testset "threaded (thread-safe)" begin
+            begin # formerly @testset "threaded (thread-safe)"
                 test_shape_keeping_simple_batch_op(true)
             end
         end
     end
-    @testset "Dimension count changing op (Variation)" begin
-        @testset "non-threaded" begin
+    begin # formerly @testset "Dimension count changing op (Variation)"
+        begin # formerly @testset "non-threaded"
             test_variation_simple_batch_op(false)
         end
         if Threads.nthreads() > 1
-            @testset "threaded (thread-safe)" begin
+            begin # formerly @testset "threaded (thread-safe)"
                 test_variation_simple_batch_op(true)
             end
         end
     end
-    @testset "Shape-changing op (DiagOp∘FiniteDiff)" begin
-        @testset "non-threaded" begin
+    begin # formerly @testset "Shape-changing op (DiagOp∘FiniteDiff)"
+        begin # formerly @testset "non-threaded"
             test_shape_changing_simple_batch_op(false)
         end
         if Threads.nthreads() > 1
-            @testset "threaded (thread-safe)" begin
+            begin # formerly @testset "threaded (thread-safe)"
                 test_shape_changing_simple_batch_op(true)
             end
         end
     end
-    @testset "Other tests" begin
-        @testset "non-threaded" begin
+    begin # formerly @testset "Other tests"
+        begin # formerly @testset "non-threaded"
             other_tests(false)
         end
         if Threads.nthreads() > 1
-            @testset "threaded (thread-safe)" begin
+            begin # formerly @testset "threaded (thread-safe)"
                 other_tests(true)
             end
         end
     end
     if Threads.nthreads() > 1 && get(ENV, "CI", "false") == "false"
-        @testset "Benchmark" begin
+        begin # formerly @testset "Benchmark"
             t_single_threaded = benchmark_threading(false)
             t_multi_threaded = benchmark_threading(true)
             @test t_multi_threaded < t_single_threaded
         end
     end
-    @testset "GPU (JLArray)" begin
+    begin # formerly @testset "GPU (JLArray)"
         # GPU arrays: _should_thread dispatch auto-disables threading
         op = DiagOp(jl([1.0, 2.0]))
         batch_op = BatchOp(op, (3, 4), (:_, :b, :b))

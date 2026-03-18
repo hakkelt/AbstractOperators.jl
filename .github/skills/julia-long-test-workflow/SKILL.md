@@ -71,3 +71,7 @@ benchpkgtable \
 - For FFT plans, prefer `inv(plan)` (AbstractFFTs-generic) over backend-specific `FFTW.plan_inv(...)` to keep CUDA/AMDGPU compatibility.
 - With JLArrays/GPUArrays, avoid `copyto!(gpu, cpu_view)` where source is a `SubArray`; materialize first (for example `src[1:n]`) or copy from a plain array.
 - During large rebases, resolve conflicts by preserving known-good behavior first, then run focused `TestItemRunner` filters before full-suite reruns.
+- Prefer `@testitem` over nested `@testset`; split oversized files into helper modules + multiple test items.
+- For honest GPU coverage, keep JLArray checks separate from real device checks and add backend-specific tags (`:cuda`, `:amdgpu`) plus runtime skip guards.
+- In `test/runtests.jl`, filter backend-tagged testitems when corresponding runtimes are unavailable, but keep per-test safety checks too.
+- Add explicit tests for `domain_storage_type`/`codomain_storage_type` and that `op * x` allocates on the active backend.
