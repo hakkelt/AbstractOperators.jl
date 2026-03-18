@@ -57,6 +57,9 @@ include("linearoperators/LMatrixOp.jl")
 include("linearoperators/FiniteDiff.jl")
 include("linearoperators/Variation.jl")
 include("linearoperators/LBFGS.jl")
+include("linearoperators/CpuOperatorWrapper.jl")
+
+export CpuOperatorWrapper
 
 # Batch operators
 include("batching/BatchOp.jl")

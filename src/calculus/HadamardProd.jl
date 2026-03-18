@@ -109,3 +109,26 @@ function remove_displacement(P::HadamardProd)
         remove_displacement(P.A), remove_displacement(P.B), P.bufA, P.bufB, P.bufD
     )
 end
+
+has_mutable_buffers(::Type{<:HadamardProd}) = true
+has_mutable_buffers(::Type{<:HadamardProdJac}) = true
+
+function _copy_operator_impl(op::HadamardProd; storage_type = nothing, threaded = nothing)
+    new_bufA = _convert_buffer(op.bufA, storage_type)
+    new_bufB = _convert_buffer(op.bufB, storage_type)
+    new_bufD = _convert_buffer(op.bufD, storage_type)
+    new_A = copy_operator(op.A; storage_type, threaded)
+    new_B = copy_operator(op.B; storage_type, threaded)
+    return HadamardProd(new_A, new_B, new_bufA, new_bufB, new_bufD)
+end
+
+function _copy_operator_impl(op::HadamardProdJac; storage_type = nothing, threaded = nothing)
+    new_bufA = _convert_buffer(op.bufA, storage_type)
+    new_bufB = _convert_buffer(op.bufB, storage_type)
+    new_bufD = _convert_buffer(op.bufD, storage_type)
+    new_A = copy_operator(op.A; storage_type, threaded)
+    new_B = copy_operator(op.B; storage_type, threaded)
+    return HadamardProdJac{typeof(new_A), typeof(new_B), typeof(new_bufA), typeof(new_bufD)}(
+        new_A, new_B, new_bufA, new_bufB, new_bufD
+    )
+end

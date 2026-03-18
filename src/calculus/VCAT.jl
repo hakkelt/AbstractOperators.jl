@@ -276,3 +276,11 @@ function permute(H::VCAT{N, L, P, C}, p::AbstractVector{Int}) where {N, L, P, C}
 end
 
 remove_displacement(V::VCAT) = VCAT(remove_displacement.(V.A), V.idxs, V.buf)
+
+has_mutable_buffers(::Type{<:VCAT}) = true
+
+function _copy_operator_impl(op::VCAT; storage_type = nothing, threaded = nothing)
+    new_buf = _convert_buffer(op.buf, storage_type)
+    new_ops = tuple([copy_operator(a; storage_type, threaded) for a in op.A]...)
+    return VCAT(new_ops, op.idxs, new_buf)
+end

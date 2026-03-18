@@ -1,6 +1,8 @@
 import Base: size, ndims, similar, copy
 import LinearAlgebra: diag, opnorm
 
+export copy_operator, has_mutable_buffers
+export _should_thread
 export ndoms,
     domain_type,
     codomain_type,
@@ -72,13 +74,7 @@ RecursiveArrayTools.ArrayPartition{ComplexF64, Tuple{Array{ComplexF64}, Array{Co
 ```
 """
 function domain_storage_type(L::AbstractOperator)
-    dt = domain_type(L)
-    return if dt isa Tuple
-        arrayTypes = Tuple{[Array{t} for t in dt]...}
-        ArrayPartition{promote_type(dt...), arrayTypes}
-    else
-        Array{dt}
-    end
+    return _storage_type_for_elem(domain_type(L))
 end
 
 """
@@ -95,20 +91,25 @@ RecursiveArrayTools.ArrayPartition{ComplexF64, Tuple{Array{ComplexF64}, Array{Co
 ```
 """
 function codomain_storage_type(L::AbstractOperator)
-    dt = codomain_type(L)
-    return if dt isa Tuple
-        arrayTypes = Tuple{[Array{t} for t in dt]...}
-        ArrayPartition{promote_type(dt...), arrayTypes}
-    else
-        Array{dt}
-    end
+    return _storage_type_for_elem(codomain_type(L))
 end
+
+_storage_type_for_elem(T::Type) = Array{T}
+function _storage_type_for_elem(dt::Tuple)
+    arrayTypes = Tuple{[Array{t} for t in dt]...}
+    return ArrayPartition{promote_type(dt...), arrayTypes}
+end
+
+# Get the array container type (Array, CuArray, etc.) from an array instance
+_array_wrapper(x::A) where {T, A <: AbstractArray{T}} = (x isa SubArray ? parent(x) : x) |> typeof |> a -> a.name.wrapper
 
 function allocate_in_domain(L::AbstractOperator, dims... = size(L, 2)...)
     dS = domain_storage_type(L)
     if dS <: ArrayPartition
         S = dS.parameters[2]
         return ArrayPartition([similar(s, d...) for (s, d) in zip(S.parameters, dims)]...)
+    elseif dS <: Array
+        return Array{domain_type(L), length(dims)}(undef, dims...)
     else
         return similar(dS, dims...)
     end
@@ -119,6 +120,8 @@ function allocate_in_codomain(L::AbstractOperator, dims... = size(L, 1)...)
     if cS <: ArrayPartition
         S = cS.parameters[2]
         return ArrayPartition([similar(s, d...) for (s, d) in zip(S.parameters, dims)]...)
+    elseif cS <: Array
+        return Array{codomain_type(L), length(dims)}(undef, dims...)
     else
         return similar(cS, dims...)
     end
@@ -471,3 +474,50 @@ function string_dom(dm::Tuple, sz::Tuple)
     s = string_dom.(dm, sz)
     return length(s) > 3 ? s[1] * "..." * s[end] : *(s...)
 end
+
+"""
+    has_mutable_buffers(::Type{<:AbstractOperator}) -> Bool
+
+Returns `true` if the operator type has mutable internal buffers that must be
+deep-copied for thread safety. Default is `false`.
+"""
+has_mutable_buffers(::Type{<:AbstractOperator}) = false
+
+"""
+    copy_operator(op::AbstractOperator; storage_type=nothing, threaded=nothing)
+
+Create a copy of `op` suitable for parallel use.
+
+- Immutable fields (operator arrays, type params) are **shared** (no copy).
+- Mutable buffer fields are **deep-copied**.
+- `storage_type`: if provided (e.g., `CuArray`), convert buffer arrays to that storage.
+- `threaded`: if provided (`true`/`false`), toggle threading for operators that support it.
+
+When `storage_type` is `nothing` and `threaded` is `nothing`, equivalent to the old `copy_op`
+but more efficient (shares immutable data).
+"""
+function copy_operator(op::AbstractOperator; storage_type = nothing, threaded = nothing)
+    if !has_mutable_buffers(typeof(op)) && threaded === nothing
+        return op  # safe to share
+    end
+    return _copy_operator_impl(op; storage_type, threaded)
+end
+
+# Default implementation: just deepcopy (fallback)
+function _copy_operator_impl(
+        op::T; storage_type = nothing, threaded = nothing
+    ) where {T <: AbstractOperator}
+    return deepcopy(op)
+end
+
+# Helper: convert a buffer array to the target storage type
+function _convert_buffer(buf::AbstractArray, ::Nothing)
+    return similar(buf)  # same type, new allocation
+end
+function _convert_buffer(buf::AbstractArray{T}, storage_type::Type) where {T}
+    return similar(storage_type{T}, size(buf))
+end
+
+_should_thread(d) = length(d) > 2^16 && Threads.nthreads() > 1
+# Type-based dispatch for storage types (used in BroadCast constructors)
+_should_thread(::Type{<:AbstractArray}) = true

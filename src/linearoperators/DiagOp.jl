@@ -28,7 +28,7 @@ end
 function DiagOp(D::Type, domain_dim::NTuple{N, Int}, d::T; threaded::Bool = true) where {N, T <: AbstractArray}
     size(d) != domain_dim && error("dimension of d must coincide with domain_dim")
     C = promote_type(eltype(d), D)
-    threaded = threaded && Threads.nthreads() > 1 && length(d) * sizeof(D) > 2^16
+    threaded = threaded && _should_thread(d)
     B = threaded ? FastBroadcast.True() : FastBroadcast.False()
     dS = typeof(d isa SubArray ? parent(d) : d).name.wrapper{D}
     cS = typeof(d isa SubArray ? parent(d) : d).name.wrapper{C}
@@ -38,7 +38,7 @@ end
 ###standard constructor with Scalar
 function DiagOp(D::Type, domain_dim::NTuple{N, Int}, d::T; threaded::Bool = true) where {N, T <: Number}
     C = promote_type(eltype(d), D)
-    threaded = threaded && Threads.nthreads() > 1 && length(d) > 2^16
+    threaded = threaded && _should_thread(d)
     B = threaded ? FastBroadcast.True() : FastBroadcast.False()
     return DiagOp{B, D, C, N, Array{D}, Array{C}, T}(domain_dim, d)
 end
@@ -46,11 +46,13 @@ end
 # other constructors
 function DiagOp(d::AbstractArray{T, N}; threaded::Bool = true) where {N, T <: Number}
     C = eltype(d)
-    B = (threaded && length(d) > 2^16) ? FastBroadcast.True() : FastBroadcast.False()
+    threaded = threaded && _should_thread(d)
+    B = threaded ? FastBroadcast.True() : FastBroadcast.False()
     S = typeof(d isa SubArray ? parent(d) : d).name.wrapper{T}
     return DiagOp{B, eltype(d), C, N, S, S, typeof(d)}(size(d), d)
 end
 DiagOp(domain_dim::NTuple{N, Int}, d::A; threaded::Bool = true) where {N, A <: Number} = DiagOp(Float64, domain_dim, d; threaded)
+
 
 # scale of DiagOp
 function Scale(coeff::T, L::DiagOp{B, D, C, N, dS, cS}) where {T <: Number, B, D, C, N, dS, cS}

@@ -20,22 +20,22 @@ true
 	
 ```
 """
-struct FiniteDiff{N, D, T} <: LinearOperator
+struct FiniteDiff{N, D, T, S<:AbstractArray{T}} <: LinearOperator
     dim_in::NTuple{N, Int}
-    function FiniteDiff{N, D, T}(dim_in) where {N, D, T}
+    function FiniteDiff{N, D, T, S}(dim_in) where {N, D, T, S<:AbstractArray{T}}
         D > N && error("direction is bigger the number of dimension $N")
-        return new{N, D, T}(dim_in)
+        return new{N, D, T, S}(dim_in)
     end
 end
 
 # Constructors
 # Val-dispatch constructor — fully type-stable (D is known at compile time)
 function FiniteDiff(::Type{T}, dim_in::NTuple{N, Int}, ::Val{D}) where {T, N, D}
-    return FiniteDiff{N, D, T}(dim_in)
+    return FiniteDiff{N, D, T, Array{T}}(dim_in)
 end
 
 # Specialized no-direction constructor: D=1 is a compile-time literal — fully type-stable
-FiniteDiff(dim_in::NTuple{N, Int}) where {N} = FiniteDiff{N, 1, Float64}(dim_in)
+FiniteDiff(dim_in::NTuple{N, Int}) where {N} = FiniteDiff{N, 1, Float64, Array{Float64}}(dim_in)
 
 #default constructor (direction as runtime Int — delegates to Val)
 function FiniteDiff(domain_type::Type, dim_in::NTuple{N, Int}, dir::Int = 1) where {N}
@@ -45,7 +45,8 @@ end
 FiniteDiff(dim_in::NTuple{N, Int}, dir::Int) where {N} = FiniteDiff(Float64, dim_in, Val(dir))
 
 function FiniteDiff(x::AbstractArray{T, N}, dir::Int = 1) where {T, N}
-    return FiniteDiff(T, size(x), Val(dir))
+    S = _array_wrapper(x){T}
+    return FiniteDiff{N, dir, T, S}(size(x))
 end
 
 # Mappings
@@ -76,6 +77,8 @@ end
 
 domain_type(::FiniteDiff{<:Any, <:Any, T}) where {T} = T
 codomain_type(::FiniteDiff{<:Any, <:Any, T}) where {T} = T
+domain_storage_type(::FiniteDiff{N,D,T,S}) where {N,D,T,S} = S
+codomain_storage_type(::FiniteDiff{N,D,T,S}) where {N,D,T,S} = S
 is_thread_safe(::FiniteDiff) = true
 
 function size(L::FiniteDiff{N, D}) where {N, D}

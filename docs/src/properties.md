@@ -57,3 +57,10 @@ remove_slicing
 is_thread_safe
 estimate_opnorm
 ```
+
+## Operator Copying
+
+```@docs
+copy_operator
+has_mutable_buffers
+```

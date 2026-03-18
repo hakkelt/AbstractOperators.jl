@@ -9,16 +9,21 @@ Creates an hyperbolic secant non-linear operator with input dimensions `dim_in`:
 ```
 
 """
-struct Sech{T, N} <: NonLinearOperator
+struct Sech{T, N, S<:AbstractArray{T}} <: NonLinearOperator
     dim::NTuple{N, Int}
 end
 
-function Sech(domain_type::Type, DomainDim::NTuple{N, Int}) where {N}
-    return Sech{domain_type, N}(DomainDim)
+function Sech(domain_type::Type{T}, DomainDim::NTuple{N, Int}) where {T, N}
+    return Sech{T, N, Array{T}}(DomainDim)
 end
 
-Sech(DomainDim::NTuple{N, Int}) where {N} = Sech{Float64, N}(DomainDim)
-Sech(DomainDim::Vararg{Int}) = Sech{Float64, length(DomainDim)}(DomainDim)
+Sech(DomainDim::NTuple{N, Int}) where {N} = Sech{Float64, N, Array{Float64}}(DomainDim)
+Sech(DomainDim::Vararg{Int}) = Sech{Float64, length(DomainDim), Array{Float64}}(DomainDim)
+
+function Sech(x::AbstractArray{T}) where {T}
+    S = _array_wrapper(x){T}
+    return Sech{T, ndims(x), S}(size(x))
+end
 
 function mul!(y::AbstractArray, L::Sech, x::AbstractArray)
     check(y, L, x)
@@ -37,4 +42,6 @@ size(L::Sech) = (L.dim, L.dim)
 
 domain_type(::Sech{T, N}) where {T, N} = T
 codomain_type(::Sech{T, N}) where {T, N} = T
+domain_storage_type(::Sech{T, N, S}) where {T, N, S} = S
+codomain_storage_type(::Sech{T, N, S}) where {T, N, S} = S
 is_thread_safe(::Sech) = true

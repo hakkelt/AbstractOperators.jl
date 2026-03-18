@@ -242,6 +242,7 @@ function create_BatchOp(
         codomain_batch_dim_mask,
         spreading_dims,
     )
+    threaded = threaded && _should_thread(domain_storage_type(operators[1]))
     if threaded && nthreads() > 1
         type_args = (
             dType,
@@ -340,7 +341,7 @@ function create_threaded_SpreadingBatchOp(
         end
         if threading_strategy == ThreadingStrategy.COPYING
             operators = [
-                i == 1 ? operators : [copy_op(op) for op in operators] for
+                i == 1 ? operators : [AbstractOperators.copy_operator(op) for op in operators] for
                     i in 1:min(nthreads(), prod(batch_size))
             ]
             return SpreadingBatchOpCopying{type_args...}(

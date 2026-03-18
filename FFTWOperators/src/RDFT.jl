@@ -80,6 +80,13 @@ domain_type(::RDFT{T}) where {T} = T
 codomain_type(::RDFT{T}) where {T} = Complex{T}
 is_thread_safe(::RDFT) = false
 
+function domain_storage_type(L::RDFT{T, N, T1, T2, T3}) where {T, N, T1, T2, T3}
+    return T3.name.wrapper{T}
+end
+function codomain_storage_type(L::RDFT{T, N, T1, T2, T3}) where {T, N, T1, T2, T3}
+    return T3.name.wrapper{Complex{T}}
+end
+
 is_AAc_diagonal(L::RDFT) = false #TODO but might be true?
 is_invertible(L::RDFT) = true
 is_full_row_rank(L::RDFT) = true

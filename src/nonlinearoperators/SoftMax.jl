@@ -35,13 +35,10 @@ end
 function mul!(y::AbstractArray, J::AdjointOperator{<:Jacobian{<:SoftMax}}, b::AbstractArray)
     check(y, J, b)
     L = J.A
-    fill!(y, zero(eltype(y)))
     L.A.buf .= exp.(L.x .- maximum(L.x))
     L.A.buf ./= sum(L.A.buf)
-    for i in eachindex(y)
-        y[i] = -L.A.buf[i] * dot(L.A.buf, b)
-        y[i] += L.A.buf[i] * b[i]
-    end
+    d = dot(L.A.buf, b)
+    y .= L.A.buf .* (b .- d)
     return y
 end
 
@@ -51,4 +48,6 @@ size(L::SoftMax) = (L.dim, L.dim)
 
 domain_type(::SoftMax{T}) where {T} = T
 codomain_type(::SoftMax{T}) where {T} = T
+domain_storage_type(::SoftMax{T, N, B}) where {T, N, B} = B.name.wrapper{T}
+codomain_storage_type(::SoftMax{T, N, B}) where {T, N, B} = B.name.wrapper{T}
 is_thread_safe(::SoftMax) = true

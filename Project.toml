@@ -3,7 +3,7 @@ uuid = "d9c5613a-d543-52d8-9afd-8f241a8c3f1c"
 version = "0.4.0"
 
 [workspace]
-projects = ["test", "docs", "benchmark", "DSPOperators", "FFTWOperators", "NFFTOperators", "WaveletOperators"]
+projects = ["test", "docs", "DSPOperators", "FFTWOperators", "NFFTOperators", "WaveletOperators"]
 
 [deps]
 FastBroadcast = "7034ab61-46d4-4ed7-9d0f-46aef9175898"
@@ -23,7 +23,7 @@ LinearMapsExt = "LinearMaps"
 
 [compat]
 FastBroadcast = "0.3.5"
-GPUArrays = "11.2.3"
+GPUArrays = "10, 11"
 LinearAlgebra = "1"
 LinearMaps = "3.11.4"
 OperatorCore = "0.1"

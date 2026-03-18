@@ -103,10 +103,8 @@ end
 
 # Mappings
 
-@generated function mul!(
-        y::AbstractArray, L::GetIndex{I}, b::AbstractArray
-    ) where {K, I <: Tuple{Vararg{Any, K}}}
-    return if K == 1
+@generated function mul!(y, L::GetIndex{I}, b) where {K, I <: Tuple{Vararg{Any, K}}}
+    if K == 1
         if I.parameters[1] <: AbstractArray{Bool}
             indices = :(to_indices(b, L.idx)[1])
         else

@@ -62,6 +62,12 @@ end
 # Properties
 domain_type(::LMatrixOp{T}) where {T} = T
 codomain_type(::LMatrixOp{T}) where {T} = T
+function domain_storage_type(L::LMatrixOp{T, A}) where {T, A}
+    return A.name.wrapper{T}
+end
+function codomain_storage_type(L::LMatrixOp{T, A}) where {T, A}
+    return A.name.wrapper{T}
+end
 is_thread_safe(::LMatrixOp) = true
 
 fun_name(L::LMatrixOp) = "(⋅)b"

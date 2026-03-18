@@ -30,6 +30,12 @@ import AbstractOperators:
     has_fast_opnorm,
     check
 
+# Capture AbstractFFTs generic functions for use in package extensions.
+# Extensions cannot directly `import AbstractFFTs`, but can import these via
+# `import FFTWOperators: _plan_fft, _plan_bfft`.
+const _plan_fft = plan_fft
+const _plan_bfft = plan_bfft
+
 function __init__()
     return push!(
         AbstractOperators.thread_count_functions[],

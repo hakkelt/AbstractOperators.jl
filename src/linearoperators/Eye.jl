@@ -36,7 +36,7 @@ end
 Eye(t::Type, dims::Vararg{Integer}) = Eye(t, dims)
 Eye(dims::NTuple{N, Integer}) where {N} = Eye(Float64, dims)
 Eye(dims::Vararg{Integer}) = Eye(Float64, dims)
-Eye(x::A) where {A <: AbstractArray} = Eye(eltype(x), size(x), Array{eltype(x)})
+Eye(x::A) where {A <: AbstractArray} = Eye(eltype(x), size(x), A.name.wrapper{eltype(x)})
 
 # Mappings
 

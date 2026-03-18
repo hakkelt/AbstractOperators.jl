@@ -17,7 +17,7 @@ julia> Z*ones(2,2)
 	
 ```
 """
-struct ZeroPad{N, T} <: LinearOperator
+struct ZeroPad{N, T, S<:AbstractArray{T}} <: LinearOperator
     dim_in::NTuple{N, Int}
     zp::NTuple{N, Int}
 end
@@ -27,7 +27,7 @@ end
 function ZeroPad(domain_type::Type, dim_in::NTuple{N, Int}, zp::NTuple{M, Int}) where {N, M}
     M != N && error("dim_in and zp must have the same length")
     any([zp...] .< 0) && error("zero padding cannot be negative")
-    return ZeroPad{N, domain_type}(dim_in, zp)
+    return ZeroPad{N, domain_type, Array{domain_type}}(dim_in, zp)
 end
 
 ZeroPad(dim_in::Tuple, zp::NTuple{N, Int}) where {N} = ZeroPad(Float64, dim_in, zp)
@@ -35,100 +35,55 @@ function ZeroPad(domain_type::Type, dim_in::Tuple, zp::Vararg{Int, N}) where {N}
     return ZeroPad(domain_type, dim_in, zp)
 end
 ZeroPad(dim_in::Tuple, zp::Vararg{Int, N}) where {N} = ZeroPad(Float64, dim_in, zp)
-ZeroPad(x::AbstractArray, zp::NTuple{N, Int}) where {N} = ZeroPad(eltype(x), size(x), zp)
-ZeroPad(x::AbstractArray, zp::Vararg{Int, N}) where {N} = ZeroPad(eltype(x), size(x), zp)
+function ZeroPad(x::AbstractArray{T}, zp::NTuple{N, Int}) where {T, N}
+    S = _array_wrapper(x){T}
+    return ZeroPad{N, T, S}(size(x), zp)
+end
+function ZeroPad(x::AbstractArray{T}, zp::Vararg{Int, N}) where {T, N}
+    S = _array_wrapper(x){T}
+    return ZeroPad{N, T, S}(size(x), zp)
+end
 
 # Mappings
-@generated function mul!(
-        y::AbstractArray, L::ZeroPad{N}, b::AbstractArray
-    ) where {N}
-
-    # builds
-    #for i1 =1:size(y,1), i2 =1:size(y,2)
-    #	y[i1,i2] = i1 <= size(b,1) && i2 <= size(b,2)  ?  b[i1,i2] : 0.
-    #end
-
-    ex = "for "
-    for i in 1:N
-        ex *= "i$i =1:size(y,$i),"
+@generated function mul!(y, L::ZeroPad{N, T}, b) where {N, T}
+    z = zero(T)  # compile-time literal zero for type T
+    vars = [Symbol("i$i") for i in 1:N]
+    # Condition: i1 <= size(b,1) && i2 <= size(b,2) && ...
+    cond = if N == 1
+        :($(vars[1]) <= size(b, 1))
+    else
+        Expr(:&&, [:($(vars[i]) <= size(b, $i)) for i in 1:N]...)
     end
-
-    ex = ex[1:(end - 1)] #remove ,
-
-    ex *= " y["
+    # Inner assignment: @inbounds y[i1,i2,...] = cond ? b[i1,i2,...] : z
+    assign = :(@inbounds y[$(vars...)] = $cond ? b[$(vars...)] : $z)
+    # Wrap in nested for loops: outermost=dim N, innermost=dim 1 (column-major)
+    body = assign
     for i in 1:N
-        ex *= "i$i,"
+        body = :(for $(vars[i]) in 1:size(y, $i); $body; end)
     end
-
-    ex = ex[1:(end - 1)] #remove ,
-
-    ex *= "] = "
-    for i in 1:N
-        ex *= " i$i <= size(b,$i) &&"
-    end
-
-    ex = ex[1:(end - 2)] #remove &&
-
-    ex *= " ?  b["
-    for i in 1:N
-        ex *= "i$i,"
-    end
-
-    ex = ex[1:(end - 1)] #remove ,
-    ex *= "] : 0. end"
-
-    loop_expr = Meta.parse(ex)
     return quote
         check(y, L, b)
-        $loop_expr
+        $body
         return y
     end
 end
 
-@generated function mul!(
-        y::AbstractArray, L::AdjointOperator{<:ZeroPad{N}}, b::AbstractArray
-    ) where {N}
-
-    #builds
-    #for l = 1:size(y,1), m = 1:size(y,2)
-    #	y[l,m] = b[l,m]
-    #end
-
-    ex = "for "
-    for i in 1:N
-        ex *= "i$i =1:size(y,$i),"
-    end
-
-    ex *= " y["
-    idx = ""
-    for i in 1:N
-        idx *= "i$i,"
-    end
-
-    idx = idx[1:(end - 1)] #remove ,
-
-    ex *= idx
-
-    ex *= "] = b["
-    ex *= idx
-    ex *= "] end"
-
-    loop_expr = Meta.parse(ex)
-    return quote
-        check(y, L, b)
-        $loop_expr
-        return y
-    end
+function mul!(y, L::AdjointOperator{<:ZeroPad}, b)
+    check(y, L, b)
+    copyto!(y, view(b, ntuple(i -> 1:L.A.dim_in[i], length(L.A.dim_in))...))
+    return y
 end
 
-function get_normal_op(L::ZeroPad{N, T}) where {N, T}
-    return Eye(domain_type(L), size(L, 2), domain_storage_type(L))
+function get_normal_op(L::ZeroPad{N, T, S}) where {N, T, S}
+    return Eye(domain_type(L), size(L, 2), S)
 end
 
 # Properties
 
 domain_type(::ZeroPad{<:Any, T}) where {T} = T
 codomain_type(::ZeroPad{<:Any, T}) where {T} = T
+domain_storage_type(::ZeroPad{N,T,S}) where {N,T,S} = S
+codomain_storage_type(::ZeroPad{N,T,S}) where {N,T,S} = S
 is_thread_safe(::ZeroPad) = true
 
 size(L::ZeroPad) = L.dim_in .+ L.zp, L.dim_in

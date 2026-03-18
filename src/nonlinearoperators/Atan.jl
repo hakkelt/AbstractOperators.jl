@@ -9,16 +9,21 @@ Creates an inverse tangent non-linear operator with input dimensions `dim_in`:
 ```
 
 """
-struct Atan{T, N} <: NonLinearOperator
+struct Atan{T, N, S<:AbstractArray{T}} <: NonLinearOperator
     dim::NTuple{N, Int}
 end
 
-function Atan(domain_type::Type, DomainDim::NTuple{N, Int}) where {N}
-    return Atan{domain_type, N}(DomainDim)
+function Atan(domain_type::Type{T}, DomainDim::NTuple{N, Int}) where {T, N}
+    return Atan{T, N, Array{T}}(DomainDim)
 end
 
-Atan(DomainDim::NTuple{N, Int}) where {N} = Atan{Float64, N}(DomainDim)
-Atan(DomainDim::Vararg{Int}) = Atan{Float64, length(DomainDim)}(DomainDim)
+Atan(DomainDim::NTuple{N, Int}) where {N} = Atan{Float64, N, Array{Float64}}(DomainDim)
+Atan(DomainDim::Vararg{Int}) = Atan{Float64, length(DomainDim), Array{Float64}}(DomainDim)
+
+function Atan(x::AbstractArray{T}) where {T}
+    S = _array_wrapper(x){T}
+    return Atan{T, ndims(x), S}(size(x))
+end
 
 function mul!(y::AbstractArray, L::Atan, x::AbstractArray)
     check(y, L, x)
@@ -37,4 +42,6 @@ size(L::Atan) = (L.dim, L.dim)
 
 domain_type(::Atan{T, N}) where {T, N} = T
 codomain_type(::Atan{T, N}) where {T, N} = T
+domain_storage_type(::Atan{T, N, S}) where {T, N, S} = S
+codomain_storage_type(::Atan{T, N, S}) where {T, N, S} = S
 is_thread_safe(::Atan) = true

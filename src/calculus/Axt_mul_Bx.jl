@@ -84,7 +84,8 @@ function mul!(y::AbstractArray, P::Axt_mul_Bx{1}, b::AbstractArray)
     check(y, P, b)
     mul!(P.bufA, P.A, b)
     mul!(P.bufB, P.B, b)
-    return y[1] = dot(P.bufA, P.bufB)
+    fill!(y, dot(P.bufA, P.bufB))
+    return y
 end
 
 function mul!(y::AbstractArray, J::AdjointOperator{<:Axt_mul_BxJac{1}}, b::AbstractArray)

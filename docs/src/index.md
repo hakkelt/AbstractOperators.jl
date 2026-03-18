@@ -118,6 +118,31 @@ A list of the available `AbstractOperators` and calculus rules can be found in t
 
 `AbstractOperators.jl` is distinguished by its support for multi-dimensional array domains and codomains, efficient in-place implementations of both linear and nonlinear operators, and seamless integration with optimization algorithms in related packages: [ProximalOperators.jl](https://github.com/kul-forbes/ProximalOperators.jl), [ProximalAlgorithms.jl](https://github.com/kul-forbes/ProximalAlgorithms.jl), and [StructuredOptimization.jl](https://github.com/kul-forbes/StructuredOptimization.jl). It has built-in threading support for many operators, and partial (and extending) GPU support.
 
+## GPU Support
+
+AbstractOperators.jl supports GPU arrays through a lightweight extension. Most operators work transparently with GPU arrays (e.g., `CuArray` from CUDA.jl):
+
+```julia
+using AbstractOperators, CUDA
+x_gpu = CuArray(randn(Float32, 100))
+F = FiniteDiff(Float32, (100,))
+y_gpu = similar(x_gpu, 99)
+mul!(y_gpu, F, x_gpu)  # works transparently
+```
+
+CPU threading is disabled automatically for GPU arrays. Storage types propagate through composed operators. See the [GPU documentation](gpu.md) for details.
+
+## Smart Operator Copying
+
+For parallel or multi-threaded use, copy operators efficiently with [`copy_operator`](@ref):
+
+```julia
+op = DiagOp(rand(1000)) + DiagOp(rand(1000))  # Sum with mutable buffers
+op2 = copy_operator(op)  # shares immutable data, copies buffers only
+```
+
+See the [Performance documentation](performance.md) for more details on threading, FastBroadcast optimizations, and memory allocation.
+
 ## Credits
 
 AbstractOperators.jl is developed by

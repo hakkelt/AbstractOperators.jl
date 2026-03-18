@@ -45,7 +45,7 @@ function Conv(domain_type::Type, dim_in::NTuple{N, Int}, h::H) where {N, H <: Ab
         R = plan_fft(buf)
         buf_c1 = similar(buf)
         complex_type = domain_type
-        I = FFTW.plan_inv(R)
+        I = inv(R)
     end
     buf_c2 = similar(buf_c1)
     return Conv{domain_type, N, H, typeof(buf_c1), typeof(R), typeof(I)}(dim_in, h, buf, buf_c1, buf_c2, R, I)
@@ -60,12 +60,11 @@ Conv(x::H, h::H) where {H <: AbstractArray} = Conv(eltype(x), size(x), h)
 function mul!(
         y::AbstractArray{T, N}, A::AbstractConv{T, N}, b::AbstractArray{T, N}
     ) where {T, N}
-    #y .= conv(A.h,b) #naive implementation
     fill!(A.buf, zero(T))
-    A.buf[CartesianIndices(A.h)] .= A.h
+    view(A.buf, axes(A.h)...) .= A.h
     mul!(A.buf_c1, A.R, A.buf)
     fill!(A.buf, zero(T))
-    A.buf[CartesianIndices(b)] .= b
+    view(A.buf, axes(b)...) .= b
     mul!(A.buf_c2, A.R, A.buf)
     A.buf_c2 .*= A.buf_c1
     return mul!(y, A.I, A.buf_c2)
@@ -74,16 +73,16 @@ end
 function mul!(
         y::AbstractArray{T, N}, L::AdjointOperator{C}, b::AbstractArray{T, N}
     ) where {T, N, C <: AbstractConv{T, N}}
-    #y .= xcorr(b,L.A.h)[size(L.A.h,1)[1]:end-length(L.A.h)+1] #naive implementation
     fill!(L.A.buf, zero(T))
-    L.A.buf[CartesianIndices(L.A.h)] .= L.A.h
+    view(L.A.buf, axes(L.A.h)...) .= L.A.h
     mul!(L.A.buf_c1, L.A.R, L.A.buf)
     fill!(L.A.buf, zero(T))
-    L.A.buf[CartesianIndices(b)] .= b
+    view(L.A.buf, axes(b)...) .= b
     mul!(L.A.buf_c2, L.A.R, L.A.buf)
     L.A.buf_c2 .*= conj.(L.A.buf_c1)
     mul!(L.A.buf, L.A.I, L.A.buf_c2)
-    return y .= L.A.buf[CartesianIndices(y)]
+    y .= view(L.A.buf, axes(y)...)
+    return y
 end
 
 # Properties

@@ -23,7 +23,7 @@ julia> Variation(ones(2,2))*[1. 2.; 1. 2.]
 
 ```
 """
-struct Variation{T, N, Th} <: LinearOperator
+struct Variation{T, N, Th, S<:AbstractArray{T}} <: LinearOperator
     dim_in::NTuple{N, Int}
 end
 
@@ -32,7 +32,7 @@ end
 function Variation(domain_type::Type, dim_in::NTuple{N, Int}; threaded = true) where {N}
     N == 1 && error("use FiniteDiff instead!")
     threaded = threaded && Threads.nthreads() > 1 && prod(dim_in) * sizeof(domain_type) > 2^16
-    return Variation{domain_type, N, threaded}(dim_in)
+    return Variation{domain_type, N, threaded, Array{domain_type}}(dim_in)
 end
 
 function Variation(domain_type::Type, dim_in::Vararg{Int}; threaded = true)
@@ -42,12 +42,19 @@ function Variation(dim_in::NTuple{N, Int}; threaded = true) where {N}
     return Variation(Float64, dim_in; threaded)
 end
 Variation(dim_in::Vararg{Int}; threaded = true) = Variation(dim_in; threaded)
-Variation(x::AbstractArray; threaded = true) = Variation(eltype(x), size(x); threaded)
+function Variation(x::AbstractArray; threaded = true)
+    S = _array_wrapper(x){eltype(x)}
+    T = eltype(x)
+    N = ndims(x)
+    threaded = threaded && _should_thread(x)
+    N == 1 && error("use FiniteDiff instead!")
+    return Variation{T, N, threaded, S}(size(x))
+end
 
 # Mappings
 # Non-threaded forward
 @inbounds function LinearAlgebra.mul!(
-        y::AbstractArray, A::Variation{T, N, false}, b::AbstractArray
+        y::AbstractArray, A::Variation{T, N, false, <:Any}, b::AbstractArray
     ) where {T, N}
     check(y, A, b)
     @assert firstindex(b) == 1 "Only support 1-based arrays"
@@ -84,7 +91,7 @@ Variation(x::AbstractArray; threaded = true) = Variation(eltype(x), size(x); thr
 end
 
 @inbounds function LinearAlgebra.mul!(
-        y::AbstractArray, A::Variation{T, N, true}, b::AbstractArray
+        y::AbstractArray, A::Variation{T, N, true, <:Any}, b::AbstractArray
     ) where {T, N}
     check(y, A, b)
     @assert firstindex(b) == 1 "Only support 1-based arrays"
@@ -122,7 +129,7 @@ end
 
 # Non-threaded adjoint
 @inbounds function LinearAlgebra.mul!(
-        y::AbstractArray, A::AdjointOperator{Variation{T, N, false}}, b::AbstractArray
+        y::AbstractArray, A::AdjointOperator{<:Variation{T, N, false}}, b::AbstractArray
     ) where {T, N}
     check(y, A, b)
     for cnt in LinearIndices(size(y))
@@ -156,7 +163,7 @@ end
 
 # Threaded adjoint
 @inbounds function LinearAlgebra.mul!(
-        y::AbstractArray, A::AdjointOperator{Variation{T, N, true}}, b::AbstractArray
+        y::AbstractArray, A::AdjointOperator{<:Variation{T, N, true}}, b::AbstractArray
     ) where {T, N}
     check(y, A, b)
     @batch for cnt in LinearIndices(size(y))
@@ -192,6 +199,8 @@ end
 
 domain_type(::Variation{T}) where {T} = T
 codomain_type(::Variation{T}) where {T} = T
+domain_storage_type(::Variation{T,N,Th,S}) where {T,N,Th,S} = S
+codomain_storage_type(::Variation{T,N,Th,S}) where {T,N,Th,S} = S
 is_thread_safe(::Variation) = true
 
 size(L::Variation{T, N}) where {T, N} = ((prod(L.dim_in), N), L.dim_in)

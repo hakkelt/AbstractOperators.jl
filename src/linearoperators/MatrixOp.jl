@@ -125,6 +125,8 @@ end
 
 domain_type(::MatrixOp{D}) where {D} = D
 codomain_type(::MatrixOp{D, T}) where {D, T} = D <: Real && T <: Complex ? T : D
+domain_storage_type(::MatrixOp{D, T, M, NC}) where {D, T, M, NC} = M.name.wrapper{D}
+codomain_storage_type(L::MatrixOp{D, T, M, NC}) where {D, T, M, NC} = M.name.wrapper{codomain_type(L)}
 is_thread_safe(::MatrixOp) = true
 
 # Type-stable size dispatch: NC=1 → 1D, NC>1 → 2D
