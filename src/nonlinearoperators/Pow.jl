@@ -11,14 +11,18 @@ struct Pow{T, N, I <: Real, S<:AbstractArray{T}} <: NonLinearOperator
     p::I
 end
 
-function Pow(domain_type::Type{T}, DomainDim::NTuple{N, Int}, p::I) where {T, N, I <: Real}
-    return Pow{T, N, I, Array{T}}(DomainDim, p)
+function Pow(
+        domain_type::Type{T}, DomainDim::NTuple{N, Int}, p::I; array_type::Type = Array
+    ) where {T, N, I <: Real}
+    S = _normalize_array_type(array_type, T)
+    return Pow{T, N, I, S}(DomainDim, p)
 end
 
-Pow(DomainDim::NTuple{N, Int}, p::I) where {N, I <: Real} = Pow{Float64, N, I, Array{Float64}}(DomainDim, p)
+Pow(DomainDim::NTuple{N, Int}, p::I; array_type::Type = Array) where {N, I <: Real} =
+    Pow(Float64, DomainDim, p; array_type)
 
-function Pow(x::AbstractArray{T}, p::I) where {T, I <: Real}
-    S = _array_wrapper(x){T}
+function Pow(x::AbstractArray{T}, p::I; array_type::Type = _array_wrapper(x)) where {T, I <: Real}
+    S = _normalize_array_type(array_type, T)
     return Pow{T, ndims(x), I, S}(size(x), p)
 end
 

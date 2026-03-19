@@ -13,14 +13,18 @@ struct SoftPlus{T, N, S<:AbstractArray{T}} <: NonLinearOperator
     dim::NTuple{N, Int}
 end
 
-function SoftPlus(domain_type::Type{T}, DomainDim::NTuple{N, Int}) where {T, N}
-    return SoftPlus{T, N, Array{T}}(DomainDim)
+function SoftPlus(
+        domain_type::Type{T}, DomainDim::NTuple{N, Int}; array_type::Type = Array
+    ) where {T, N}
+    S = _normalize_array_type(array_type, T)
+    return SoftPlus{T, N, S}(DomainDim)
 end
 
-SoftPlus(DomainDim::NTuple{N, Int}) where {N} = SoftPlus{Float64, N, Array{Float64}}(DomainDim)
+SoftPlus(DomainDim::NTuple{N, Int}; array_type::Type = Array) where {N} =
+    SoftPlus(Float64, DomainDim; array_type)
 
-function SoftPlus(x::AbstractArray{T}) where {T}
-    S = _array_wrapper(x){T}
+function SoftPlus(x::AbstractArray{T}; array_type::Type = _array_wrapper(x)) where {T}
+    S = _normalize_array_type(array_type, T)
     return SoftPlus{T, ndims(x), S}(size(x))
 end
 

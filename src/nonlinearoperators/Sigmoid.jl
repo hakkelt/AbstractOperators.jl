@@ -14,16 +14,26 @@ struct Sigmoid{T, N, G <: Real, S<:AbstractArray{T}} <: NonLinearOperator
     gamma::G
 end
 
-function Sigmoid(domain_type::Type{T}, DomainDim::NTuple{N, Int}, gamma::G = 1.0) where {T, N, G <: Real}
-    return Sigmoid{T, N, G, Array{T}}(DomainDim, gamma)
+function Sigmoid(
+        domain_type::Type{T},
+        DomainDim::NTuple{N, Int},
+        gamma::G = 1.0;
+        array_type::Type = Array,
+    ) where {T, N, G <: Real}
+    S = _normalize_array_type(array_type, T)
+    return Sigmoid{T, N, G, S}(DomainDim, gamma)
 end
 
-function Sigmoid(DomainDim::NTuple{N, Int}, gamma::G = 1.0) where {N, G}
-    return Sigmoid{Float64, N, G, Array{Float64}}(DomainDim, gamma)
+function Sigmoid(
+        DomainDim::NTuple{N, Int}, gamma::G = 1.0; array_type::Type = Array
+    ) where {N, G}
+    return Sigmoid(Float64, DomainDim, gamma; array_type)
 end
 
-function Sigmoid(x::AbstractArray{T}; gamma::G = 1.0) where {T, G <: Real}
-    S = _array_wrapper(x){T}
+function Sigmoid(
+        x::AbstractArray{T}; gamma::G = 1.0, array_type::Type = _array_wrapper(x)
+    ) where {T, G <: Real}
+    S = _normalize_array_type(array_type, T)
     return Sigmoid{T, ndims(x), G, S}(size(x), gamma)
 end
 

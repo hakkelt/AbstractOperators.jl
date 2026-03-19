@@ -76,3 +76,4 @@ benchpkgtable \
 - For honest GPU coverage, keep JLArray checks separate from real device checks and add backend-specific tags (`:cuda`, `:amdgpu`) plus runtime skip guards.
 - In `test/runtests.jl`, filter backend-tagged testitems when corresponding runtimes are unavailable, but keep per-test safety checks too.
 - Add explicit tests for `domain_storage_type`/`codomain_storage_type` and that `op * x` allocates on the active backend.
+- In benchmark setup code for normal operators, normalize potentially wrapped domain/codomain type traits to scalar element types before calling `randn`/`zeros`.

@@ -19,6 +19,9 @@ applyTo: "src/**/*.jl"
   - property traits such as linearity, diagonal structure, and rank-related predicates.
 - `check` utility function must be called in all effective `mul!` paths to ensure consistent argument validation and error messages.
 - Preserve `domain_storage_type` and `codomain_storage_type` semantics and dispatch compatibility.
+- Constructors should expose an `array_type` keyword where storage backend selection is meaningful.
+- `domain_storage_type`/`codomain_storage_type` must remain consistent with constructor-selected storage.
+- When storage checks become stricter, fix operator traits and tests instead of relaxing `check`.
 - Prefer behavior-preserving refactors: extract helpers, separate setup from kernels, reduce method size, but do not weaken checks.
 - If modifying copy semantics, preserve the package convention that immutable/read-only arrays are shared while mutable working buffers are copied deliberately.
 - Keep source formatted with Runic-compatible Julia style.
