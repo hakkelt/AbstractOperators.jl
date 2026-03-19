@@ -1,5 +1,5 @@
 @testitem "LMatrixOp" tags = [:linearoperator, :LMatrixOp] setup=[TestUtils] begin
-    using Random, AbstractOperators, JLArrays
+    using Random, AbstractOperators
     Random.seed!(0)
     verb && println(" --- Testing LMatrixOp --- ")
 
@@ -10,13 +10,14 @@
         test_op(op, conv(randn(n, m)), conv(randn(n)), verb)
     end
 
-    for (name, _, conv) in active_backends()
-        test_lmatrixop_mul(conv, name == "CPU" && verb)
-    end
+    test_lmatrixop_mul(identity, verb)
 
     n, m = 5, 6
     b = randn(m)
     op = LMatrixOp(Float64, (n, m), b)
+    op_array_type = LMatrixOp(Float64, (n, m), b; array_type = Array{ComplexF32, 2})
+    @test domain_storage_type(op_array_type) == Array{Float64}
+    @test codomain_storage_type(op_array_type) == Array{Float64}
     x1 = randn(n, m)
     y1 = test_op(op, x1, randn(n), verb)
     y2 = x1 * b
@@ -117,4 +118,54 @@
 
     # Show output symbol
     io = IOBuffer(); show(io, op_vec); s = String(take!(io)); @test occursin("(⋅)b", s)
+end
+
+@testitem "LMatrixOp (CUDA)" tags = [:linearoperator, :LMatrixOp, :gpu, :cuda] setup=[TestUtils] begin
+    using Random, AbstractOperators
+    cuda = try
+        @eval import CUDA
+        @eval CUDA
+    catch
+        nothing
+    end
+    has_cuda = !(cuda === nothing) && try
+        cuda.functional()
+    catch
+        false
+    end
+    if !has_cuda
+        @test_skip "CUDA not functional"
+    else
+        Random.seed!(0)
+        n, m = 5, 6
+        conv = cuda.cu
+        b = randn(m)
+        op = LMatrixOp(Float64, (n, m), conv(b))
+        test_op(op, conv(randn(n, m)), conv(randn(n)), false)
+    end
+end
+
+@testitem "LMatrixOp (AMDGPU)" tags = [:linearoperator, :LMatrixOp, :gpu, :amdgpu] setup=[TestUtils] begin
+    using Random, AbstractOperators
+    amdgpu = try
+        @eval import AMDGPU
+        @eval AMDGPU
+    catch
+        nothing
+    end
+    has_amdgpu = !(amdgpu === nothing) && try
+        amdgpu.functional()
+    catch
+        false
+    end
+    if !has_amdgpu
+        @test_skip "AMDGPU not functional"
+    else
+        Random.seed!(0)
+        n, m = 5, 6
+        conv = amdgpu.ROCArray
+        b = randn(m)
+        op = LMatrixOp(Float64, (n, m), conv(b))
+        test_op(op, conv(randn(n, m)), conv(randn(n)), false)
+    end
 end

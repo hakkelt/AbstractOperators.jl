@@ -108,11 +108,19 @@ end
 
 @testitem "NFFTOp (CUDA)" tags = [:nfft, :gpu, :cuda] setup = [TestUtils] begin
     using NFFTOperators, Random
-    b = backend_by_tag(:cuda)
-    if b === nothing
-        @test_skip "CUDA not functional"
-    else
-        _, _, conv = b
+    cuda = try
+        @eval import CUDA
+        @eval CUDA
+    catch
+        nothing
+    end
+    has_cuda = !(cuda === nothing) && try
+        cuda.functional()
+    catch
+        false
+    end
+    if has_cuda
+        conv = cuda.cu
         Random.seed!(21)
         trajectory = rand(2, 64, 16) .- 0.5
         dcf = rand(64, 16)
@@ -121,16 +129,26 @@ end
         op = NFFTOp(image_size, trajectory, dcf; array_type = typeof(image), threaded = false)
         y = op * image
         @test y isa AbstractArray
+    else
+        @test_skip "CUDA not functional"
     end
 end
 
 @testitem "NFFTOp (AMDGPU)" tags = [:nfft, :gpu, :amdgpu] setup = [TestUtils] begin
     using NFFTOperators, Random
-    b = backend_by_tag(:amdgpu)
-    if b === nothing
-        @test_skip "AMDGPU not functional"
-    else
-        _, _, conv = b
+    amdgpu = try
+        @eval import AMDGPU
+        @eval AMDGPU
+    catch
+        nothing
+    end
+    has_amdgpu = !(amdgpu === nothing) && try
+        amdgpu.functional()
+    catch
+        false
+    end
+    if has_amdgpu
+        conv = amdgpu.ROCArray
         Random.seed!(22)
         trajectory = rand(2, 64, 16) .- 0.5
         dcf = rand(64, 16)
@@ -139,5 +157,7 @@ end
         op = NFFTOp(image_size, trajectory, dcf; array_type = typeof(image), threaded = false)
         y = op * image
         @test y isa AbstractArray
+    else
+        @test_skip "AMDGPU not functional"
     end
 end

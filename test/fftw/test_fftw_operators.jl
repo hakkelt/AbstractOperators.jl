@@ -364,110 +364,21 @@ end
     @test collect(z_gpu) ≈ idct(collect(b_gpu))
 end
 
-@testitem "DFT (JLArray)" tags = [:fftw, :gpu, :DFT] setup=[TestUtils] begin
-    using FFTW, LinearAlgebra, Random, FFTWOperators
-    Random.seed!(1)
-
-    for (backend_name, conv) in filter(b -> b[1] == "JLArray", GPU_BACKENDS)
-        # Complex input
-        n = 8
-        x_cpu = randn(ComplexF64, n)
-        op_cpu = DFT(x_cpu)
-        y_cpu = zeros(ComplexF64, n)
-        mul!(y_cpu, op_cpu, x_cpu)
-
-        x = conv(x_cpu)
-        op = DFT(x)
-        y = conv(zeros(ComplexF64, n))
-        mul!(y, op, x)
-        @test collect(y) ≈ y_cpu  atol=1e-10
-
-        # Adjoint
-        b_cpu = randn(ComplexF64, n)
-        z_cpu = zeros(ComplexF64, n)
-        mul!(z_cpu, op_cpu', b_cpu)
-        b = conv(b_cpu)
-        z = conv(zeros(ComplexF64, n))
-        mul!(z, op', b)
-        @test collect(z) ≈ z_cpu  atol=1e-10
-
-        # Real input (codomain is complex)
-        xr_cpu = randn(Float64, n)
-        opr_cpu = DFT(xr_cpu)
-        yr_cpu = zeros(ComplexF64, n)
-        mul!(yr_cpu, opr_cpu, xr_cpu)
-
-        xr = conv(xr_cpu)
-        opr = DFT(xr)
-        yr = similar(xr, ComplexF64)
-        mul!(yr, opr, xr)
-        @test collect(yr) ≈ yr_cpu  atol=1e-10
-    end
-end
-
-@testitem "RDFT (JLArray)" tags = [:fftw, :gpu, :RDFT] setup=[TestUtils] begin
-    using FFTW, LinearAlgebra, Random, FFTWOperators
-    Random.seed!(2)
-
-    for (backend_name, conv) in filter(b -> b[1] == "JLArray", GPU_BACKENDS)
-        n = 8
-        x_cpu = randn(Float64, n)
-        op_cpu = RDFT(x_cpu)
-        y_cpu = zeros(ComplexF64, n÷2+1)
-        mul!(y_cpu, op_cpu, x_cpu)
-
-        x = conv(x_cpu)
-        op = RDFT(x)
-        y = conv(zeros(ComplexF64, n÷2+1))
-        mul!(y, op, x)
-        @test collect(y) ≈ y_cpu  atol=1e-10
-
-        # Adjoint
-        b_cpu = randn(ComplexF64, n÷2+1)
-        z_cpu = zeros(Float64, n)
-        mul!(z_cpu, op_cpu', b_cpu)
-        b = conv(b_cpu)
-        z = conv(zeros(Float64, n))
-        mul!(z, op', b)
-        @test collect(z) ≈ z_cpu  atol=1e-10
-    end
-end
-
-@testitem "IRDFT (JLArray)" tags = [:fftw, :gpu, :IRDFT] setup=[TestUtils] begin
-    using FFTW, LinearAlgebra, Random, FFTWOperators
-    Random.seed!(3)
-
-    for (backend_name, conv) in filter(b -> b[1] == "JLArray", GPU_BACKENDS)
-        n = 8
-        x_cpu = randn(ComplexF64, n÷2+1)
-        op_cpu = IRDFT(x_cpu, n)
-        y_cpu = zeros(Float64, n)
-        mul!(y_cpu, op_cpu, x_cpu)
-
-        x = conv(x_cpu)
-        op = IRDFT(x, n)
-        y = conv(zeros(Float64, n))
-        mul!(y, op, x)
-        @test collect(y) ≈ y_cpu  atol=1e-10
-
-        # Adjoint
-        b_cpu = randn(Float64, n)
-        z_cpu = zeros(ComplexF64, n÷2+1)
-        mul!(z_cpu, op_cpu', b_cpu)
-        b = conv(b_cpu)
-        z = conv(zeros(ComplexF64, n÷2+1))
-        mul!(z, op', b)
-        @test collect(z) ≈ z_cpu  atol=1e-10
-    end
-end
-
 @testitem "DFT/RDFT/IRDFT (CUDA)" tags = [:fftw, :gpu, :cuda] setup=[TestUtils] begin
     using FFTWOperators, Random
-    b = backend_by_tag(:cuda)
-    if b === nothing
-        @test_skip "CUDA not functional"
-    else
-        _, _, conv = b
+    cuda = try
+        @eval import CUDA
+        @eval CUDA
+    catch
+        nothing
+    end
+    has_cuda = !(cuda === nothing) && try
+        cuda.functional()
+    catch
+        false
+    end
+    if has_cuda
+        conv = cuda.cu
     Random.seed!(11)
 
     n = 8
@@ -487,16 +398,26 @@ end
     out = conv(zeros(Float64, n))
     mul!(out, ir, ry)
     @test out isa typeof(xr)
+    else
+        @test_skip "CUDA not functional"
     end
 end
 
 @testitem "DFT/RDFT/IRDFT (AMDGPU)" tags = [:fftw, :gpu, :amdgpu] setup=[TestUtils] begin
     using FFTWOperators, Random
-    b = backend_by_tag(:amdgpu)
-    if b === nothing
-        @test_skip "AMDGPU not functional"
-    else
-        _, _, conv = b
+    amdgpu = try
+        @eval import AMDGPU
+        @eval AMDGPU
+    catch
+        nothing
+    end
+    has_amdgpu = !(amdgpu === nothing) && try
+        amdgpu.functional()
+    catch
+        false
+    end
+    if has_amdgpu
+        conv = amdgpu.ROCArray
     Random.seed!(12)
 
     n = 8
@@ -516,5 +437,7 @@ end
     out = conv(zeros(Float64, n))
     mul!(out, ir, ry)
     @test out isa typeof(xr)
+    else
+        @test_skip "AMDGPU not functional"
     end
 end

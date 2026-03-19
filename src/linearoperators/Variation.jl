@@ -29,19 +29,23 @@ end
 
 # Constructors
 #default constructor
-function Variation(domain_type::Type, dim_in::NTuple{N, Int}; threaded = true) where {N}
+function Variation(
+        domain_type::Type, dim_in::NTuple{N, Int}; threaded = true, array_type::Type = Array
+    ) where {N}
     N == 1 && error("use FiniteDiff instead!")
     threaded = threaded && Threads.nthreads() > 1 && prod(dim_in) * sizeof(domain_type) > 2^16
-    return Variation{domain_type, N, threaded, Array{domain_type}}(dim_in)
+    S = _normalize_array_type(array_type, domain_type)
+    return Variation{domain_type, N, threaded, S}(dim_in)
 end
 
-function Variation(domain_type::Type, dim_in::Vararg{Int}; threaded = true)
-    return Variation(domain_type, dim_in; threaded)
+function Variation(domain_type::Type, dim_in::Vararg{Int}; threaded = true, array_type::Type = Array)
+    return Variation(domain_type, dim_in; threaded, array_type)
 end
-function Variation(dim_in::NTuple{N, Int}; threaded = true) where {N}
-    return Variation(Float64, dim_in; threaded)
+function Variation(dim_in::NTuple{N, Int}; threaded = true, array_type::Type = Array) where {N}
+    return Variation(Float64, dim_in; threaded, array_type)
 end
-Variation(dim_in::Vararg{Int}; threaded = true) = Variation(dim_in; threaded)
+Variation(dim_in::Vararg{Int}; threaded = true, array_type::Type = Array) =
+    Variation(dim_in; threaded, array_type)
 function Variation(x::AbstractArray; threaded = true)
     S = _array_wrapper(x){eltype(x)}
     T = eltype(x)

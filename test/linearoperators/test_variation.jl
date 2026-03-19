@@ -1,5 +1,5 @@
 @testitem "Variation" tags = [:linearoperator, :Variation] setup=[TestUtils] begin
-    using Random, SparseArrays, LinearAlgebra, AbstractOperators, JLArrays
+    using Random, SparseArrays, LinearAlgebra, AbstractOperators
     Random.seed!(0)
     verb && println(" --- Testing Variation --- ")
 
@@ -9,14 +9,15 @@
         test_op(op, conv(randn(n, m)), conv(randn(n * m, 2)), verb)
     end
 
-    for (name, _, conv) in active_backends()
-        test_variation_mul(conv, name == "CPU" && verb)
-    end
+    test_variation_mul(identity, verb)
 
     for threaded in (false, true)
         n, m = 10, 5
         verb && println("  - threaded = $threaded")
         op = Variation(Float64, (n, m); threaded)
+        op_array_type = Variation(Float64, (n, m); threaded, array_type = Array{ComplexF32, 2})
+        @test domain_storage_type(op_array_type) == Array{Float64}
+        @test codomain_storage_type(op_array_type) == Array{Float64}
         x1 = randn(n, m)
         y1 = test_op(op, x1, randn(m * n, 2), verb)
         # size & types
@@ -108,5 +109,53 @@
         @test is_invertible(op) == false
         @test is_full_row_rank(op) == false
         @test is_full_column_rank(op) == false
+    end
+end
+
+@testitem "Variation (CUDA)" tags = [:linearoperator, :Variation, :gpu, :cuda] setup=[TestUtils] begin
+    using Random, AbstractOperators
+    cuda = try
+        @eval import CUDA
+        @eval CUDA
+    catch
+        nothing
+    end
+    has_cuda = !(cuda === nothing) && try
+        cuda.functional()
+    catch
+        false
+    end
+    if !has_cuda
+        @test_skip "CUDA not functional"
+    else
+    Random.seed!(0)
+    conv = cuda.cu
+    n, m = 10, 5
+    op = Variation(conv(zeros(Float64, n, m)); threaded = false)
+    test_op(op, conv(randn(n, m)), conv(randn(n * m, 2)), false)
+    end
+end
+
+@testitem "Variation (AMDGPU)" tags = [:linearoperator, :Variation, :gpu, :amdgpu] setup=[TestUtils] begin
+    using Random, AbstractOperators
+    amdgpu = try
+        @eval import AMDGPU
+        @eval AMDGPU
+    catch
+        nothing
+    end
+    has_amdgpu = !(amdgpu === nothing) && try
+        amdgpu.functional()
+    catch
+        false
+    end
+    if !has_amdgpu
+        @test_skip "AMDGPU not functional"
+    else
+    Random.seed!(0)
+    conv = amdgpu.ROCArray
+    n, m = 10, 5
+    op = Variation(conv(zeros(Float64, n, m)); threaded = false)
+    test_op(op, conv(randn(n, m)), conv(randn(n * m, 2)), false)
     end
 end

@@ -6,57 +6,15 @@ using RecursiveArrayTools: ArrayPartition
 using LinearAlgebra
 using Random
 using JLArrays
-try
-    import CUDA
-catch
-end
-try
-    import AMDGPU
-catch
-end
 
 export verb, test_op, test_NLop, gradient_fd, ArrayPartition, norm, dot, diag, opnorm
 export jl, to_cpu, test_NLop_gpu
-export CPU_BACKEND, JLARRAY_BACKEND, CUDA_BACKEND, AMDGPU_BACKEND
-export ALL_BACKENDS, GPU_BACKENDS, GPU_BACKENDS_TAGGED, HAS_CUDA, HAS_AMDGPU
-export active_backends, active_gpu_backends, backend_by_tag
-export has_cuda_backend, has_amdgpu_backend
 export assert_cpu_approx, assert_adjoint_invariant
 
 const verb = get(ENV, "ABSTRACTOPERATORS_TEST_VERBOSE", "false") == "true"
 
 to_cpu(x::AbstractArray) = collect(x)
 to_cpu(x::RecursiveArrayTools.ArrayPartition) = RecursiveArrayTools.ArrayPartition(collect.(x.x)...)
-
-const HAS_CUDA = (@isdefined CUDA) && CUDA.functional()
-const HAS_AMDGPU = (@isdefined AMDGPU) && AMDGPU.functional()
-
-const CPU_BACKEND = ("CPU", :cpu, identity)
-const JLARRAY_BACKEND = ("JLArray", :jlarray, jl)
-const CUDA_BACKEND = ("CuArray", :cuda, x -> CUDA.cu(x))
-const AMDGPU_BACKEND = ("ROCArray", :amdgpu, x -> AMDGPU.ROCArray(x))
-
-const ALL_BACKENDS = begin
-    backends = Any[CPU_BACKEND, JLARRAY_BACKEND]
-    HAS_CUDA && push!(backends, CUDA_BACKEND)
-    HAS_AMDGPU && push!(backends, AMDGPU_BACKEND)
-    Tuple(backends)
-end
-
-const GPU_BACKENDS_TAGGED = filter(b -> b[2] != :cpu, ALL_BACKENDS)
-const GPU_BACKENDS = map(b -> (b[1], b[3]), GPU_BACKENDS_TAGGED)
-
-active_backends() = ALL_BACKENDS
-active_gpu_backends() = GPU_BACKENDS_TAGGED
-has_cuda_backend() = HAS_CUDA
-has_amdgpu_backend() = HAS_AMDGPU
-
-function backend_by_tag(tag::Symbol)
-    for backend in ALL_BACKENDS
-        backend[2] == tag && return backend
-    end
-    return nothing
-end
 
 function assert_cpu_approx(x, y; atol = 1.0e-8)
     @test norm(to_cpu(x) .- to_cpu(y)) <= atol

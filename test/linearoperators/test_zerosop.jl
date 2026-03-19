@@ -1,5 +1,5 @@
 @testitem "Zeros" tags = [:linearoperator, :Zeros] setup=[TestUtils] begin
-    using Random, AbstractOperators, JLArrays
+    using Random, AbstractOperators
     Random.seed!(0)
     verb && println(" --- Testing Zeros --- ")
 
@@ -12,15 +12,16 @@
         @test to_cpu(y1) == zeros(Float64, m)
     end
 
-    for (name, _, conv) in active_backends()
-        test_zeros_mul(conv, name == "CPU" && verb)
-    end
+    test_zeros_mul(identity, verb)
 
     n = (3, 4)
     D = Float64
     m = (5, 2)
     C = Complex{Float64}
     op = Zeros(D, n, C, m)
+    op_array_type = Zeros(D, n, C, m; array_type = Array{ComplexF32, 2})
+    @test domain_storage_type(op_array_type) == Array{Float64}
+    @test codomain_storage_type(op_array_type) == Array{ComplexF64}
     x1 = randn(n)
     y1 = test_op(op, x1, randn(m) + im * randn(m), verb)
     @test y1 == zeros(eltype(y1), m)
@@ -70,4 +71,52 @@
 
     # Show output symbol
     io = IOBuffer(); show(io, op); s = String(take!(io)); @test occursin("0", s)
+end
+
+@testitem "Zeros (CUDA)" tags = [:linearoperator, :Zeros, :gpu, :cuda] setup=[TestUtils] begin
+    using Random, AbstractOperators
+    cuda = try
+        @eval import CUDA
+        @eval CUDA
+    catch
+        nothing
+    end
+    has_cuda = !(cuda === nothing) && try
+        cuda.functional()
+    catch
+        false
+    end
+    if !has_cuda
+        @test_skip "CUDA not functional"
+    else
+    Random.seed!(0)
+    n = (3, 4); m = (5, 2)
+    op = Zeros(Float64, n, Float64, m; array_type = cuda.CuArray)
+    y = test_op(op, cuda.cu(randn(n)), cuda.cu(randn(m)), false)
+    @test collect(y) == zeros(Float64, m)
+    end
+end
+
+@testitem "Zeros (AMDGPU)" tags = [:linearoperator, :Zeros, :gpu, :amdgpu] setup=[TestUtils] begin
+    using Random, AbstractOperators
+    amdgpu = try
+        @eval import AMDGPU
+        @eval AMDGPU
+    catch
+        nothing
+    end
+    has_amdgpu = !(amdgpu === nothing) && try
+        amdgpu.functional()
+    catch
+        false
+    end
+    if !has_amdgpu
+        @test_skip "AMDGPU not functional"
+    else
+    Random.seed!(0)
+    n = (3, 4); m = (5, 2)
+    op = Zeros(Float64, n, Float64, m; array_type = amdgpu.ROCArray)
+    y = test_op(op, amdgpu.ROCArray(randn(n)), amdgpu.ROCArray(randn(m)), false)
+    @test collect(y) == zeros(Float64, m)
+    end
 end

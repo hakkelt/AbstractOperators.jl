@@ -6,6 +6,11 @@
     n, m = 5, 4
     A = randn(n, m)
     op = MyLinOp(Float64, (m,), (n,), (y, x) -> mul!(y, A, x), (y, x) -> mul!(y, A', x))
+    op_array_type = MyLinOp(
+        Float64, (m,), (n,), (y, x) -> mul!(y, A, x), (y, x) -> mul!(y, A', x); array_type = Array{ComplexF32, 2}
+    )
+    @test domain_storage_type(op_array_type) == Array{Float64}
+    @test codomain_storage_type(op_array_type) == Array{Float64}
     x1 = randn(m)
     y1 = test_op(op, x1, randn(n), verb)
     y2 = A * x1
@@ -47,4 +52,58 @@
     )
     @test size(op) == ((n,), (m,))
     @test op * x1 ≈ A * x1
+end
+
+@testitem "MyLinOp (CUDA)" tags = [:linearoperator, :MyLinOp, :gpu, :cuda] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    cuda = try
+        @eval import CUDA
+        @eval CUDA
+    catch
+        nothing
+    end
+    has_cuda = !(cuda === nothing) && try
+        cuda.functional()
+    catch
+        false
+    end
+    if !has_cuda
+        @test_skip "CUDA not functional"
+    else
+        Random.seed!(0)
+        n, m = 5, 4
+        A = cuda.cu(randn(n, m))
+        op = MyLinOp(Float64, (m,), (n,), (y, x) -> mul!(y, A, x), (y, x) -> mul!(y, A', x); array_type = cuda.CuArray)
+        x = cuda.cu(randn(m))
+        y = cuda.cu(randn(n))
+        test_op(op, x, y, false)
+        @test domain_storage_type(op) <: cuda.CuArray
+    end
+end
+
+@testitem "MyLinOp (AMDGPU)" tags = [:linearoperator, :MyLinOp, :gpu, :amdgpu] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    amdgpu = try
+        @eval import AMDGPU
+        @eval AMDGPU
+    catch
+        nothing
+    end
+    has_amdgpu = !(amdgpu === nothing) && try
+        amdgpu.functional()
+    catch
+        false
+    end
+    if !has_amdgpu
+        @test_skip "AMDGPU not functional"
+    else
+        Random.seed!(0)
+        n, m = 5, 4
+        A = amdgpu.ROCArray(randn(n, m))
+        op = MyLinOp(Float64, (m,), (n,), (y, x) -> mul!(y, A, x), (y, x) -> mul!(y, A', x); array_type = amdgpu.ROCArray)
+        x = amdgpu.ROCArray(randn(m))
+        y = amdgpu.ROCArray(randn(n))
+        test_op(op, x, y, false)
+        @test domain_storage_type(op) <: amdgpu.ROCArray
+    end
 end

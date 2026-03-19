@@ -101,7 +101,10 @@ function _storage_type_for_elem(dt::Tuple)
 end
 
 # Get the array container type (Array, CuArray, etc.) from an array instance
-_array_wrapper(x::A) where {T, A <: AbstractArray{T}} = (x isa SubArray ? parent(x) : x) |> typeof |> a -> a.name.wrapper
+_array_wrapper_type(::Type{A}) where {A <: AbstractArray} = Base.typename(A).wrapper
+_array_wrapper(x::A) where {T, A <: AbstractArray{T}} = _array_wrapper_type(typeof(x isa SubArray ? parent(x) : x))
+_normalize_array_type(array_type::Type{A}, elem_type::Type{T}) where {A <: AbstractArray, T} =
+    _array_wrapper_type(A){T}
 
 function allocate_in_domain(L::AbstractOperator, dims... = size(L, 2)...)
     dS = domain_storage_type(L)

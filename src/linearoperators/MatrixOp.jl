@@ -24,7 +24,7 @@ julia> MatrixOp(randn(20,10),4)
 	
 ```
 """
-struct MatrixOp{D, T, M <: AbstractMatrix{T}, NC} <: LinearOperator
+struct MatrixOp{D, T, M <: AbstractMatrix{T}, NC, dS, cS} <: LinearOperator
     A::M
 end
 
@@ -33,27 +33,33 @@ end
 ###standard constructor Operator{N}(domain_type::Type, DomainDim::NTuple{N,Int})
 function MatrixOp(
         domain_type::Type, DomainDim::NTuple{N, Int}, A::M
+        ; array_type::Type = _array_wrapper_type(M),
     ) where {N, T, M <: AbstractMatrix{T}}
     N > 2 && error("cannot multiply a Matrix by a n-dimensional Variable with n > 2")
     size(A, 2) != DomainDim[1] && error("wrong input dimensions")
+    codomainT = domain_type <: Real && T <: Complex ? T : domain_type
+    dS = _normalize_array_type(array_type, domain_type)
+    cS = _normalize_array_type(array_type, codomainT)
     return if N == 1
-        MatrixOp{domain_type, T, M, 1}(A)
+        MatrixOp{domain_type, T, M, 1, dS, cS}(A)
     else
-        MatrixOp{domain_type, T, M, DomainDim[2]}(A)
+        MatrixOp{domain_type, T, M, DomainDim[2], dS, cS}(A)
     end
 end
 ###
 
-MatrixOp(A::M) where {M <: AbstractMatrix} = MatrixOp(eltype(A), (size(A, 2),), A)
-MatrixOp(D::Type, A::M) where {M <: AbstractMatrix} = MatrixOp(D, (size(A, 2),), A)
+MatrixOp(A::M; array_type::Type = _array_wrapper_type(M)) where {M <: AbstractMatrix} =
+    MatrixOp(eltype(A), (size(A, 2),), A; array_type)
+MatrixOp(D::Type, A::M; array_type::Type = _array_wrapper_type(M)) where {M <: AbstractMatrix} =
+    MatrixOp(D, (size(A, 2),), A; array_type)
 function MatrixOp(A::M, n::Integer) where {M <: AbstractMatrix}
-    return MatrixOp(eltype(A), (size(A, 2), n), A)
+    return MatrixOp(eltype(A), (size(A, 2), n), A; array_type = _array_wrapper_type(M))
 end
 function MatrixOp(D::Type, A::M, n::Integer) where {M <: AbstractMatrix}
-    return MatrixOp(D, (size(A, 2), n), A)
+    return MatrixOp(D, (size(A, 2), n), A; array_type = _array_wrapper_type(M))
 end
 
-function Scale(coeff::Number, A::MatrixOp{D, T, M, NC}) where {D, T, M, NC}
+function Scale(coeff::Number, A::MatrixOp{D, T, M, NC, dS, cS}) where {D, T, M, NC, dS, cS}
     if coeff == 1
         return A
     end
@@ -64,7 +70,7 @@ function Scale(coeff::Number, A::MatrixOp{D, T, M, NC}) where {D, T, M, NC}
             "Cannot Scale AbstractOperator with real codomain with complex scalar. Use `DiagOp` instead.",
         )
     end
-    return MatrixOp(coeff * A.A, NC)
+    return MatrixOp(domain_type(A), size(A, 2), coeff * A.A; array_type = _array_wrapper_type(dS))
 end
 function Scale(coeff::Number, A::AdjointOperator{<:MatrixOp})
     if coeff == 1
@@ -81,7 +87,7 @@ function Scale(coeff::Number, A::AdjointOperator{<:MatrixOp})
 end
 
 import Base: convert
-convert(::Type{LinearOperator}, L::M) where {T, M <: AbstractMatrix{T}} = MatrixOp{T, T, M, 1}(L)
+convert(::Type{LinearOperator}, L::M) where {T, M <: AbstractMatrix{T}} = MatrixOp(T, (size(L, 2),), L)
 function convert(::Type{LinearOperator}, L::M, n::Integer) where {T, M <: AbstractMatrix{T}}
     return MatrixOp(L, n)
 end
@@ -96,7 +102,7 @@ function mul!(y::AbstractArray, L::MatrixOp, b::AbstractArray)
     return mul!(y, L.A, b)
 end
 # NC=1 implicit batching: matrix input accepted (domain declared as 1D but each column is processed)
-function mul!(y::AbstractArray, L::MatrixOp{<:Any, <:Any, <:Any, 1}, b::AbstractArray)
+function mul!(y::AbstractArray, L::MatrixOp{<:Any, <:Any, <:Any, 1, <:Any, <:Any}, b::AbstractArray)
     return mul!(y, L.A, b)
 end
 function mul!(y::AbstractArray, L::AdjointOperator{<:MatrixOp}, b::AbstractArray)
@@ -104,7 +110,7 @@ function mul!(y::AbstractArray, L::AdjointOperator{<:MatrixOp}, b::AbstractArray
     return mul!(y, L.A.A', b)
 end
 # NC=1 adjoint implicit batching: matrix input accepted
-function mul!(y::AbstractArray, L::AdjointOperator{<:MatrixOp{<:Any, <:Any, <:Any, 1}}, b::AbstractArray)
+function mul!(y::AbstractArray, L::AdjointOperator{<:MatrixOp{<:Any, <:Any, <:Any, 1, <:Any, <:Any}}, b::AbstractArray)
     return mul!(y, L.A.A', b)
 end
 
@@ -115,7 +121,7 @@ function mul!(y::AbstractArray, L::AdjointOperator{<:MatrixOp{D, T}}, b::Abstrac
     return y .= real.(yc)
 end
 # Resolves ambiguity: NC=1 real-domain complex-matrix adjoint with matrix batching
-function mul!(y::AbstractArray, L::AdjointOperator{<:MatrixOp{D, T, M, 1}}, b::AbstractArray) where {D <: Real, T <: Complex, M}
+function mul!(y::AbstractArray, L::AdjointOperator{<:MatrixOp{D, T, M, 1, <:Any, <:Any}}, b::AbstractArray) where {D <: Real, T <: Complex, M}
     yc = similar(y, T, size(y))
     mul!(yc, L.A.A', b)
     return y .= real.(yc)
@@ -125,13 +131,13 @@ end
 
 domain_type(::MatrixOp{D}) where {D} = D
 codomain_type(::MatrixOp{D, T}) where {D, T} = D <: Real && T <: Complex ? T : D
-domain_storage_type(::MatrixOp{D, T, M, NC}) where {D, T, M, NC} = M.name.wrapper{D}
-codomain_storage_type(L::MatrixOp{D, T, M, NC}) where {D, T, M, NC} = M.name.wrapper{codomain_type(L)}
+domain_storage_type(::MatrixOp{D, T, M, NC, dS}) where {D, T, M, NC, dS} = dS
+codomain_storage_type(::MatrixOp{D, T, M, NC, dS, cS}) where {D, T, M, NC, dS, cS} = cS
 is_thread_safe(::MatrixOp) = true
 
 # Type-stable size dispatch: NC=1 → 1D, NC>1 → 2D
-size(L::MatrixOp{D, T, M, 1}) where {D, T, M} = ((size(L.A, 1),), (size(L.A, 2),))
-size(L::MatrixOp{D, T, M, NC}) where {D, T, M, NC} = ((size(L.A, 1), NC), (size(L.A, 2), NC))
+size(L::MatrixOp{D, T, M, 1, dS, cS}) where {D, T, M, dS, cS} = ((size(L.A, 1),), (size(L.A, 2),))
+size(L::MatrixOp{D, T, M, NC, dS, cS}) where {D, T, M, NC, dS, cS} = ((size(L.A, 1), NC), (size(L.A, 2), NC))
 
 fun_name(L::MatrixOp) = "▒"
 

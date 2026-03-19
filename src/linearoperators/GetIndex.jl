@@ -46,12 +46,13 @@ end
 
 # Constructors
 # default
-function GetIndex(domain_type::Type, dim_in::Dims, idx::Tuple)
+function GetIndex(domain_type::Type, dim_in::Dims, idx::Tuple; array_type::Type = Array)
     dim_out = get_dim_out(dim_in, idx...)
     if dim_out == dim_in
         return Eye(domain_type, dim_in)
     else
-        return GetIndex(domain_type, Array{domain_type}, dim_out, dim_in, idx)
+        S = _normalize_array_type(array_type, domain_type)
+        return GetIndex(domain_type, S, dim_out, dim_in, idx)
     end
 end
 
@@ -59,21 +60,25 @@ function GetIndex(
         domain_type::Type,
         dim_in::Dims,
         idx::Union{AbstractVector{Int}, AbstractVector{<:CartesianIndex}},
+        ; array_type::Type = Array,
     )
     dim_out = (length(idx),)
-    return GetIndex(domain_type, Array{domain_type}, dim_out, dim_in, idx)
+    S = _normalize_array_type(array_type, domain_type)
+    return GetIndex(domain_type, S, dim_out, dim_in, idx)
 end
 
-function GetIndex(domain_type::Type, dim_in::Dims, mask::AbstractArray{Bool})
+function GetIndex(domain_type::Type, dim_in::Dims, mask::AbstractArray{Bool}; array_type::Type = Array)
     dim_out = (sum(mask),)
     if dim_out[1] == prod(dim_in)
         return reshape(Eye(domain_type, dim_in), dim_out)
     else
-        return GetIndex(domain_type, Array{domain_type}, dim_out, dim_in, mask)
+        S = _normalize_array_type(array_type, domain_type)
+        return GetIndex(domain_type, S, dim_out, dim_in, mask)
     end
 end
 
-GetIndex(domain_type::Type, dim_in::Dims, idx...) = GetIndex(domain_type, dim_in, idx)
+GetIndex(domain_type::Type, dim_in::Dims, idx...; array_type::Type = Array) =
+    GetIndex(domain_type, dim_in, idx; array_type)
 GetIndex(dim_in::Dims, idx...) = GetIndex(Float64, dim_in, idx)
 GetIndex(dim_in::Dims, idx::Tuple) = GetIndex(Float64, dim_in, idx)
 GetIndex(dim_in::Dims, idx) = GetIndex(Float64, dim_in, idx)
@@ -83,7 +88,7 @@ function GetIndex(x::AbstractArray, idx::Tuple)
     if dim_out == dim_in
         return Eye(eltype(x), dim_in)
     else
-        S = typeof(x isa SubArray ? parent(x) : x).name.wrapper{eltype(x)}
+        S = _array_wrapper(x){eltype(x)}
         return GetIndex(eltype(x), S, dim_out, dim_in, idx)
     end
 end
@@ -96,7 +101,7 @@ function GetIndex(
     if dim_out == dim_in
         return Eye(eltype(x), dim_in)
     else
-        S = typeof(x isa SubArray ? parent(x) : x).name.wrapper{eltype(x)}
+        S = _array_wrapper(x){eltype(x)}
         return GetIndex(eltype(x), S, dim_out, dim_in, idx)
     end
 end

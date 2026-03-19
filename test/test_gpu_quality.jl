@@ -62,32 +62,52 @@ end
 
 @testitem "Gpu storage type (CUDA)" tags = [:quality, :gpu, :cuda] setup = [TestUtils] begin
     using AbstractOperators
-    b = backend_by_tag(:cuda)
-    if b === nothing
-        @test_skip "CUDA not functional"
-    else
-        _, _, conv = b
+    cuda = try
+        @eval import CUDA
+        @eval CUDA
+    catch
+        nothing
+    end
+    has_cuda = !(cuda === nothing) && try
+        cuda.functional()
+    catch
+        false
+    end
+    if has_cuda
+        conv = cuda.cu
         x = conv(randn(8))
         op = DiagOp(x)
         @test domain_storage_type(op) <: typeof(x).name.wrapper
         @test codomain_storage_type(op) <: typeof(x).name.wrapper
         y = op * x
         @test y isa typeof(x)
+    else
+        @test_skip "CUDA not functional"
     end
 end
 
 @testitem "Gpu storage type (AMDGPU)" tags = [:quality, :gpu, :amdgpu] setup = [TestUtils] begin
     using AbstractOperators
-    b = backend_by_tag(:amdgpu)
-    if b === nothing
-        @test_skip "AMDGPU not functional"
-    else
-        _, _, conv = b
+    amdgpu = try
+        @eval import AMDGPU
+        @eval AMDGPU
+    catch
+        nothing
+    end
+    has_amdgpu = !(amdgpu === nothing) && try
+        amdgpu.functional()
+    catch
+        false
+    end
+    if has_amdgpu
+        conv = amdgpu.ROCArray
         x = conv(randn(8))
         op = DiagOp(x)
         @test domain_storage_type(op) <: typeof(x).name.wrapper
         @test codomain_storage_type(op) <: typeof(x).name.wrapper
         y = op * x
         @test y isa typeof(x)
+    else
+        @test_skip "AMDGPU not functional"
     end
 end

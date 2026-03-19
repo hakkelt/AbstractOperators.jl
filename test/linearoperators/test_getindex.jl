@@ -1,5 +1,5 @@
 @testitem "GetIndex" tags = [:linearoperator, :GetIndex] setup=[TestUtils] begin
-    using Random, LinearAlgebra, AbstractOperators, JLArrays
+    using Random, LinearAlgebra, AbstractOperators
     Random.seed!(0)
     verb && println(" --- Testing GetIndex --- ")
 
@@ -14,15 +14,16 @@
         test_op(op, conv(randn(n, m)), conv(randn(k, m)), verb)
     end
 
-    for (name, _, conv) in active_backends()
-        test_getindex_mul(conv, name == "CPU" && verb)
-    end
+    test_getindex_mul(identity, verb)
 
     n, m = 5, 4
     k = 3
     op = GetIndex(Float64, (n,), (1:k,))
     x1 = randn(n)
     y1 = test_op(op, x1, randn(k), verb)
+    op_array_type = GetIndex(Float64, (n,), (1:k,); array_type = Array{ComplexF32, 2})
+    @test domain_storage_type(op_array_type) == Array{Float64}
+    @test codomain_storage_type(op_array_type) == Array{Float64}
 
     @test all(norm.(y1 .- x1[1:k]) .<= 1.0e-12)
 
@@ -144,6 +145,58 @@
     bad_y = zeros(size(A, 1)..., 2)  # deliberately wrong extra dim
     @test_throws DimensionMismatch mul!(bad_y, A, xA)
 
+end
+
+@testitem "GetIndex (CUDA)" tags = [:linearoperator, :GetIndex, :gpu, :cuda] setup=[TestUtils] begin
+    using Random, AbstractOperators
+    cuda = try
+        @eval import CUDA
+        @eval CUDA
+    catch
+        nothing
+    end
+    has_cuda = !(cuda === nothing) && try
+        cuda.functional()
+    catch
+        false
+    end
+    if !has_cuda
+        @test_skip "CUDA not functional"
+    else
+        Random.seed!(0)
+        n, m, k = 5, 4, 3
+        conv = cuda.cu
+        op = GetIndex(conv(zeros(Float64, n)), (1:k,))
+        test_op(op, conv(randn(n)), conv(randn(k)), false)
+        op2 = GetIndex(conv(zeros(Float64, n, m)), (1:k, :))
+        test_op(op2, conv(randn(n, m)), conv(randn(k, m)), false)
+    end
+end
+
+@testitem "GetIndex (AMDGPU)" tags = [:linearoperator, :GetIndex, :gpu, :amdgpu] setup=[TestUtils] begin
+    using Random, AbstractOperators
+    amdgpu = try
+        @eval import AMDGPU
+        @eval AMDGPU
+    catch
+        nothing
+    end
+    has_amdgpu = !(amdgpu === nothing) && try
+        amdgpu.functional()
+    catch
+        false
+    end
+    if !has_amdgpu
+        @test_skip "AMDGPU not functional"
+    else
+        Random.seed!(0)
+        n, m, k = 5, 4, 3
+        conv = amdgpu.ROCArray
+        op = GetIndex(conv(zeros(Float64, n)), (1:k,))
+        test_op(op, conv(randn(n)), conv(randn(k)), false)
+        op2 = GetIndex(conv(zeros(Float64, n, m)), (1:k, :))
+        test_op(op2, conv(randn(n, m)), conv(randn(k, m)), false)
+    end
 end
 
 @testitem "GetIndex scalar Int specialized path" tags = [:linearoperator, :GetIndex] setup=[TestUtils] begin

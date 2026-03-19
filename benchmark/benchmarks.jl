@@ -301,6 +301,8 @@ function normal_state(op)
     return (op = nop, x = x, y = y)
 end
 
+nfft_normal_state() = normal_state(nfft_state().op)
+
 linear = SUITE["linearoperators"] = BenchmarkGroup()
 calculus = SUITE["calculus"] = BenchmarkGroup()
 nonlinear = SUITE["nonlinearoperators"] = BenchmarkGroup()
@@ -502,7 +504,7 @@ end
 
 if HAS_NFFT
     normal["NFFTOp"] = BenchmarkGroup()
-    normal["NFFTOp"]["mul"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = normal_state(nfft_state().op))
+    normal["NFFTOp"]["mul"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = nfft_normal_state())
 end
 
 # Cap run time so CI / ASV comparisons complete in reasonable time

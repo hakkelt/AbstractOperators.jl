@@ -1,5 +1,5 @@
 @testitem "MatrixOp" tags = [:linearoperator, :MatrixOp] setup=[TestUtils] begin
-    using Random, SparseArrays, LinearAlgebra, AbstractOperators, JLArrays
+    using Random, SparseArrays, LinearAlgebra, AbstractOperators
     Random.seed!(0)
     verb && println(" --- Testing MatrixOp --- ")
 
@@ -14,14 +14,15 @@
         test_op(op, conv(randn(m) + im * randn(m)), conv(randn(n) + im * randn(n)), verb)
     end
 
-    for (name, _, conv) in active_backends()
-        test_matrixop_mul(conv, name == "CPU" && verb)
-    end
+    test_matrixop_mul(identity, verb)
 
     # real matrix, real input
     n, m = 5, 4
     A = randn(n, m)
     op = MatrixOp(Float64, (m,), A)
+    op_array_type = MatrixOp(Float64, (m,), A; array_type = Array{ComplexF32, 2})
+    @test domain_storage_type(op_array_type) == Array{Float64}
+    @test codomain_storage_type(op_array_type) == Array{Float64}
     x1 = randn(m)
     y1 = test_op(op, x1, randn(n), verb)
     y2 = A * x1
@@ -147,4 +148,56 @@
 
     # Show output symbol
     io = IOBuffer(); show(io, TallOp); str = String(take!(io)); @test occursin("▒", str)
+end
+
+@testitem "MatrixOp (CUDA)" tags = [:linearoperator, :MatrixOp, :gpu, :cuda] setup=[TestUtils] begin
+    using Random, AbstractOperators
+    cuda = try
+        @eval import CUDA
+        @eval CUDA
+    catch
+        nothing
+    end
+    has_cuda = !(cuda === nothing) && try
+        cuda.functional()
+    catch
+        false
+    end
+    if !has_cuda
+        @test_skip "CUDA not functional"
+    else
+        Random.seed!(0)
+        conv = cuda.cu
+        n, m = 5, 4
+        A = randn(n, m)
+        test_op(MatrixOp(conv(A)), conv(randn(m)), conv(randn(n)), false)
+        Ac = randn(n, m) + im * randn(n, m)
+        test_op(MatrixOp(conv(Ac)), conv(randn(m) + im * randn(m)), conv(randn(n) + im * randn(n)), false)
+    end
+end
+
+@testitem "MatrixOp (AMDGPU)" tags = [:linearoperator, :MatrixOp, :gpu, :amdgpu] setup=[TestUtils] begin
+    using Random, AbstractOperators
+    amdgpu = try
+        @eval import AMDGPU
+        @eval AMDGPU
+    catch
+        nothing
+    end
+    has_amdgpu = !(amdgpu === nothing) && try
+        amdgpu.functional()
+    catch
+        false
+    end
+    if !has_amdgpu
+        @test_skip "AMDGPU not functional"
+    else
+        Random.seed!(0)
+        conv = amdgpu.ROCArray
+        n, m = 5, 4
+        A = randn(n, m)
+        test_op(MatrixOp(conv(A)), conv(randn(m)), conv(randn(n)), false)
+        Ac = randn(n, m) + im * randn(n, m)
+        test_op(MatrixOp(conv(Ac)), conv(randn(m) + im * randn(m)), conv(randn(n) + im * randn(n)), false)
+    end
 end
