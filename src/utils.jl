@@ -43,10 +43,10 @@ macro restrict_threading(expr)
 end
 
 function check(codomain_array, op, domain_array)
-    if domain_array isa AbstractArray === false
+    if domain_array isa domain_storage_type(op) === false
         throw(ArgumentError("Input must be an AbstractArray"))
     end
-    if codomain_array isa AbstractArray === false
+    if codomain_array isa codomain_storage_type(op) === false
         throw(ArgumentError("Output must be an AbstractArray"))
     end
     if (ndoms(op, 2) > 1) != (domain_array isa ArrayPartition)
