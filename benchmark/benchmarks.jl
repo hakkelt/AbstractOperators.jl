@@ -296,8 +296,12 @@ end
 function normal_state(op)
     nop = AbstractOperators.get_normal_op(op)
     rng = make_rng()
-    x = randn(rng, domain_type(nop), size(nop, 2)...)
-    y = zeros(codomain_type(nop), size(nop, 1)...)
+    dT = domain_type(nop)
+    cT = codomain_type(nop)
+    dEl = dT <: AbstractArray ? eltype(dT) : dT
+    cEl = cT <: AbstractArray ? eltype(cT) : cT
+    x = randn(rng, dEl, size(nop, 2)...)
+    y = zeros(cEl, size(nop, 1)...)
     return (op = nop, x = x, y = y)
 end
 

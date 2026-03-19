@@ -56,13 +56,23 @@ _is_storage_compatible(a, ::Type{T}) where {T} = a isa T
     return :(length(a.x) == $(length(types)) && $cond)
 end
 
-function check(codomain_array, op, domain_array)
+_check_domain_storage(::ArrayPartition, op) = nothing
+function _check_domain_storage(domain_array, op)
     if !_is_storage_compatible(domain_array, domain_storage_type(op))
         throw(ArgumentError("Input must be an AbstractArray"))
     end
+end
+
+_check_codomain_storage(::ArrayPartition, op) = nothing
+function _check_codomain_storage(codomain_array, op)
     if !_is_storage_compatible(codomain_array, codomain_storage_type(op))
         throw(ArgumentError("Output must be an AbstractArray"))
     end
+end
+
+function check(codomain_array, op, domain_array)
+    _check_domain_storage(domain_array, op)
+    _check_codomain_storage(codomain_array, op)
     if (ndoms(op, 2) > 1) != (domain_array isa ArrayPartition)
         throw(ArgumentError("Input must be an ArrayPartition if and only if operator has multiple input domains"))
     end

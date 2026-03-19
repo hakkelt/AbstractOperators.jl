@@ -64,7 +64,8 @@ function mul!(
         y::T4, L::AdjointOperator{RDFT{T, N, T1, T2, T3}}, b::T3
     ) where {N, T, T1, T2, T3, T4 <: AbstractArray{T, N}}
     A = L.A
-    mul!(A.b2, A.Zp, b)
+    fill!(A.b2, zero(eltype(A.b2)))
+    copyto!(view(A.b2, ntuple(i -> Base.OneTo(size(b, i)), N)...), b)
     mul!(A.y2, A.At, A.b2)
     y .= real.(A.y2)
     return y

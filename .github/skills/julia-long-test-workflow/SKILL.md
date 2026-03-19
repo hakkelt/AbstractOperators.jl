@@ -24,7 +24,7 @@ user-invocable: true
 5. For performance-sensitive changes, benchmark before and after.
 6. Run focused ASV filters first, then a single full ASV comparison for final validation.
 7. Treat `speedup + uncertainty < 0.95` (master/dirty ratio) as a significant regression.
-8. Prefer representative large inputs (for this repo use `32768` baseline elements where feasible) to reduce microbenchmark noise.
+8. Prefer representative large inputs for linear and nonlinear operators to reduce microbenchmark noise, but wrap only fast operators in calculus operators to measure the calculus overhead itself.
 9. Use AirspeedVelocity with an explicit script path when comparing against revisions that do not yet contain the benchmark file.
 
 ## Common Commands
@@ -33,7 +33,8 @@ Filtered test run:
 
 ```julia
 using TestItemRunner
-TestItemRunner.run_tests(pwd(); filter = ti -> :MatrixOp in ti.tags)
+TestItemRunner.run_tests(pwd(); filter = ti -> :MatrixOp in ti.tags) # example of filtering by tag
+TestItemRunner.run_tests(pwd(); filter = ti -> ti.name == "DCT") # example of filtering by test name instead of tags
 ```
 
 AirSpeedVelocity comparison:

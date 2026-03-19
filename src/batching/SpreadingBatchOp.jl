@@ -575,10 +575,24 @@ fun_name(L::SpreadingBatchOpCopying) = "⟳" * fun_name(L.operators[1][1])
 
 size(L::SpreadingBatchOp) = L.codomain_size, L.domain_size
 
-domain_storage_type(L::SpreadingBatchOp) = domain_storage_type(L.operators[1])
+domain_storage_type(L::SpreadingBatchOpSingleThreaded) = domain_storage_type(L.operators[1])
+domain_storage_type(L::SpreadingBatchOpThreadSafe) = domain_storage_type(L.operators[1])
+domain_storage_type(L::SpreadingBatchOpLocking) = domain_storage_type(L.operators[1])
+domain_storage_type(L::SpreadingBatchOpFixedOperator) = domain_storage_type(L.operators[1])
 domain_storage_type(L::SpreadingBatchOpCopying) = domain_storage_type(L.operators[1][1])
-codomain_storage_type(L::SpreadingBatchOp) = codomain_storage_type(L.operators[1])
+codomain_storage_type(L::SpreadingBatchOpSingleThreaded) = codomain_storage_type(L.operators[1])
+codomain_storage_type(L::SpreadingBatchOpThreadSafe) = codomain_storage_type(L.operators[1])
+codomain_storage_type(L::SpreadingBatchOpLocking) = codomain_storage_type(L.operators[1])
+codomain_storage_type(L::SpreadingBatchOpFixedOperator) = codomain_storage_type(L.operators[1])
 codomain_storage_type(L::SpreadingBatchOpCopying) = codomain_storage_type(L.operators[1][1])
+AbstractOperators._check_domain_storage(domain_array, ::SpreadingBatchOp) = nothing
+AbstractOperators._check_codomain_storage(codomain_array, ::SpreadingBatchOp) = nothing
+AbstractOperators._check_domain_storage(
+    domain_array::ArrayPartition, ::SpreadingBatchOp
+) = nothing
+AbstractOperators._check_codomain_storage(
+    codomain_array::ArrayPartition, ::SpreadingBatchOp
+) = nothing
 
 is_linear(L::SpreadingBatchOp) = is_linear(L.operators[1])
 is_linear(L::SpreadingBatchOpCopying) = is_linear(L.operators[1][1])
