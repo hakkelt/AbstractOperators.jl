@@ -365,78 +365,60 @@ end
 end
 
 @testitem "DFT/RDFT/IRDFT (CUDA)" tags = [:fftw, :gpu, :cuda] setup=[TestUtils] begin
-    using FFTWOperators, Random
-    cuda = try
-        @eval import CUDA
-        @eval CUDA
-    catch
-        nothing
-    end
-    has_cuda = !(cuda === nothing) && try
-        cuda.functional()
-    catch
-        false
-    end
-    if has_cuda
-        conv = cuda.cu
-    Random.seed!(11)
+    using FFTWOperators, Random, Pkg
+    haskey(Pkg.project().dependencies, "CUDA") || (@test_skip "CUDA not in project"; return)
+    import CUDA
+    if CUDA.functional()
+        conv = CUDA.cu
+        Random.seed!(11)
 
-    n = 8
-    x = conv(randn(ComplexF64, n))
-    op = DFT(x)
-    y = conv(zeros(ComplexF64, n))
-    mul!(y, op, x)
-    @test y isa typeof(x)
+        n = 8
+        x = conv(randn(ComplexF64, n))
+        op = DFT(x)
+        y = conv(zeros(ComplexF64, n))
+        mul!(y, op, x)
+        @test y isa typeof(x)
 
-    xr = conv(randn(Float64, n))
-    rop = RDFT(xr)
-    ry = conv(zeros(ComplexF64, n ÷ 2 + 1))
-    mul!(ry, rop, xr)
-    @test ry isa typeof(ry)
+        xr = conv(randn(Float64, n))
+        rop = RDFT(xr)
+        ry = conv(zeros(ComplexF64, n ÷ 2 + 1))
+        mul!(ry, rop, xr)
+        @test ry isa typeof(ry)
 
-    ir = IRDFT(ry, n)
-    out = conv(zeros(Float64, n))
-    mul!(out, ir, ry)
-    @test out isa typeof(xr)
+        ir = IRDFT(ry, n)
+        out = conv(zeros(Float64, n))
+        mul!(out, ir, ry)
+        @test out isa typeof(xr)
     else
         @test_skip "CUDA not functional"
     end
 end
 
 @testitem "DFT/RDFT/IRDFT (AMDGPU)" tags = [:fftw, :gpu, :amdgpu] setup=[TestUtils] begin
-    using FFTWOperators, Random
-    amdgpu = try
-        @eval import AMDGPU
-        @eval AMDGPU
-    catch
-        nothing
-    end
-    has_amdgpu = !(amdgpu === nothing) && try
-        amdgpu.functional()
-    catch
-        false
-    end
-    if has_amdgpu
-        conv = amdgpu.ROCArray
-    Random.seed!(12)
+    using FFTWOperators, Random, Pkg
+    haskey(Pkg.project().dependencies, "AMDGPU") || (@test_skip "AMDGPU not in project"; return)
+    import AMDGPU
+    if AMDGPU.functional()
+        conv = AMDGPU.ROCArray
+        Random.seed!(12)
 
-    n = 8
-    x = conv(randn(ComplexF64, n))
-    op = DFT(x)
-    y = conv(zeros(ComplexF64, n))
-    mul!(y, op, x)
-    @test y isa typeof(x)
+        n = 8
+        x = conv(randn(ComplexF64, n))
+        op = DFT(x)
+        y = conv(zeros(ComplexF64, n))
+        mul!(y, op, x)
+        @test y isa typeof(x)
 
-    xr = conv(randn(Float64, n))
-    rop = RDFT(xr)
-    ry = conv(zeros(ComplexF64, n ÷ 2 + 1))
-    mul!(ry, rop, xr)
-    @test ry isa typeof(ry)
+        xr = conv(randn(Float64, n))
+        rop = RDFT(xr)
+        ry = conv(zeros(ComplexF64, n ÷ 2 + 1))
+        mul!(ry, rop, xr)
+        @test ry isa typeof(ry)
 
-    ir = IRDFT(ry, n)
-    out = conv(zeros(Float64, n))
-    mul!(out, ir, ry)
-    @test out isa typeof(xr)
+        ir = IRDFT(ry, n)
+        out = conv(zeros(Float64, n))
+        mul!(out, ir, ry)
+        @test out isa typeof(xr)
     else
         @test_skip "AMDGPU not functional"
     end

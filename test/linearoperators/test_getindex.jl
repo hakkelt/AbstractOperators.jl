@@ -147,56 +147,14 @@
 
 end
 
-@testitem "GetIndex (CUDA)" tags = [:linearoperator, :GetIndex, :gpu, :cuda] setup=[TestUtils] begin
+@testitem "GetIndex (JLArray)" tags = [:linearoperator, :GetIndex, :gpu, :jlarray] setup=[TestUtils] begin
     using Random, AbstractOperators
-    cuda = try
-        @eval import CUDA
-        @eval CUDA
-    catch
-        nothing
-    end
-    has_cuda = !(cuda === nothing) && try
-        cuda.functional()
-    catch
-        false
-    end
-    if !has_cuda
-        @test_skip "CUDA not functional"
-    else
-        Random.seed!(0)
-        n, m, k = 5, 4, 3
-        conv = cuda.cu
-        op = GetIndex(conv(zeros(Float64, n)), (1:k,))
-        test_op(op, conv(randn(n)), conv(randn(k)), false)
-        op2 = GetIndex(conv(zeros(Float64, n, m)), (1:k, :))
-        test_op(op2, conv(randn(n, m)), conv(randn(k, m)), false)
-    end
-end
-
-@testitem "GetIndex (AMDGPU)" tags = [:linearoperator, :GetIndex, :gpu, :amdgpu] setup=[TestUtils] begin
-    using Random, AbstractOperators
-    amdgpu = try
-        @eval import AMDGPU
-        @eval AMDGPU
-    catch
-        nothing
-    end
-    has_amdgpu = !(amdgpu === nothing) && try
-        amdgpu.functional()
-    catch
-        false
-    end
-    if !has_amdgpu
-        @test_skip "AMDGPU not functional"
-    else
-        Random.seed!(0)
-        n, m, k = 5, 4, 3
-        conv = amdgpu.ROCArray
-        op = GetIndex(conv(zeros(Float64, n)), (1:k,))
-        test_op(op, conv(randn(n)), conv(randn(k)), false)
-        op2 = GetIndex(conv(zeros(Float64, n, m)), (1:k, :))
-        test_op(op2, conv(randn(n, m)), conv(randn(k, m)), false)
-    end
+    Random.seed!(0)
+    n, m, k = 5, 4, 3
+    op = GetIndex(jl(zeros(Float64, n)), (1:k,))
+    test_op(op, jl(randn(n)), jl(randn(k)), false)
+    op2 = GetIndex(jl(zeros(Float64, n, m)), (1:k, :))
+    test_op(op2, jl(randn(n, m)), jl(randn(k, m)), false)
 end
 
 @testitem "GetIndex scalar Int specialized path" tags = [:linearoperator, :GetIndex] setup=[TestUtils] begin

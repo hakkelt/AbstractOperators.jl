@@ -150,54 +150,12 @@
     io = IOBuffer(); show(io, TallOp); str = String(take!(io)); @test occursin("▒", str)
 end
 
-@testitem "MatrixOp (CUDA)" tags = [:linearoperator, :MatrixOp, :gpu, :cuda] setup=[TestUtils] begin
+@testitem "MatrixOp (JLArray)" tags = [:linearoperator, :MatrixOp, :gpu, :jlarray] setup=[TestUtils] begin
     using Random, AbstractOperators
-    cuda = try
-        @eval import CUDA
-        @eval CUDA
-    catch
-        nothing
-    end
-    has_cuda = !(cuda === nothing) && try
-        cuda.functional()
-    catch
-        false
-    end
-    if !has_cuda
-        @test_skip "CUDA not functional"
-    else
-        Random.seed!(0)
-        conv = cuda.cu
-        n, m = 5, 4
-        A = randn(n, m)
-        test_op(MatrixOp(conv(A)), conv(randn(m)), conv(randn(n)), false)
-        Ac = randn(n, m) + im * randn(n, m)
-        test_op(MatrixOp(conv(Ac)), conv(randn(m) + im * randn(m)), conv(randn(n) + im * randn(n)), false)
-    end
-end
-
-@testitem "MatrixOp (AMDGPU)" tags = [:linearoperator, :MatrixOp, :gpu, :amdgpu] setup=[TestUtils] begin
-    using Random, AbstractOperators
-    amdgpu = try
-        @eval import AMDGPU
-        @eval AMDGPU
-    catch
-        nothing
-    end
-    has_amdgpu = !(amdgpu === nothing) && try
-        amdgpu.functional()
-    catch
-        false
-    end
-    if !has_amdgpu
-        @test_skip "AMDGPU not functional"
-    else
-        Random.seed!(0)
-        conv = amdgpu.ROCArray
-        n, m = 5, 4
-        A = randn(n, m)
-        test_op(MatrixOp(conv(A)), conv(randn(m)), conv(randn(n)), false)
-        Ac = randn(n, m) + im * randn(n, m)
-        test_op(MatrixOp(conv(Ac)), conv(randn(m) + im * randn(m)), conv(randn(n) + im * randn(n)), false)
-    end
+    Random.seed!(0)
+    n, m = 5, 4
+    A = randn(n, m)
+    test_op(MatrixOp(jl(A)), jl(randn(m)), jl(randn(n)), false)
+    Ac = randn(n, m) + im * randn(n, m)
+    test_op(MatrixOp(jl(Ac)), jl(randn(m) + im * randn(m)), jl(randn(n) + im * randn(n)), false)
 end

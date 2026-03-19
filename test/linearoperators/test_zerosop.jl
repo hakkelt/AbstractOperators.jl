@@ -73,50 +73,11 @@
     io = IOBuffer(); show(io, op); s = String(take!(io)); @test occursin("0", s)
 end
 
-@testitem "Zeros (CUDA)" tags = [:linearoperator, :Zeros, :gpu, :cuda] setup=[TestUtils] begin
+@testitem "Zeros (JLArray)" tags = [:linearoperator, :Zeros, :gpu, :jlarray] setup=[TestUtils] begin
     using Random, AbstractOperators
-    cuda = try
-        @eval import CUDA
-        @eval CUDA
-    catch
-        nothing
-    end
-    has_cuda = !(cuda === nothing) && try
-        cuda.functional()
-    catch
-        false
-    end
-    if !has_cuda
-        @test_skip "CUDA not functional"
-    else
     Random.seed!(0)
     n = (3, 4); m = (5, 2)
-    op = Zeros(Float64, n, Float64, m; array_type = cuda.CuArray)
-    y = test_op(op, cuda.cu(randn(n)), cuda.cu(randn(m)), false)
+    op = Zeros(Float64, n, Float64, m; array_type = typeof(jl(randn(1))))
+    y = test_op(op, jl(randn(n)), jl(randn(m)), false)
     @test collect(y) == zeros(Float64, m)
-    end
-end
-
-@testitem "Zeros (AMDGPU)" tags = [:linearoperator, :Zeros, :gpu, :amdgpu] setup=[TestUtils] begin
-    using Random, AbstractOperators
-    amdgpu = try
-        @eval import AMDGPU
-        @eval AMDGPU
-    catch
-        nothing
-    end
-    has_amdgpu = !(amdgpu === nothing) && try
-        amdgpu.functional()
-    catch
-        false
-    end
-    if !has_amdgpu
-        @test_skip "AMDGPU not functional"
-    else
-    Random.seed!(0)
-    n = (3, 4); m = (5, 2)
-    op = Zeros(Float64, n, Float64, m; array_type = amdgpu.ROCArray)
-    y = test_op(op, amdgpu.ROCArray(randn(n)), amdgpu.ROCArray(randn(m)), false)
-    @test collect(y) == zeros(Float64, m)
-    end
 end

@@ -42,11 +42,25 @@ macro restrict_threading(expr)
     return set_thread_counts_expr(1, expr)
 end
 
+_is_storage_compatible(a, ::Type{<:Array}) = a isa AbstractArray
+_is_storage_compatible(a, ::Type{T}) where {T} = a isa T
+
+@generated function _is_storage_compatible(a::ArrayPartition, ::Type{T}) where {T <: ArrayPartition}
+    Tp = T.parameters[2]
+    if !(Tp isa DataType && Tp <: Tuple)
+        return :(a isa T)
+    end
+    types = Tp.parameters
+    checks = [:(a.x[$i] isa $(types[i])) for i in 1:length(types)]
+    cond = isempty(checks) ? :(true) : reduce((x, y) -> :($x && $y), checks)
+    return :(length(a.x) == $(length(types)) && $cond)
+end
+
 function check(codomain_array, op, domain_array)
-    if domain_array isa domain_storage_type(op) === false
+    if !_is_storage_compatible(domain_array, domain_storage_type(op))
         throw(ArgumentError("Input must be an AbstractArray"))
     end
-    if codomain_array isa codomain_storage_type(op) === false
+    if !_is_storage_compatible(codomain_array, codomain_storage_type(op))
         throw(ArgumentError("Output must be an AbstractArray"))
     end
     if (ndoms(op, 2) > 1) != (domain_array isa ArrayPartition)

@@ -157,23 +157,14 @@ end
 end
 
 @testitem "Conv (CUDA)" tags = [:dsp, :gpu, :cuda, :Conv] setup=[TestUtils] begin
-    using DSPOperators, DSP, LinearAlgebra, Random
-    cuda = try
-        @eval import CUDA
-        @eval CUDA
-    catch
-        nothing
-    end
-    has_cuda = !(cuda === nothing) && try
-        cuda.functional()
-    catch
-        false
-    end
-    if !has_cuda
+    using DSPOperators, DSP, LinearAlgebra, Random, Pkg
+    haskey(Pkg.project().dependencies, "CUDA") || (@test_skip "CUDA not in project"; return)
+    import CUDA
+    if !CUDA.functional()
         @test_skip "CUDA not functional"
     else
         Random.seed!(0)
-        conv = cuda.cu
+        conv = CUDA.cu
         n, m = 20, 6
         h_cpu = randn(m)
         x_cpu = randn(n)
@@ -197,23 +188,14 @@ end
 end
 
 @testitem "Conv (AMDGPU)" tags = [:dsp, :gpu, :amdgpu, :Conv] setup=[TestUtils] begin
-    using DSPOperators, DSP, LinearAlgebra, Random
-    amdgpu = try
-        @eval import AMDGPU
-        @eval AMDGPU
-    catch
-        nothing
-    end
-    has_amdgpu = !(amdgpu === nothing) && try
-        amdgpu.functional()
-    catch
-        false
-    end
-    if !has_amdgpu
+    using DSPOperators, DSP, LinearAlgebra, Random, Pkg
+    haskey(Pkg.project().dependencies, "AMDGPU") || (@test_skip "AMDGPU not in project"; return)
+    import AMDGPU
+    if !AMDGPU.functional()
         @test_skip "AMDGPU not functional"
     else
         Random.seed!(0)
-        conv = amdgpu.ROCArray
+        conv = AMDGPU.ROCArray
         n, m = 20, 6
         h_cpu = randn(m)
         x_cpu = randn(n)
@@ -237,23 +219,14 @@ end
 end
 
 @testitem "Xcorr (CUDA)" tags = [:dsp, :gpu, :cuda, :Xcorr] setup=[TestUtils] begin
-    using DSPOperators, DSP, LinearAlgebra, Random
-    cuda = try
-        @eval import CUDA
-        @eval CUDA
-    catch
-        nothing
-    end
-    has_cuda = !(cuda === nothing) && try
-        cuda.functional()
-    catch
-        false
-    end
-    if !has_cuda
+    using DSPOperators, DSP, LinearAlgebra, Random, Pkg
+    haskey(Pkg.project().dependencies, "CUDA") || (@test_skip "CUDA not in project"; return)
+    import CUDA
+    if !CUDA.functional()
         @test_skip "CUDA not functional"
     else
         Random.seed!(0)
-        conv = cuda.cu
+        conv = CUDA.cu
         n, m = 15, 5
         h_cpu = randn(m)
         x_cpu = randn(n)
@@ -278,23 +251,14 @@ end
 end
 
 @testitem "Xcorr (AMDGPU)" tags = [:dsp, :gpu, :amdgpu, :Xcorr] setup=[TestUtils] begin
-    using DSPOperators, DSP, LinearAlgebra, Random
-    amdgpu = try
-        @eval import AMDGPU
-        @eval AMDGPU
-    catch
-        nothing
-    end
-    has_amdgpu = !(amdgpu === nothing) && try
-        amdgpu.functional()
-    catch
-        false
-    end
-    if !has_amdgpu
+    using DSPOperators, DSP, LinearAlgebra, Random, Pkg
+    haskey(Pkg.project().dependencies, "AMDGPU") || (@test_skip "AMDGPU not in project"; return)
+    import AMDGPU
+    if !AMDGPU.functional()
         @test_skip "AMDGPU not functional"
     else
         Random.seed!(0)
-        conv = amdgpu.ROCArray
+        conv = AMDGPU.ROCArray
         n, m = 15, 5
         h_cpu = randn(m)
         x_cpu = randn(n)
@@ -319,23 +283,14 @@ end
 end
 
 @testitem "Filt (CUDA, FIR)" tags = [:dsp, :gpu, :cuda, :Filt] setup=[TestUtils] begin
-    using DSPOperators, DSP, LinearAlgebra, Random
-    cuda = try
-        @eval import CUDA
-        @eval CUDA
-    catch
-        nothing
-    end
-    has_cuda = !(cuda === nothing) && try
-        cuda.functional()
-    catch
-        false
-    end
-    if !has_cuda
+    using DSPOperators, DSP, LinearAlgebra, Random, Pkg
+    haskey(Pkg.project().dependencies, "CUDA") || (@test_skip "CUDA not in project"; return)
+    import CUDA
+    if !CUDA.functional()
         @test_skip "CUDA not functional"
     else
         Random.seed!(42)
-        conv = cuda.cu
+        conv = CUDA.cu
         n = 20
         b = randn(5)
         x_cpu = randn(n)
@@ -358,23 +313,14 @@ end
 end
 
 @testitem "Filt (AMDGPU, FIR)" tags = [:dsp, :gpu, :amdgpu, :Filt] setup=[TestUtils] begin
-    using DSPOperators, DSP, LinearAlgebra, Random
-    amdgpu = try
-        @eval import AMDGPU
-        @eval AMDGPU
-    catch
-        nothing
-    end
-    has_amdgpu = !(amdgpu === nothing) && try
-        amdgpu.functional()
-    catch
-        false
-    end
-    if !has_amdgpu
+    using DSPOperators, DSP, LinearAlgebra, Random, Pkg
+    haskey(Pkg.project().dependencies, "AMDGPU") || (@test_skip "AMDGPU not in project"; return)
+    import AMDGPU
+    if !AMDGPU.functional()
         @test_skip "AMDGPU not functional"
     else
         Random.seed!(42)
-        conv = amdgpu.ROCArray
+        conv = AMDGPU.ROCArray
         n = 20
         b = randn(5)
         x_cpu = randn(n)
@@ -397,23 +343,14 @@ end
 end
 
 @testitem "MIMOFilt (CUDA, FIR)" tags = [:dsp, :gpu, :cuda, :MIMOFilt] setup=[TestUtils] begin
-    using DSPOperators, DSP, LinearAlgebra, Random
-    cuda = try
-        @eval import CUDA
-        @eval CUDA
-    catch
-        nothing
-    end
-    has_cuda = !(cuda === nothing) && try
-        cuda.functional()
-    catch
-        false
-    end
-    if !has_cuda
+    using DSPOperators, DSP, LinearAlgebra, Random, Pkg
+    haskey(Pkg.project().dependencies, "CUDA") || (@test_skip "CUDA not in project"; return)
+    import CUDA
+    if !CUDA.functional()
         @test_skip "CUDA not functional"
     else
         Random.seed!(7)
-        conv = cuda.cu
+        conv = CUDA.cu
         m, n = 10, 3
         b = [randn(5), randn(3), randn(4), randn(5), randn(3), randn(4)]
         a = [[1.0] for _ in b]
@@ -437,23 +374,14 @@ end
 end
 
 @testitem "MIMOFilt (AMDGPU, FIR)" tags = [:dsp, :gpu, :amdgpu, :MIMOFilt] setup=[TestUtils] begin
-    using DSPOperators, DSP, LinearAlgebra, Random
-    amdgpu = try
-        @eval import AMDGPU
-        @eval AMDGPU
-    catch
-        nothing
-    end
-    has_amdgpu = !(amdgpu === nothing) && try
-        amdgpu.functional()
-    catch
-        false
-    end
-    if !has_amdgpu
+    using DSPOperators, DSP, LinearAlgebra, Random, Pkg
+    haskey(Pkg.project().dependencies, "AMDGPU") || (@test_skip "AMDGPU not in project"; return)
+    import AMDGPU
+    if !AMDGPU.functional()
         @test_skip "AMDGPU not functional"
     else
         Random.seed!(7)
-        conv = amdgpu.ROCArray
+        conv = AMDGPU.ROCArray
         m, n = 10, 3
         b = [randn(5), randn(3), randn(4), randn(5), randn(3), randn(4)]
         a = [[1.0] for _ in b]

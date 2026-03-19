@@ -112,50 +112,10 @@
     end
 end
 
-@testitem "Variation (CUDA)" tags = [:linearoperator, :Variation, :gpu, :cuda] setup=[TestUtils] begin
+@testitem "Variation (JLArray)" tags = [:linearoperator, :Variation, :gpu, :jlarray] setup=[TestUtils] begin
     using Random, AbstractOperators
-    cuda = try
-        @eval import CUDA
-        @eval CUDA
-    catch
-        nothing
-    end
-    has_cuda = !(cuda === nothing) && try
-        cuda.functional()
-    catch
-        false
-    end
-    if !has_cuda
-        @test_skip "CUDA not functional"
-    else
     Random.seed!(0)
-    conv = cuda.cu
     n, m = 10, 5
-    op = Variation(conv(zeros(Float64, n, m)); threaded = false)
-    test_op(op, conv(randn(n, m)), conv(randn(n * m, 2)), false)
-    end
-end
-
-@testitem "Variation (AMDGPU)" tags = [:linearoperator, :Variation, :gpu, :amdgpu] setup=[TestUtils] begin
-    using Random, AbstractOperators
-    amdgpu = try
-        @eval import AMDGPU
-        @eval AMDGPU
-    catch
-        nothing
-    end
-    has_amdgpu = !(amdgpu === nothing) && try
-        amdgpu.functional()
-    catch
-        false
-    end
-    if !has_amdgpu
-        @test_skip "AMDGPU not functional"
-    else
-    Random.seed!(0)
-    conv = amdgpu.ROCArray
-    n, m = 10, 5
-    op = Variation(conv(zeros(Float64, n, m)); threaded = false)
-    test_op(op, conv(randn(n, m)), conv(randn(n * m, 2)), false)
-    end
+    op = Variation(jl(zeros(Float64, n, m)); threaded = false)
+    test_op(op, jl(randn(n, m)), jl(randn(n * m, 2)), false)
 end

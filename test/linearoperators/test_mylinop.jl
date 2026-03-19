@@ -1,4 +1,4 @@
-@testitem "MyLinOp" tags = [:linearoperator, :MyLinOp] setup = [TestUtils] begin
+@testitem "MyLinOp basic" tags = [:linearoperator, :MyLinOp] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     verb && println(" --- Testing MyLinOp --- ")
@@ -20,90 +20,53 @@
     @test size(op) == ((n,), (m,))
     @test domain_type(op) == Float64
     @test codomain_type(op) == Float64
+end
 
-    # adjoint application
+@testitem "MyLinOp mul and scaling" tags = [:linearoperator, :MyLinOp] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
+    n, m = 5, 4
+    A = randn(n, m)
+    op = MyLinOp(Float64, (m,), (n,), (y, x) -> mul!(y, A, x), (y, x) -> mul!(y, A', x))
+    x1 = randn(m)
     z = randn(n)
     out_adj = similar(x1)
     mul!(out_adj, op', z)
     @test out_adj ≈ A' * z
-
-    # In-place forward mul! on matrix input via broadcasting columns
     X = randn(m, 3)
     Y = zeros(n, 3)
     for j in 1:3
         mul!(view(Y, :, j), op, view(X, :, j))
     end
     @test Y ≈ A * X
-
-    # Scaling operator (real scale ok, complex should fail for real op)
     Sop = Scale(3.0, op)
     @test Sop * x1 ≈ 3.0 * (op * x1)
     @test_throws ErrorException Scale(1 + 2im, op)
+end
 
-    # Error path: dimension mismatch input length
+@testitem "MyLinOp constructors and errors" tags = [:linearoperator, :MyLinOp] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
+    n, m = 5, 4
+    A = randn(n, m)
+    op = MyLinOp(Float64, (m,), (n,), (y, x) -> mul!(y, A, x), (y, x) -> mul!(y, A', x))
+    x1 = randn(m)
     @test_throws DimensionMismatch op * randn(m + 1)
-
-    # Show output
     io = IOBuffer(); show(io, op); s = String(take!(io)); @test occursin("A", s)
-
-    # other constructors
-    op = MyLinOp(
-        Float64, (m,), Float64, (n,), (y, x) -> mul!(y, A, x), (y, x) -> mul!(y, A', x)
-    )
-    @test size(op) == ((n,), (m,))
-    @test op * x1 ≈ A * x1
+    op2 = MyLinOp(Float64, (m,), Float64, (n,), (y, x) -> mul!(y, A, x), (y, x) -> mul!(y, A', x))
+    @test size(op2) == ((n,), (m,))
+    @test op2 * x1 ≈ A * x1
 end
 
-@testitem "MyLinOp (CUDA)" tags = [:linearoperator, :MyLinOp, :gpu, :cuda] setup = [TestUtils] begin
+@testitem "MyLinOp (JLArray)" tags = [:linearoperator, :MyLinOp, :gpu] setup = [TestUtils] begin
     using Random, AbstractOperators
-    cuda = try
-        @eval import CUDA
-        @eval CUDA
-    catch
-        nothing
-    end
-    has_cuda = !(cuda === nothing) && try
-        cuda.functional()
-    catch
-        false
-    end
-    if !has_cuda
-        @test_skip "CUDA not functional"
-    else
-        Random.seed!(0)
-        n, m = 5, 4
-        A = cuda.cu(randn(n, m))
-        op = MyLinOp(Float64, (m,), (n,), (y, x) -> mul!(y, A, x), (y, x) -> mul!(y, A', x); array_type = cuda.CuArray)
-        x = cuda.cu(randn(m))
-        y = cuda.cu(randn(n))
-        test_op(op, x, y, false)
-        @test domain_storage_type(op) <: cuda.CuArray
-    end
-end
-
-@testitem "MyLinOp (AMDGPU)" tags = [:linearoperator, :MyLinOp, :gpu, :amdgpu] setup = [TestUtils] begin
-    using Random, AbstractOperators
-    amdgpu = try
-        @eval import AMDGPU
-        @eval AMDGPU
-    catch
-        nothing
-    end
-    has_amdgpu = !(amdgpu === nothing) && try
-        amdgpu.functional()
-    catch
-        false
-    end
-    if !has_amdgpu
-        @test_skip "AMDGPU not functional"
-    else
-        Random.seed!(0)
-        n, m = 5, 4
-        A = amdgpu.ROCArray(randn(n, m))
-        op = MyLinOp(Float64, (m,), (n,), (y, x) -> mul!(y, A, x), (y, x) -> mul!(y, A', x); array_type = amdgpu.ROCArray)
-        x = amdgpu.ROCArray(randn(m))
-        y = amdgpu.ROCArray(randn(n))
-        test_op(op, x, y, false)
-        @test domain_storage_type(op) <: amdgpu.ROCArray
-    end
+    Random.seed!(0)
+    n, m = 5, 4
+    A = jl(randn(n, m))
+    AT = Base.typename(typeof(jl(randn(1)))).wrapper
+    op = MyLinOp(Float64, (m,), (n,), (y, x) -> mul!(y, A, x), (y, x) -> mul!(y, A', x); array_type = AT)
+    x = jl(randn(m))
+    y = jl(randn(n))
+    test_op(op, x, y, false)
+    @test domain_storage_type(op) <: AT
 end
