@@ -166,6 +166,8 @@ end
 
 domain_type(::Filt{T}) where {T} = T
 codomain_type(::Filt{T}) where {T} = T
+domain_storage_type(::Filt{T}) where {T} = Array{T}
+codomain_storage_type(::Filt{T}) where {T} = Array{T}
 is_thread_safe(::Filt) = false
 
 size(L::Filt) = L.dim_in, L.dim_in

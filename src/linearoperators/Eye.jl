@@ -27,16 +27,17 @@ end
 # Constructors
 ###standard constructor Operator{N}(domain_type::Type, DomainDim::NTuple{N,Int})
 function Eye(
-        domain_type::Type{T}, domainDim::NTuple{N, <:Integer}, storageType::Type{S} = Array{T}
-    ) where {N, T, S <: AbstractArray{T}}
-    return Eye{domain_type, N, storageType}(map(Int, domainDim))
+        domain_type::Type{T}, domainDim::NTuple{N, <:Integer}; array_type::Type = Array{T}
+    ) where {N, T}
+    S = _normalize_array_type(array_type, T)
+    return Eye{domain_type, N, S}(map(Int, domainDim))
 end
 ###
 
-Eye(t::Type, dims::Vararg{Integer}) = Eye(t, dims)
-Eye(dims::NTuple{N, Integer}) where {N} = Eye(Float64, dims)
-Eye(dims::Vararg{Integer}) = Eye(Float64, dims)
-Eye(x::A) where {A <: AbstractArray} = Eye(eltype(x), size(x), A.name.wrapper{eltype(x)})
+Eye(t::Type, dims::Vararg{Integer}; array_type::Type = Array{t}) = Eye(t, dims; array_type)
+Eye(dims::NTuple{N, Integer}; array_type::Type = Array{Float64}) where {N} = Eye(Float64, dims; array_type)
+Eye(dims::Vararg{Integer}; array_type::Type = Array{Float64}) = Eye(Float64, dims; array_type)
+Eye(x::A) where {A <: AbstractArray} = Eye(eltype(x), size(x); array_type = _array_wrapper(x){eltype(x)})
 
 # Mappings
 

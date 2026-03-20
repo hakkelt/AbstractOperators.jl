@@ -24,23 +24,29 @@ end
 
 # Constructors
 #standard constructor
-function ZeroPad(domain_type::Type, dim_in::NTuple{N, Int}, zp::NTuple{M, Int}) where {N, M}
+function ZeroPad(
+        domain_type::Type{T}, dim_in::NTuple{N, Int}, zp::NTuple{M, Int};
+        array_type::Type = Array{T}
+    ) where {T, N, M}
     M != N && error("dim_in and zp must have the same length")
     any([zp...] .< 0) && error("zero padding cannot be negative")
-    return ZeroPad{N, domain_type, Array{domain_type}}(dim_in, zp)
+    S = _normalize_array_type(array_type, T)
+    return ZeroPad{N, T, S}(dim_in, zp)
 end
 
-ZeroPad(dim_in::Tuple, zp::NTuple{N, Int}) where {N} = ZeroPad(Float64, dim_in, zp)
-function ZeroPad(domain_type::Type, dim_in::Tuple, zp::Vararg{Int, N}) where {N}
-    return ZeroPad(domain_type, dim_in, zp)
+ZeroPad(dim_in::Tuple, zp::NTuple{N, Int}; array_type::Type = Array{Float64}) where {N} =
+    ZeroPad(Float64, dim_in, zp; array_type)
+function ZeroPad(domain_type::Type{T}, dim_in::Tuple, zp::Vararg{Int, N}; array_type::Type = Array{T}) where {T, N}
+    return ZeroPad(domain_type, dim_in, zp; array_type)
 end
-ZeroPad(dim_in::Tuple, zp::Vararg{Int, N}) where {N} = ZeroPad(Float64, dim_in, zp)
+ZeroPad(dim_in::Tuple, zp::Vararg{Int, N}; array_type::Type = Array{Float64}) where {N} =
+    ZeroPad(Float64, dim_in, zp; array_type)
 function ZeroPad(x::AbstractArray{T}, zp::NTuple{N, Int}) where {T, N}
-    S = _array_wrapper(x){T}
+    S = _normalize_array_type(_array_wrapper(x), T)
     return ZeroPad{N, T, S}(size(x), zp)
 end
 function ZeroPad(x::AbstractArray{T}, zp::Vararg{Int, N}) where {T, N}
-    S = _array_wrapper(x){T}
+    S = _normalize_array_type(_array_wrapper(x), T)
     return ZeroPad{N, T, S}(size(x), zp)
 end
 
@@ -75,7 +81,7 @@ function mul!(y::AbstractArray, L::AdjointOperator{<:ZeroPad}, b::AbstractArray)
 end
 
 function get_normal_op(L::ZeroPad{N, T, S}) where {N, T, S}
-    return Eye(domain_type(L), size(L, 2), S)
+    return Eye(domain_type(L), size(L, 2); array_type = S)
 end
 
 # Properties

@@ -30,22 +30,32 @@ end
 
 # Constructors
 # Val-dispatch constructor — fully type-stable (D is known at compile time)
-function FiniteDiff(::Type{T}, dim_in::NTuple{N, Int}, ::Val{D}) where {T, N, D}
-    return FiniteDiff{N, D, T, Array{T}}(dim_in)
+function FiniteDiff(
+        ::Type{T}, dim_in::NTuple{N, Int}, ::Val{D}; array_type::Type = Array{T}
+    ) where {T, N, D}
+    S = _normalize_array_type(array_type, T)
+    return FiniteDiff{N, D, T, S}(dim_in)
 end
 
 # Specialized no-direction constructor: D=1 is a compile-time literal — fully type-stable
-FiniteDiff(dim_in::NTuple{N, Int}) where {N} = FiniteDiff{N, 1, Float64, Array{Float64}}(dim_in)
-
-#default constructor (direction as runtime Int — delegates to Val)
-function FiniteDiff(domain_type::Type, dim_in::NTuple{N, Int}, dir::Int = 1) where {N}
-    return FiniteDiff(domain_type, dim_in, Val(dir))
+function FiniteDiff(dim_in::NTuple{N, Int}; array_type::Type = Array{Float64}) where {N}
+    S = _normalize_array_type(array_type, Float64)
+    return FiniteDiff{N, 1, Float64, S}(dim_in)
 end
 
-FiniteDiff(dim_in::NTuple{N, Int}, dir::Int) where {N} = FiniteDiff(Float64, dim_in, Val(dir))
+#default constructor (direction as runtime Int — delegates to Val)
+function FiniteDiff(
+        domain_type::Type{T}, dim_in::NTuple{N, Int}, dir::Int = 1;
+        array_type::Type = Array{T}
+    ) where {T, N}
+    return FiniteDiff(domain_type, dim_in, Val(dir); array_type)
+end
+
+FiniteDiff(dim_in::NTuple{N, Int}, dir::Int; array_type::Type = Array{Float64}) where {N} =
+    FiniteDiff(Float64, dim_in, Val(dir); array_type)
 
 function FiniteDiff(x::AbstractArray{T, N}, dir::Int = 1) where {T, N}
-    S = _array_wrapper(x){T}
+    S = _normalize_array_type(_array_wrapper(x), T)
     return FiniteDiff{N, dir, T, S}(size(x))
 end
 

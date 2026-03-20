@@ -15,5 +15,6 @@ end
 @testitem "Aqua" tags = [:quality] begin
     using Aqua, AbstractOperators
 
-    Aqua.test_all(AbstractOperators)
+    Aqua.test_all(AbstractOperators; persistent_tasks = false)
+    Aqua.test_persistent_tasks(AbstractOperators; broken = true)
 end

@@ -68,15 +68,16 @@ function NFFTOp(
         trajectory::AbstractArray{T},
         dcf::AbstractArray;
         threaded::Bool = true,
-        array_type::Type = Array,
+        array_type::Type = Array{T},
         kwargs...,
     ) where {T, D}
     check_traj_and_dcf(trajectory, dcf, D)
-    plan = _nfft_plan(array_type, trajectory, image_size, threaded; kwargs...)
+    arr_wrapper = AbstractOperators._array_wrapper_type(array_type)
+    plan = _nfft_plan(arr_wrapper, trajectory, image_size, threaded; kwargs...)
     ksp_shape = size(trajectory)[2:end]
-    ksp_buffer = _nfft_adapt(array_type, zeros(complex(T), ksp_shape...))
-    adapted_dcf = _nfft_adapt(array_type, collect(dcf))
-    threaded_flag = threaded && array_type === Array
+    ksp_buffer = _nfft_adapt(arr_wrapper, zeros(complex(T), ksp_shape...))
+    adapted_dcf = _nfft_adapt(arr_wrapper, collect(dcf))
+    threaded_flag = threaded && arr_wrapper === Array
     return NFFTOp{T, D, typeof(plan), typeof(ksp_buffer), typeof(adapted_dcf)}(plan, ksp_buffer, adapted_dcf, threaded_flag)
 end
 
@@ -84,19 +85,20 @@ function NFFTOp(
         image_size::NTuple{D, Int},
         trajectory::AbstractArray{T};
         threaded::Bool = true,
-        array_type::Type = Array,
+        array_type::Type = Array{T},
         dcf_estimation_iterations::Int = 20,
         dcf_correction_function::Function = identity,
         kwargs...,
     ) where {T, D}
     check_traj(trajectory, D)
-    plan = _nfft_plan(array_type, trajectory, image_size, threaded; kwargs...)
+    arr_wrapper = AbstractOperators._array_wrapper_type(array_type)
+    plan = _nfft_plan(arr_wrapper, trajectory, image_size, threaded; kwargs...)
     ksp_shape = size(trajectory)[2:end]
-    ksp_buffer = _nfft_adapt(array_type, zeros(complex(T), ksp_shape...))
+    ksp_buffer = _nfft_adapt(arr_wrapper, zeros(complex(T), ksp_shape...))
     raw_dcf = NFFTTools.sdc(plan; iters = dcf_estimation_iterations)
     dcf_cpu = dcf_correction_function(reshape(raw_dcf, ksp_shape))
-    adapted_dcf = _nfft_adapt(array_type, collect(dcf_cpu))
-    threaded_flag = threaded && array_type === Array
+    adapted_dcf = _nfft_adapt(arr_wrapper, collect(dcf_cpu))
+    threaded_flag = threaded && arr_wrapper === Array
     return NFFTOp{T, D, typeof(plan), typeof(ksp_buffer), typeof(adapted_dcf)}(plan, ksp_buffer, adapted_dcf, threaded_flag)
 end
 

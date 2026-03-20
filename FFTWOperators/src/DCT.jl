@@ -128,6 +128,8 @@ fun_name(A::IDCT) = "ℱc⁻¹"
 
 domain_type(::CosineTransform{N, C, T1, T2}) where {N, C, T1, T2} = C
 codomain_type(::CosineTransform{N, C, T1, T2}) where {N, C, T1, T2} = C
+domain_storage_type(::CosineTransform{N, C}) where {N, C} = Array{C}
+codomain_storage_type(::CosineTransform{N, C}) where {N, C} = Array{C}
 is_thread_safe(::CosineTransform) = true
 
 is_AcA_diagonal(L::CosineTransform) = true

@@ -139,10 +139,16 @@ end
 
 domain_type(::FFTShift{T}) where {T} = T
 codomain_type(::FFTShift{T}) where {T} = T
+domain_storage_type(::FFTShift{T}) where {T} = Array{T}
+codomain_storage_type(::FFTShift{T}) where {T} = Array{T}
 domain_type(::IFFTShift{T}) where {T} = T
 codomain_type(::IFFTShift{T}) where {T} = T
+domain_storage_type(::IFFTShift{T}) where {T} = Array{T}
+codomain_storage_type(::IFFTShift{T}) where {T} = Array{T}
 domain_type(::SignAlternation{S}) where {S} = S
 codomain_type(::SignAlternation{S}) where {S} = S
+domain_storage_type(::SignAlternation{S}) where {S} = Array{S}
+codomain_storage_type(::SignAlternation{S}) where {S} = Array{S}
 
 size(L::FFTShift) = (L.dim_in, L.dim_in)
 size(L::IFFTShift) = (L.dim_in, L.dim_in)

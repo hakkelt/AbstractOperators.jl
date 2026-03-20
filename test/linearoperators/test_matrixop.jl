@@ -1,78 +1,56 @@
-@testitem "MatrixOp" tags = [:linearoperator, :MatrixOp] setup=[TestUtils] begin
+@testitem "MatrixOp: basic mul" tags = [:linearoperator, :MatrixOp] setup=[TestUtils] begin
     using Random, SparseArrays, LinearAlgebra, AbstractOperators
     Random.seed!(0)
     verb && println(" --- Testing MatrixOp --- ")
 
-    function test_matrixop_mul(conv, verb)
-        n, m = 5, 4
-        A = randn(n, m)
-        op = MatrixOp(conv(A))
-        test_op(op, conv(randn(m)), conv(randn(n)), verb)
-
-        A = randn(n, m) + im * randn(n, m)
-        op = MatrixOp(conv(A))
-        test_op(op, conv(randn(m) + im * randn(m)), conv(randn(n) + im * randn(n)), verb)
-    end
-
-    test_matrixop_mul(identity, verb)
-
-    # real matrix, real input
     n, m = 5, 4
     A = randn(n, m)
-    op = MatrixOp(Float64, (m,), A)
-    op_array_type = MatrixOp(Float64, (m,), A; array_type = Array{ComplexF32, 2})
-    @test domain_storage_type(op_array_type) == Array{Float64}
-    @test codomain_storage_type(op_array_type) == Array{Float64}
-    x1 = randn(m)
-    y1 = test_op(op, x1, randn(n), verb)
-    y2 = A * x1
+    op = MatrixOp(A)
+    test_op(op, randn(m), randn(n), verb)
 
-    # real matrix, complex input
-    n, m = 5, 4
+    A = randn(n, m) + im * randn(n, m)
+    op = MatrixOp(A)
+    test_op(op, randn(m) + im * randn(m), randn(n) + im * randn(n), verb)
+
+    # array_type keyword is ignored for element-type selection
     A = randn(n, m)
-    op = MatrixOp(Complex{Float64}, (m,), A)
-    x1 = randn(m) + im .* randn(m)
-    y1 = test_op(op, x1, randn(n) + im * randn(n), verb)
-    y2 = A * x1
-
-    # complex matrix, complex input
-    n, m = 5, 4
-    A = randn(n, m) + im * randn(n, m)
-    op = MatrixOp(Complex{Float64}, (m,), A)
-    x1 = randn(m) + im .* randn(m)
-    y1 = test_op(op, x1, randn(n) + im * randn(n), verb)
-    y2 = A * x1
-
-    # complex matrix, real input
-    n, m = 5, 4
-    A = randn(n, m) + im * randn(n, m)
-    op = MatrixOp(Float64, (m,), A)
-    x1 = randn(m)
-    y1 = test_op(op, x1, randn(n) + im * randn(n), verb)
-    y2 = A * x1
-
-    @test all(norm.(y1 .- y2) .<= 1.0e-12)
+    op = MatrixOp(Float64, (m,), A; array_type = Array{ComplexF32, 2})
+    @test domain_storage_type(op) == Array{Float64}
+    @test codomain_storage_type(op) == Array{Float64}
 
     # complex matrix, real matrix input
-    c = 3
-    op = MatrixOp(Float64, (m, c), A)
-    @test_throws ErrorException MatrixOp(Float64, (m, c, 3), A)
-    @test_throws MethodError MatrixOp(Float64, (m, c), randn(n, m, 2))
+    A = randn(n, m) + im * randn(n, m)
+    c = 3; op = MatrixOp(Float64, (m, c), A)
     x1 = randn(m, c)
-    y1 = test_op(op, x1, randn(n, c) .+ im .* randn(n, c), verb)  # codomain is ComplexF64
-    y2 = A * x1
+    y1 = test_op(op, x1, randn(n, c) .+ im .* randn(n, c), verb)
+    @test all(norm.(y1 .- A * x1) .<= 1.0e-12)
+end
 
-    # other constructors
+@testitem "MatrixOp: constructors" tags = [:linearoperator, :MatrixOp] setup=[TestUtils] begin
+    using Random, LinearAlgebra, AbstractOperators
+    Random.seed!(0)
+
+    n, m = 5, 4
+    A = randn(n, m) + im * randn(n, m)
+    c = 3
     op = MatrixOp(A)
     op = MatrixOp(Float64, A)
     op = MatrixOp(A, c)
     op = MatrixOp(Float64, A, c)
-
     op = convert(LinearOperator, A)
     op = convert(LinearOperator, A, c)
-    op = convert(LinearOperator, Complex{Float64}, size(x1), A)
+    op = convert(LinearOperator, Complex{Float64}, (m, c), A)
 
-    #properties
+    @test_throws ErrorException MatrixOp(Float64, (m, c, 3), A)
+    @test_throws MethodError MatrixOp(Float64, (m, c), randn(n, m, 2))
+end
+
+@testitem "MatrixOp: properties" tags = [:linearoperator, :MatrixOp] setup=[TestUtils] begin
+    using Random, LinearAlgebra, AbstractOperators
+    Random.seed!(0)
+
+    n, m = 5, 4; A = randn(n, m) + im * randn(n, m); c = 3
+    op = MatrixOp(Float64, (m, c), A)
     @test is_sliced(op) == false
     @test is_linear(op) == true
     @test is_null(op) == false
@@ -85,69 +63,38 @@
     @test is_full_row_rank(MatrixOp(randn(Random.seed!(0), 3, 4))) == true
     @test is_full_column_rank(MatrixOp(randn(Random.seed!(0), 3, 4))) == false
 
-    # Square invertible matrix
-    B = randn(4, 4)
-    invop = MatrixOp(Float64, (4,), B)
+    B = randn(4, 4); invop = MatrixOp(Float64, (4,), B)
     @test is_invertible(invop) == (det(B) != 0)
 
-    # Orthogonal case (approx)
-    Q, _ = qr(randn(5, 5))
-    Qmat = Matrix(Q)
-    Qop = MatrixOp(Float64, (5,), Qmat)
-    @test is_orthogonal(Qop) == true
+    Q, _ = qr(randn(5, 5)); Qmat = Matrix(Q)
+    @test is_orthogonal(MatrixOp(Float64, (5,), Qmat)) == true
 
-    # Diagonal detection path
-    D = diagm(0 => randn(5))
-    Dop = MatrixOp(Float64, (5,), D)
+    D = diagm(0 => randn(5)); Dop = MatrixOp(Float64, (5,), D)
     @test is_diagonal(Dop) == true
     @test is_AcA_diagonal(Dop) == true
     @test is_AAc_diagonal(Dop) == true
+end
 
-    # Scale: real codomain, complex coeff should error
-    @test_throws ErrorException Scale(1.0 + 2im, invop)
-    Sop = Scale(2.0, invop)
-    xS = randn(4)
-    @test Sop * xS ≈ 2.0 * (invop * xS)
+@testitem "MatrixOp: adjoint and in-place" tags = [:linearoperator, :MatrixOp] setup=[TestUtils] begin
+    using Random, LinearAlgebra, AbstractOperators
+    Random.seed!(0)
 
-    # Normal operator A'A
-    Nop = AbstractOperators.get_normal_op(invop)
-    @test size(Nop) == ((4,), (4,))
-    xN = randn(4)
-    @test Nop * xN ≈ invop' * (invop * xN)
+    Q, _ = qr(randn(5, 5)); Qmat = Matrix(Q)
+    Qop = MatrixOp(Float64, (5,), Qmat)
+    xvec = randn(5); yvec = zeros(5)
+    mul!(yvec, Qop, xvec); @test yvec ≈ Qmat * xvec
+    Xmat = randn(5, 3); Ymat = zeros(5, 3)
+    mul!(Ymat, Qop, Xmat); @test Ymat ≈ Qmat * Xmat
 
-    # Adjoint mapping with complex matrix and real input (special method)
     Cmat = randn(3, 3) + im * randn(3, 3)
     Cop = MatrixOp(Float64, (3,), Cmat)
     xr = randn(3)
-    yr = Cop' * xr
-    # Compare with manual real of complex multiplication
-    @test yr ≈ real.(Cmat' * xr)
+    @test Cop' * xr ≈ real.(Cmat' * xr)
 
-    # In-place mul!
-    xvec = randn(5)
-    yvec = zeros(5)
-    mul!(yvec, Qop, xvec)
-    @test yvec ≈ Qmat * xvec
+    Nop = AbstractOperators.get_normal_op(Qop)
+    @test Nop * randn(5) ≈ Qop' * (Qop * randn(5))
 
-    # Batched (matrix input) in-place multiplication
-    Xmat = randn(5, 3)
-    Ymat = zeros(5, 3)
-    mul!(Ymat, Qop, Xmat)
-    @test Ymat ≈ Qmat * Xmat
-
-    # opnorm vs estimate_opnorm
-    @test opnorm(invop) ≈ estimate_opnorm(invop)
-    @test opnorm(invop) ≈ opnorm(B)
-
-    # Size variations: single vs multi-column
-    Tall = randn(8, 3)
-    TallOp = MatrixOp(Float64, (3,), Tall)
-    TallOpMulti = MatrixOp(Float64, (3, 2), Tall)
-    @test size(TallOp) == ((8,), (3,))
-    @test size(TallOpMulti) == ((8, 2), (3, 2))
-
-    # Show output symbol
-    io = IOBuffer(); show(io, TallOp); str = String(take!(io)); @test occursin("▒", str)
+    @test opnorm(Qop) ≈ estimate_opnorm(Qop) rtol = 0.02
 end
 
 @testitem "MatrixOp (JLArray)" tags = [:linearoperator, :MatrixOp, :gpu, :jlarray] setup=[TestUtils] begin

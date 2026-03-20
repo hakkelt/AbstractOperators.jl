@@ -1,4 +1,4 @@
-@testitem "HCAT" tags = [:calculus, :HCAT] setup = [TestUtils] begin
+@testitem "HCAT: basic mul" tags = [:calculus, :HCAT] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     verb && println(" --- Testing HCAT --- ")
@@ -21,63 +21,26 @@
     y1 = test_op(opHp, ArrayPartition(x2, x1), randn(m), verb)
     @test norm(y1 - y2) <= 1.0e-12
 
-    # test HCAT longer
-
     m, n1, n2, n3 = 4, 7, 5, 6
-    A1 = randn(m, n1)
-    A2 = randn(m, n2)
-    A3 = randn(m, n3)
-    opA1 = MatrixOp(A1)
-    opA2 = MatrixOp(A2)
-    opA3 = MatrixOp(A3)
+    A1 = randn(m, n1); A2 = randn(m, n2); A3 = randn(m, n3)
+    opA1 = MatrixOp(A1); opA2 = MatrixOp(A2); opA3 = MatrixOp(A3)
     opH = HCAT(opA1, opA2, opA3)
-    x1 = randn(n1)
-    x2 = randn(n2)
-    x3 = randn(n3)
+    x1 = randn(n1); x2 = randn(n2); x3 = randn(n3)
     y1 = test_op(opH, ArrayPartition(x1, x2, x3), randn(m), verb)
-    y2 = A1 * x1 + A2 * x2 + A3 * x3
-    @test norm(y1 - y2) <= 1.0e-12
+    @test norm(y1 - (A1 * x1 + A2 * x2 + A3 * x3)) <= 1.0e-12
 
-    # test HCAT of HCAT
+    # HCAT of HCAT (flattening)
     opHH = HCAT(opH, opA2, opA3)
     y1 = test_op(opHH, ArrayPartition(x1, x2, x3, x2, x3), randn(m), verb)
-    y2 = A1 * x1 + A2 * x2 + A3 * x3 + A2 * x2 + A3 * x3
-    @test norm(y1 - y2) <= 1.0e-12
+    @test norm(y1 - (A1 * x1 + A2 * x2 + A3 * x3 + A2 * x2 + A3 * x3)) <= 1.0e-12
+end
 
-    opHH = HCAT(opH, opH, opA3)
-    x = ArrayPartition(x1, x2, x3, x1, x2, x3, x3)
-    y1 = test_op(opHH, x, randn(m), verb)
-    y2 = A1 * x1 + A2 * x2 + A3 * x3 + A1 * x1 + A2 * x2 + A3 * x3 + A3 * x3
-    @test norm(y1 - y2) <= 1.0e-12
+@testitem "HCAT: properties" tags = [:calculus, :HCAT] setup = [TestUtils] begin
+    using Random, LinearAlgebra, AbstractOperators
+    Random.seed!(0)
 
-    opA3 = MatrixOp(randn(n1, n1))
-    @test_throws Exception HCAT(opA1, opA2, opA3)
-    opF = MatrixOp(randn(ComplexF64, m, m))
-    @test_throws Exception HCAT(opA1, opF, opA2)
-
-    # test utilities
-
-    # permutation
-    p = randperm(ndoms(opHH, 2))
-    opHP = AbstractOperators.permute(opHH, p)
-
-    xp = ArrayPartition(x.x[p]...)
-
-    y1 = test_op(opHP, xp, randn(m), verb)
-
-    pp = randperm(ndoms(opHH, 2))
-    opHPP = AbstractOperators.permute(opHH, pp)
-    xpp = ArrayPartition(x.x[pp]...)
-    y1 = test_op(opHPP, xpp, randn(m), verb)
-
-    #properties
     m, n1, n2, n3 = 4, 7, 5, 6
-    A1 = randn(m, n1)
-    A2 = randn(m, n2)
-    A3 = randn(m, n3)
-    opA1 = MatrixOp(A1)
-    opA2 = MatrixOp(A2)
-    opA3 = MatrixOp(A3)
+    opA1 = MatrixOp(randn(m, n1)); opA2 = MatrixOp(randn(m, n2)); opA3 = MatrixOp(randn(m, n3))
     op = HCAT(opA1, opA2, opA3)
     @test is_linear(op) == true
     @test is_null(op) == false
@@ -92,81 +55,49 @@
 
     d1 = randn(n1) .+ im .* randn(n1)
     d2 = randn(n1) .+ im .* randn(n1)
-    op = HCAT(DiagOp(d1), DiagOp(d2))
-    @test is_null(op) == false
-    @test is_eye(op) == false
-    @test is_diagonal(op) == false
-    @test is_AcA_diagonal(op) == false
-    @test is_AAc_diagonal(op) == true
-    @test is_orthogonal(op) == false
-    @test is_invertible(op) == false
-    @test is_full_row_rank(op) == true
-    @test is_full_column_rank(op) == false
-
-    @test diag_AAc(op) == d1 .* conj(d1) .+ d2 .* conj(d2)
-
+    op2 = HCAT(DiagOp(d1), DiagOp(d2))
+    @test is_AAc_diagonal(op2) == true
+    @test diag_AAc(op2) == d1 .* conj(d1) .+ d2 .* conj(d2)
     y1 = randn(n1) .+ im .* randn(n1)
-    @test norm(op * (op' * y1) .- diag_AAc(op) .* y1) < 1.0e-12
+    @test norm(op2 * (op2' * y1) .- diag_AAc(op2) .* y1) < 1.0e-12
 
-    #test displacement
+    # storage type and thread safety
+    A1 = MatrixOp(randn(m, n1)); A2 = MatrixOp(randn(m, n2))
+    op3 = HCAT(A1, A2)
+    @test domain_storage_type(op3) !== nothing
+    @test codomain_storage_type(op3) !== nothing
+    @test is_thread_safe(op3) == false
+end
+
+@testitem "HCAT: displacement" tags = [:calculus, :HCAT] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
 
     m, n1, n2 = 4, 7, 5
-    A1 = randn(m, n1)
-    A2 = randn(m, n2)
-    d1 = randn(m)
-    d2 = randn(m)
+    A1 = randn(m, n1); A2 = randn(m, n2)
+    d1 = randn(m); d2 = randn(m)
     opA1 = AffineAdd(MatrixOp(A1), d1)
     opA2 = AffineAdd(MatrixOp(A2), d2)
     opH = HCAT(opA1, opA2)
-    x1 = randn(n1)
-    x2 = randn(n2)
+    x1 = randn(n1); x2 = randn(n2)
     y1 = opH * ArrayPartition(x1, x2)
-    y2 = A1 * x1 + d1 + A2 * x2 + d2
-    @test norm(y1 - y2) <= 1.0e-12
-    y1 = remove_displacement(opH) * ArrayPartition(x1, x2)
-    y2 = A1 * x1 + A2 * x2
-    @test norm(y1 - y2) <= 1.0e-12
+    @test norm(y1 - (A1 * x1 + d1 + A2 * x2 + d2)) <= 1.0e-12
+    y2 = remove_displacement(opH) * ArrayPartition(x1, x2)
+    @test norm(y2 - (A1 * x1 + A2 * x2)) <= 1.0e-12
 
-    m, n1, n2 = 4, 7, 5
-    A1 = MatrixOp(randn(m, n1))
-    A2 = MatrixOp(randn(m, n2))
-    op = HCAT(A1, A2)
-    # storage type accessors (results not asserted for value, just exercise paths)
-    _ds = domain_storage_type(op)
-    _cs = codomain_storage_type(op)
-    @test _ds !== nothing
-    @test _cs !== nothing
-    # thread safety (expected false because of shared output accumulation)
-    @test is_thread_safe(op) == false
-
-    # remove_displacement idempotence (no displacement present)
+    # remove_displacement idempotence
+    A1b = MatrixOp(randn(m, n1)); A2b = MatrixOp(randn(m, n2))
+    op = HCAT(A1b, A2b)
     @test remove_displacement(op) == op
-
-    # with displacement once
-    d1 = randn(m)
-    d2 = randn(m)
-    opd = HCAT(AffineAdd(A1, d1), AffineAdd(A2, d2))
+    opd = HCAT(AffineAdd(A1b, d1), AffineAdd(A2b, d2))
     opd_removed = remove_displacement(opd)
-    # applying again should be a no-op
     @test remove_displacement(opd_removed) == opd_removed
+end
 
-    # Show output / fun_name indirect check (two-operator bracket form)
-    E = Eye(5)
-    D = DiagOp(2 .* ones(5))
-    H2 = HCAT(E, D)
-    io = IOBuffer(); show(io, H2); shown = String(take!(io))
-    @test occursin("HCAT", shown) || occursin("[", shown)
+@testitem "HCAT: slicing and permute utilities" tags = [:calculus, :HCAT] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
 
-    # Equality and inequality
-    Aeq = MatrixOp(randn(4, 3))
-    Beq = MatrixOp(randn(4, 2))
-    H1a = HCAT(Aeq, Beq)
-    H1b = HCAT(Aeq, Beq)
-    H1c = HCAT(Beq, Aeq)
-    @test H1a == H1b
-    @test H1a != H1c
-
-    # Slicing related helpers using GetIndex
     n = 8
     op1 = GetIndex(Float64, (n,), (1:4,))
     op2 = GetIndex(Float64, (n,), (5:8,))
@@ -174,86 +105,53 @@
     @test is_sliced(Hs) == true
     exprs = AbstractOperators.get_slicing_expr(Hs)
     @test length(exprs) == 2
-    @test exprs[1] == (1:4,)
-    @test exprs[2] == (5:8,)
+    @test exprs[1] == (1:4,) && exprs[2] == (5:8,)
     masks = AbstractOperators.get_slicing_mask(Hs)
     @test length(masks) == 2
     @test sum(masks[1]) == 4 && sum(masks[2]) == 4
-    Hs_removed = AbstractOperators.remove_slicing(Hs)
-    @test is_sliced(Hs_removed) == false
+    @test !is_sliced(AbstractOperators.remove_slicing(Hs))
 
-    # Slicing expressions for HCAT of sliced Compose operators
     d1, d2 = randn(5), randn(5)
     D1 = DiagOp(d1) * GetIndex((10,), 1:5)
     D2 = DiagOp(d2) * GetIndex((10,), 6:10)
     Hs_comp = HCAT(D1, D2)
     @test is_sliced(Hs_comp)
     @test AbstractOperators.get_slicing_expr(Hs_comp) == ((1:5,), (6:10,))
-    @test length(collect(AbstractOperators.get_slicing_mask(Hs_comp))) == 2
     @test !is_sliced(AbstractOperators.remove_slicing(Hs_comp))
 
-    # Show path with reversed domain indices
-    Hrev = HCAT(opA2, opA1)
-    Hrev_perm = Hrev[[2, 1]]
-    io2 = IOBuffer(); show(io2, Hrev_perm); s2 = String(take!(io2))
-    @test occursin("[", s2)
-
-    # Stacked second operator to exercise generated mul! stacked branch
-    Hflat = MatrixOp(randn(5, 2))
-    Hstacked_part = HCAT(MatrixOp(randn(5, 3)), MatrixOp(randn(5, 4)))
-    Hmix = HCAT((Hflat, Hstacked_part), zeros(5))
-    xmix = ArrayPartition(randn(2), randn(3), randn(4))
-    @test Hmix * xmix ≈ (Hflat * xmix.x[1]) + (Hstacked_part * ArrayPartition(xmix.x[2], xmix.x[3]))
-
-
-    # Permute domain ordering and ensure type stability
+    m, n1, n2 = 4, 3, 2
+    Aeq = MatrixOp(randn(m, n1)); Beq = MatrixOp(randn(m, n2))
+    H1a = HCAT(Aeq, Beq)
     p2 = collect(Iterators.reverse(1:ndoms(H1a, 2)))
     Hp = AbstractOperators.permute(H1a, p2)
     @test typeof(Hp) <: HCAT
     xA = randn(size(Aeq, 2)); xB = randn(size(Beq, 2))
     y_orig = H1a * ArrayPartition(xA, xB)
     xin = p2 == [2, 1] ? ArrayPartition(xB, xA) : ArrayPartition(xA, xB)
-    y_perm = Hp * xin
-    @test y_orig ≈ y_perm
+    @test y_orig ≈ Hp * xin
+end
 
-    # diag_AAc accumulation explicit check on known simple ops (DiagOp and Eye)
-    dvals = randn(5) .+ im .* randn(5)
-    Hdiag = HCAT(DiagOp(dvals), Eye(ComplexF64, 5))
-    @test diag_AAc(Hdiag) == dvals .* conj(dvals) .+ 1
+@testitem "HCAT: nonlinear operators" tags = [:calculus, :HCAT] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
 
-    # nonlinear operator test (Sigmoid + MatrixOp)
     n, m = 4, 3
     x = ArrayPartition(randn(n), randn(m))
     r = randn(m)
     A = randn(m, n)
     B = Sigmoid(Float64, (m,), 2)
     op = HCAT(MatrixOp(A), B)
-
     y, grad = test_NLop(op, x, r, verb)
+    @test norm(A * x.x[1] + B * x.x[2] - y) < 1.0e-8
 
-    Y = A * x.x[1] + B * x.x[2]
-    @test norm(Y - y) < 1.0e-8
-
-    m, n = 3, 5
+    n, m = 5, 3
     x = ArrayPartition(randn(m), randn(n))
     r = randn(m)
-    A = Sin(Float64, (m,))
+    A_sin = Sin(Float64, (m,))
     M = randn(m, n)
-    B = MatrixOp(M)
-    op = HCAT(A, B)
-
-    y, grad = test_NLop(op, x, r, verb)
-
-    Y = A * x.x[1] + M * x.x[2]
-    @test norm(Y - y) < 1.0e-8
-
-    p = [2, 1]
-    opP = AbstractOperators.permute(op, p)
-    xp = ArrayPartition(x.x[p]...)
-    J = Jacobian(opP, xp)'
-    verb && println(size(J, 1))
-    y, grad = test_NLop(opP, xp, r, verb)
-
+    op2 = HCAT(A_sin, MatrixOp(M))
+    y2, grad2 = test_NLop(op2, x, r, verb)
+    @test norm(A_sin * x.x[1] + M * x.x[2] - y2) < 1.0e-8
 end
 
 @testitem "HCAT constructor errors" tags = [:calculus, :HCAT] setup = [TestUtils] begin

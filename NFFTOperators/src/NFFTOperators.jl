@@ -20,7 +20,8 @@ import AbstractOperators:
     allocate_in_codomain,
     domain_storage_type,
     codomain_storage_type,
-    AdjointOperator
+    AdjointOperator,
+    _array_wrapper_type
 import Base.Threads: nthreads
 import FFTW: FFTW
 
