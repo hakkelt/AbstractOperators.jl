@@ -14,15 +14,15 @@ struct Sech{T, N, S<:AbstractArray{T}} <: NonLinearOperator
 end
 
 function Sech(
-        domain_type::Type{T}, DomainDim::NTuple{N, Int}; array_type::Type = Array
+        domain_type::Type{T}, DomainDim::NTuple{N, Int}; array_type::Type = Array{T}
     ) where {T, N}
     S = _normalize_array_type(array_type, T)
     return Sech{T, N, S}(DomainDim)
 end
 
-Sech(DomainDim::NTuple{N, Int}; array_type::Type = Array) where {N} =
+Sech(DomainDim::NTuple{N, Int}; array_type::Type = Array{Float64}) where {N} =
     Sech(Float64, DomainDim; array_type)
-Sech(DomainDim::Vararg{Int}; array_type::Type = Array) =
+Sech(DomainDim::Vararg{Int}; array_type::Type = Array{Float64}) =
     Sech(Float64, DomainDim; array_type)
 
 function Sech(x::AbstractArray{T}; array_type::Type = _array_wrapper(x)) where {T}

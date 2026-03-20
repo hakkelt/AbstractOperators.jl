@@ -21,15 +21,15 @@ function SoftMax(x::AbstractArray{T, N}; array_type::Type = _array_wrapper(x)) w
 end
 
 function SoftMax(
-        domain_type::Type, DomainDim::NTuple{N, Int}; array_type::Type = Array
-    ) where {N}
-    S = _normalize_array_type(array_type, domain_type)
+        domain_type::Type{T}, DomainDim::NTuple{N, Int}; array_type::Type = Array{T}
+    ) where {T, N}
+    S = _normalize_array_type(array_type, T)
     buf = similar(S, DomainDim)
-    fill!(buf, zero(domain_type))
-    return SoftMax{domain_type, N, typeof(buf)}(DomainDim, buf)
+    fill!(buf, zero(T))
+    return SoftMax{T, N, typeof(buf)}(DomainDim, buf)
 end
 
-SoftMax(DomainDim::NTuple{N, Int}; array_type::Type = Array) where {N} =
+SoftMax(DomainDim::NTuple{N, Int}; array_type::Type = Array{Float64}) where {N} =
     SoftMax(Float64, DomainDim; array_type)
 
 function mul!(y::AbstractArray, L::SoftMax, x::AbstractArray)

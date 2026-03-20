@@ -14,15 +14,15 @@ struct Sin{T, N, S<:AbstractArray{T}} <: NonLinearOperator
 end
 
 function Sin(
-        domain_type::Type{T}, DomainDim::NTuple{N, Int}; array_type::Type = Array
+        domain_type::Type{T}, DomainDim::NTuple{N, Int}; array_type::Type = Array{T}
     ) where {T, N}
     S = _normalize_array_type(array_type, T)
     return Sin{T, N, S}(DomainDim)
 end
 
-Sin(DomainDim::NTuple{N, Int}; array_type::Type = Array) where {N} =
+Sin(DomainDim::NTuple{N, Int}; array_type::Type = Array{Float64}) where {N} =
     Sin(Float64, DomainDim; array_type)
-Sin(DomainDim::Vararg{Int}; array_type::Type = Array) =
+Sin(DomainDim::Vararg{Int}; array_type::Type = Array{Float64}) =
     Sin(Float64, DomainDim; array_type)
 
 function Sin(x::AbstractArray{T}; array_type::Type = _array_wrapper(x)) where {T}

@@ -18,14 +18,14 @@ function Sigmoid(
         domain_type::Type{T},
         DomainDim::NTuple{N, Int},
         gamma::G = 1.0;
-        array_type::Type = Array,
+        array_type::Type = Array{T},
     ) where {T, N, G <: Real}
     S = _normalize_array_type(array_type, T)
     return Sigmoid{T, N, G, S}(DomainDim, gamma)
 end
 
 function Sigmoid(
-        DomainDim::NTuple{N, Int}, gamma::G = 1.0; array_type::Type = Array
+        DomainDim::NTuple{N, Int}, gamma::G = 1.0; array_type::Type = Array{Float64}
     ) where {N, G}
     return Sigmoid(Float64, DomainDim, gamma; array_type)
 end

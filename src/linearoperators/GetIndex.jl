@@ -46,7 +46,9 @@ end
 
 # Constructors
 # default
-function GetIndex(domain_type::Type, dim_in::Dims, idx::Tuple; array_type::Type = Array)
+function GetIndex(
+        domain_type::Type{T}, dim_in::Dims, idx::Tuple; array_type::Type = Array{T}
+    ) where {T}
     dim_out = get_dim_out(dim_in, idx...)
     if dim_out == dim_in
         return Eye(domain_type, dim_in)
@@ -57,17 +59,19 @@ function GetIndex(domain_type::Type, dim_in::Dims, idx::Tuple; array_type::Type 
 end
 
 function GetIndex(
-        domain_type::Type,
+        domain_type::Type{T},
         dim_in::Dims,
         idx::Union{AbstractVector{Int}, AbstractVector{<:CartesianIndex}},
-        ; array_type::Type = Array,
-    )
+        ; array_type::Type = Array{T},
+    ) where {T}
     dim_out = (length(idx),)
     S = _normalize_array_type(array_type, domain_type)
     return GetIndex(domain_type, S, dim_out, dim_in, idx)
 end
 
-function GetIndex(domain_type::Type, dim_in::Dims, mask::AbstractArray{Bool}; array_type::Type = Array)
+function GetIndex(
+        domain_type::Type{T}, dim_in::Dims, mask::AbstractArray{Bool}; array_type::Type = Array{T}
+    ) where {T}
     dim_out = (sum(mask),)
     if dim_out[1] == prod(dim_in)
         return reshape(Eye(domain_type, dim_in), dim_out)
@@ -77,7 +81,7 @@ function GetIndex(domain_type::Type, dim_in::Dims, mask::AbstractArray{Bool}; ar
     end
 end
 
-GetIndex(domain_type::Type, dim_in::Dims, idx...; array_type::Type = Array) =
+GetIndex(domain_type::Type{T}, dim_in::Dims, idx...; array_type::Type = Array{T}) where {T} =
     GetIndex(domain_type, dim_in, idx; array_type)
 GetIndex(dim_in::Dims, idx...) = GetIndex(Float64, dim_in, idx)
 GetIndex(dim_in::Dims, idx::Tuple) = GetIndex(Float64, dim_in, idx)

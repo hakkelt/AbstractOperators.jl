@@ -22,7 +22,7 @@ end
 
 end  # @testmodule DiagOpTestHelper
 
-@testitem "DiagOp" tags = [:linearoperator, :DiagOp] setup=[TestUtils, DiagOpTestHelper] begin
+@testitem "DiagOp: mul and constructors" tags = [:linearoperator, :DiagOp] setup=[TestUtils, DiagOpTestHelper] begin
     using Random, AbstractOperators, JLArrays
     Random.seed!(0)
     verb && println(" --- Testing DiagOp --- ")
@@ -46,6 +46,13 @@ end  # @testmodule DiagOpTestHelper
     # other constructors
     op = DiagOp(randn(4))
     op = DiagOp(randn(4) .+ im)
+    op = DiagOp((n,), pi)
+end
+
+@testitem "DiagOp: properties and helpers" tags = [:linearoperator, :DiagOp] setup=[TestUtils, DiagOpTestHelper] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
+    n = 4
     op = DiagOp((n,), pi)
 
     #properties

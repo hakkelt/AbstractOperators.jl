@@ -28,26 +28,26 @@ end
 # Constructors
 
 function MyLinOp(
-        domain_type::Type,
+        domain_type::Type{T},
         dim_in::NTuple{N, Int},
         dim_out::NTuple{M, Int},
         Fwd!::F,
         Adj!::G,
-        ; array_type::Type = Array,
-    ) where {N, M, F <: Function, G <: Function}
+        ; array_type::Type = Array{T},
+    ) where {T, N, M, F <: Function, G <: Function}
     dS = _normalize_array_type(array_type, domain_type)
     return MyLinOp{N, M, domain_type, domain_type, F, G, dS, dS}(dim_out, dim_in, Fwd!, Adj!)
 end
 
 function MyLinOp(
-        domain_type::Type,
+        domain_type::Type{T},
         dim_in::NTuple{N, Int},
-        codomain_type::Type,
+        codomain_type::Type{C},
         dim_out::NTuple{M, Int},
         Fwd!::F,
         Adj!::G,
-        ; array_type::Type = Array,
-    ) where {N, M, F <: Function, G <: Function}
+        ; array_type::Type = Array{T},
+    ) where {T, C, N, M, F <: Function, G <: Function}
     dS = _normalize_array_type(array_type, domain_type)
     cS = _normalize_array_type(array_type, codomain_type)
     return MyLinOp{N, M, domain_type, codomain_type, F, G, dS, cS}(dim_out, dim_in, Fwd!, Adj!)

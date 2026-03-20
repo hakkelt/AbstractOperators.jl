@@ -14,15 +14,15 @@ struct Atan{T, N, S<:AbstractArray{T}} <: NonLinearOperator
 end
 
 function Atan(
-        domain_type::Type{T}, DomainDim::NTuple{N, Int}; array_type::Type = Array
+        domain_type::Type{T}, DomainDim::NTuple{N, Int}; array_type::Type = Array{T}
     ) where {T, N}
     S = _normalize_array_type(array_type, T)
     return Atan{T, N, S}(DomainDim)
 end
 
-Atan(DomainDim::NTuple{N, Int}; array_type::Type = Array) where {N} =
+Atan(DomainDim::NTuple{N, Int}; array_type::Type = Array{Float64}) where {N} =
     Atan(Float64, DomainDim; array_type)
-Atan(DomainDim::Vararg{Int}; array_type::Type = Array) =
+Atan(DomainDim::Vararg{Int}; array_type::Type = Array{Float64}) =
     Atan(Float64, DomainDim; array_type)
 
 function Atan(x::AbstractArray{T}; array_type::Type = _array_wrapper(x)) where {T}

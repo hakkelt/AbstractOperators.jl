@@ -14,15 +14,15 @@ struct Cos{T, N, S<:AbstractArray{T}} <: NonLinearOperator
 end
 
 function Cos(
-        domain_type::Type{T}, DomainDim::NTuple{N, Int}; array_type::Type = Array
+        domain_type::Type{T}, DomainDim::NTuple{N, Int}; array_type::Type = Array{T}
     ) where {T, N}
     S = _normalize_array_type(array_type, T)
     return Cos{T, N, S}(DomainDim)
 end
 
-Cos(DomainDim::NTuple{N, Int}; array_type::Type = Array) where {N} =
+Cos(DomainDim::NTuple{N, Int}; array_type::Type = Array{Float64}) where {N} =
     Cos(Float64, DomainDim; array_type)
-Cos(DomainDim::Vararg{Int}; array_type::Type = Array) =
+Cos(DomainDim::Vararg{Int}; array_type::Type = Array{Float64}) =
     Cos(Float64, DomainDim; array_type)
 
 function Cos(x::AbstractArray{T}; array_type::Type = _array_wrapper(x)) where {T}

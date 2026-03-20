@@ -24,13 +24,13 @@ end
 # Constructors
 #default
 function Zeros(
-        domain_type::Type,
+        domain_type::Type{D},
         dim_in::NTuple{M, Int},
-        codomain_type::Type,
+        codomain_type::Type{C},
         dim_out::NTuple{N, Int};
-        storage_type::Type = Array,
+        storage_type::Type = Array{D},
         array_type::Union{Nothing, Type} = nothing,
-    ) where {N, M}
+    ) where {N, M, D, C}
     wrapper = isnothing(array_type) ? storage_type : array_type
     dS = _normalize_array_type(wrapper, domain_type)
     cS = _normalize_array_type(wrapper, codomain_type)
@@ -38,11 +38,11 @@ function Zeros(
 end
 
 function Zeros(
-        domain_type::Type,
+        domain_type::Type{T},
         dim_in::NTuple{M, Int},
         dim_out::NTuple{N, Int};
-        array_type::Type = Array,
-    ) where {N, M}
+        array_type::Type = Array{T},
+    ) where {N, M, T}
     dS = _normalize_array_type(array_type, domain_type)
     return Zeros{domain_type, N, domain_type, M, dS, dS}(dim_out, dim_in)
 end
