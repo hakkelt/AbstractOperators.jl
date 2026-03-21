@@ -1,7 +1,7 @@
-@testitem "LMatrixOp" tags = [:linearoperator, :LMatrixOp] setup=[TestUtils] begin
+@testitem "LMatrixOp: basic mul" tags = [:linearoperator, :LMatrixOp] setup=[TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing LMatrixOp --- ")
+    verb && println(" --- Testing LMatrixOp: basic mul --- ")
 
     function test_lmatrixop_mul(conv, verb)
         n, m = 5, 6
@@ -21,7 +21,6 @@
     x1 = randn(n, m)
     y1 = test_op(op, x1, randn(n), verb)
     y2 = x1 * b
-
     @test all(norm.(y1 .- y2) .<= 1.0e-12)
     # size (codomain, domain)
     @test size(op) == ((n,), (n, m))
@@ -34,7 +33,6 @@
     x1 = randn(n, m) + im * randn(n, m)
     y1 = test_op(op, x1, randn(n) + im * randn(n), verb)
     y2 = x1 * b
-
     @test all(norm.(y1 .- y2) .<= 1.0e-12)
     @test size(op) == ((n,), (n, m))
 
@@ -44,7 +42,6 @@
     x1 = randn(n, m)
     y1 = test_op(op, x1, randn(n, l), verb)
     y2 = x1 * b
-
     @test all(norm.(y1 .- y2) .<= 1.0e-12)
     @test size(op) == ((n, l), (n, m))
 
@@ -54,9 +51,16 @@
     x1 = randn(n, m) + im * randn(n, m)
     y1 = test_op(op, x1, randn(n, l) + im * randn(n, l), verb)
     y2 = x1 * b
-
     @test all(norm.(y1 .- y2) .<= 1.0e-12)
     @test size(op) == ((n, l), (n, m))
+end
+
+@testitem "LMatrixOp: other constructors" tags = [:linearoperator, :LMatrixOp] setup=[TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
+    verb && println(" --- Testing LMatrixOp: other constructors --- ")
+
+    n, m, l = 5, 6, 7
 
     ## other constructors (vector b and matrix b)
     bvec = randn(m)
@@ -91,6 +95,17 @@
     Zout2 = zeros(n, m)
     mul!(Zout2, op_mat2', Zrhs)
     @test Zout2 ≈ Zrhs * b_mat'
+end
+
+@testitem "LMatrixOp: scale and properties" tags = [:linearoperator, :LMatrixOp] setup=[TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
+    verb && println(" --- Testing LMatrixOp: scale and properties --- ")
+
+    n, m, l = 5, 6, 7
+    bvec = randn(m)
+    op_vec = LMatrixOp(bvec, n)
+    X = randn(n, m)
 
     # Scaling
     Sop = Scale(2.5, op_vec)
@@ -103,6 +118,9 @@
     # Error path: dimension mismatch (wrong inner dimension)
     Xbad = randn(n, m + 1)
     @test_throws DimensionMismatch (op_vec * Xbad)
+
+    b = randn(m, l) + im * randn(m, l)
+    op = LMatrixOp(Complex{Float64}, (n, m), b)
 
     ##properties
     @test is_linear(op) == true

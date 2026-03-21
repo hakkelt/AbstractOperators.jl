@@ -1,7 +1,7 @@
-@testitem "Reshape" tags = [:calculus, :Reshape] setup = [TestUtils] begin
+@testitem "Reshape: basic 1D->2D" tags = [:calculus, :Reshape] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing Reshape --- ")
+    verb && println(" --- Testing Reshape: basic 1D->2D --- ")
 
     m, n = 8, 4
     dim_out = (2, 2, 2)
@@ -25,6 +25,12 @@
     @test is_invertible(opR) == is_invertible(opA1)
     @test is_full_row_rank(opR) == is_full_row_rank(opA1)
     @test is_full_column_rank(opR) == is_full_column_rank(opA1)
+end
+
+@testitem "Reshape: displacement and storage" tags = [:calculus, :Reshape] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
+    verb && println(" --- Testing Reshape: displacement and storage --- ")
 
     # testing displacement
     m, n = 8, 4
@@ -51,10 +57,12 @@
     rd1 = remove_displacement(opR)
     rd2 = remove_displacement(rd1)
     @test rd1 * x1 == rd2 * x1
+end
 
-    #######################
-    ## test Scale   #######
-    #######################
+@testitem "Reshape: Scale mul" tags = [:calculus, :Reshape] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
+    verb && println(" --- Testing Reshape: Scale mul --- ")
 
     m, n = 8, 4
     coeff = pi
@@ -78,8 +86,19 @@
     y1 = test_op(opS, x1, diff(randn(m)), verb)
     y2 = coeff * (diff(x1))
     @test norm(y1 - y2) <= 1.0e-12
+end
 
+@testitem "Reshape: Scale properties" tags = [:calculus, :Reshape] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
+    verb && println(" --- Testing Reshape: Scale properties --- ")
+
+    m, n = 8, 4
+    coeff = pi
+    A1 = randn(m, n)
+    opA1 = MatrixOp(A1)
     opS = Scale(coeff, opA1)
+
     @test is_null(opS) == is_null(opA1)
     @test is_eye(opS) == is_eye(opA1)
     @test is_diagonal(opS) == is_diagonal(opA1)
@@ -125,6 +144,12 @@
     y1 = remove_displacement(opS) * x1
     y2 = coeff * (A1 * x1)
     @test norm(y1 - y2) <= 1.0e-12
+end
+
+@testitem "Reshape: equality and adjoint" tags = [:calculus, :Reshape] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
+    verb && println(" --- Testing Reshape: equality and adjoint --- ")
 
     # Equality / inequality
     m, n = 8, 4
@@ -161,6 +186,12 @@
     @test exprRG == (1:kGI,)
     maskRG = AbstractOperators.get_slicing_mask(GI)
     @test sum(maskRG) == kGI
+end
+
+@testitem "Reshape: permute and nonlinear" tags = [:calculus, :Reshape] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
+    verb && println(" --- Testing Reshape: permute and nonlinear --- ")
 
     # permute domain ordering (wrap HCAT to get multi-domain) and ensure same behavior when inputs permuted
     mH = 6; n1 = 3; n2 = 5
@@ -176,6 +207,10 @@
     @test y_orig ≈ y_perm
 
     # opnorm passthrough
+    m, n = 8, 4
+    dim_out = (2, 2, 2)
+    Aeq = MatrixOp(randn(m, n))
+    R1 = Reshape(Aeq, dim_out)
     @test AbstractOperators.has_fast_opnorm(R1) == AbstractOperators.has_fast_opnorm(Aeq)
     @test opnorm(R1) ≈ opnorm(Aeq)
 

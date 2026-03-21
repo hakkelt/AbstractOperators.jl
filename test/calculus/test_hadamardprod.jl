@@ -1,6 +1,6 @@
-@testitem "HadamardProd" tags = [:calculus, :HadamardProd] setup = [TestUtils] begin
+@testitem "HadamardProd: basic mul" tags = [:calculus, :HadamardProd] setup = [TestUtils] begin
     using AbstractOperators
-    verb && println(" --- Testing HadamardProd --- ")
+    verb && println(" --- Testing HadamardProd: basic mul --- ")
 
     # Basic square identity factors (Eye.*Eye)
     n = 3
@@ -34,6 +34,25 @@
     P = HadamardProd(op1, op2)
     y, grad = test_NLop(P, x, r, verb)
     @test norm((op1 * x) .* (op2 * x) - y) < 1.0e-9
+end
+
+@testitem "HadamardProd: properties" tags = [:calculus, :HadamardProd] setup = [TestUtils] begin
+    using AbstractOperators
+    verb && println(" --- Testing HadamardProd: properties --- ")
+
+    # Re-create the HCAT-based P for remove_displacement and permute tests
+    m, n = 3, 5
+    x = ArrayPartition(randn(m), randn(n))
+    r = randn(m)
+    b = randn(m)
+    A1 = AffineAdd(Sin(Float64, (m,)), b)
+    B1 = MatrixOp(randn(m, n))
+    op1 = HCAT(A1, B1)
+    C1 = Cos(Float64, (m,))
+    D1 = MatrixOp(randn(m, n))
+    op2 = HCAT(C1, D1)
+    P = HadamardProd(op1, op2)
+    y, grad = test_NLop(P, x, r, verb)
 
     # remove_displacement and its idempotence
     y2, grad2 = test_NLop(remove_displacement(P), x, r, verb)
@@ -62,7 +81,12 @@
     show(io, P)
     str = String(take!(io))
     @test occursin(".*", str)
-    # --- Additional coverage ---
+end
+
+@testitem "HadamardProd: equality and permute" tags = [:calculus, :HadamardProd] setup = [TestUtils] begin
+    using AbstractOperators
+    verb && println(" --- Testing HadamardProd: equality and permute --- ")
+
     # Equality / inequality
     n = 3
     A = Eye(n, n)

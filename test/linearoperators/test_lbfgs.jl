@@ -1,7 +1,32 @@
-@testitem "L-BFGS" tags = [:linearoperator, :LBFGS] setup = [TestUtils] begin
+@testitem "L-BFGS: construction and basic mul" tags = [:linearoperator, :LBFGS] setup = [TestUtils] begin
     using AbstractOperators
     using AbstractOperators: LBFGS, update!, mul!, reset!
-    verb && println(" --- Testing L-BFGS --- ")
+    verb && println(" --- Testing L-BFGS: construction and basic mul --- ")
+
+    mem = 3
+    x = zeros(10)
+
+    H = LBFGS(x, mem)
+    # Basic properties after construction (no memory yet)
+    @test size(H) == (size(x), size(x))
+    @test domain_type(H) == eltype(x)
+    @test codomain_type(H) == eltype(x)
+    @test is_thread_safe(H) == false
+    # Initial operator should act like identity (H.H = 1, empty memory)
+    @test H * x == x # stochastic but value not stored; run separately below
+    dir = zeros(10)
+    verb && println(H)
+
+    HH = LBFGS(ArrayPartition(x, x), mem)
+    @test size(HH) == (size.(ArrayPartition(x, x).x), size.(ArrayPartition(x, x).x))
+    dirdir = ArrayPartition(zeros(10), zeros(10))
+    verb && println(HH)
+end
+
+@testitem "L-BFGS: update and two-loop recursion" tags = [:linearoperator, :LBFGS] setup = [TestUtils] begin
+    using AbstractOperators
+    using AbstractOperators: LBFGS, update!, mul!, reset!
+    verb && println(" --- Testing L-BFGS: update and two-loop recursion --- ")
 
     Q = [
         32.0 13.1 -4.9 -3.0 6.0 2.2 2.6 3.4 -1.9 -7.5
@@ -48,20 +73,9 @@
     x = zeros(10)
 
     H = LBFGS(x, mem)
-    # Basic properties after construction (no memory yet)
-    @test size(H) == (size(x), size(x))
-    @test domain_type(H) == eltype(x)
-    @test codomain_type(H) == eltype(x)
-    @test is_thread_safe(H) == false
-    # Initial operator should act like identity (H.H = 1, empty memory)
-    @test H * x == x # stochastic but value not stored; run separately below
-    dir = zeros(10)
-    verb && println(H)
-
     HH = LBFGS(ArrayPartition(x, x), mem)
-    @test size(HH) == (size.(ArrayPartition(x, x).x), size.(ArrayPartition(x, x).x))
+    dir = zeros(10)
     dirdir = ArrayPartition(zeros(10), zeros(10))
-    verb && println(HH)
 
     let x_old = [], grad_old = []
         for i in 1:5
@@ -113,6 +127,62 @@
             grad_old = grad
         end
     end  # let x_old, grad_old
+end
+
+@testitem "L-BFGS: memory limit and reset" tags = [:linearoperator, :LBFGS] setup = [TestUtils] begin
+    using AbstractOperators
+    using AbstractOperators: LBFGS, update!, mul!, reset!
+    verb && println(" --- Testing L-BFGS: memory limit and reset --- ")
+
+    Q = [
+        32.0 13.1 -4.9 -3.0 6.0 2.2 2.6 3.4 -1.9 -7.5
+        13.1 18.3 -5.3 -9.5 3.0 2.1 3.9 3.0 -3.6 -4.4
+        -4.9 -5.3 7.7 2.1 -0.4 -3.4 -0.8 -3.0 5.3 5.5
+        -3.0 -9.5 2.1 20.1 1.1 0.8 -12.4 -2.5 5.5 2.1
+        6.0 3.0 -0.4 1.1 3.8 0.6 0.5 0.9 -0.4 -2.0
+        2.2 2.1 -3.4 0.8 0.6 7.8 2.9 -1.3 -4.3 -5.1
+        2.6 3.9 -0.8 -12.4 0.5 2.9 14.5 1.7 -4.9 1.2
+        3.4 3.0 -3.0 -2.5 0.9 -1.3 1.7 6.6 -0.8 2.7
+        -1.9 -3.6 5.3 5.5 -0.4 -4.3 -4.9 -0.8 7.9 5.7
+        -7.5 -4.4 5.5 2.1 -2.0 -5.1 1.2 2.7 5.7 16.1
+    ]
+
+    q = [
+        2.9, 0.8, 1.3, -1.1, -0.5, -0.3, 1.0, -0.3, 0.7, -2.1,
+    ]
+
+    xs =
+        [
+        1.0 0.01 0.02 0.03 0.04 0.05 0.06 0.07 0.08 0.09
+        0.09 1.0 0.01 0.02 0.03 0.04 0.05 0.06 0.07 0.08
+        0.08 0.09 1.0 0.01 0.02 0.03 0.04 0.05 0.06 0.07
+        0.07 0.08 0.09 1.0 0.01 0.02 0.03 0.04 0.05 0.06
+        0.06 0.07 0.08 0.09 1.0 0.01 0.02 0.03 0.04 0.05
+    ]'
+
+    mem = 3
+    x = zeros(10)
+
+    H = LBFGS(x, mem)
+    HH = LBFGS(ArrayPartition(x, x), mem)
+
+    # Run all updates to put H and HH in post-loop state
+    let x_old = [], grad_old = []
+        for i in 1:5
+            x = xs[:, i]
+            grad = Q * x + q
+            if i > 1
+                xx = ArrayPartition(x, copy(x))
+                xx_old = ArrayPartition(x_old, copy(x_old))
+                gradgrad = ArrayPartition(grad, copy(grad))
+                gradgrad_old = ArrayPartition(grad_old, copy(grad_old))
+                update!(H, x, x_old, grad, grad_old)
+                update!(HH, xx, xx_old, gradgrad, gradgrad_old)
+            end
+            x_old = x
+            grad_old = grad
+        end
+    end
 
     # Memory limit: ensure no more than mem updates stored
     @test H.currmem <= mem

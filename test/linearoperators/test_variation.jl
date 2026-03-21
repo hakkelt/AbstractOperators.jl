@@ -1,7 +1,7 @@
-@testitem "Variation" tags = [:linearoperator, :Variation] setup=[TestUtils] begin
+@testitem "Variation: basic mul" tags = [:linearoperator, :Variation] setup=[TestUtils] begin
     using Random, SparseArrays, LinearAlgebra, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing Variation --- ")
+    verb && println(" --- Testing Variation: basic mul --- ")
 
     function test_variation_mul(conv, verb)
         n, m = 10, 5
@@ -45,7 +45,15 @@
 
         x1 = randn(n, m)
         @test norm(op * x1 - reshape(TV * (x1[:]), n * m, 2)) < 1.0e-12
+    end
+end
 
+@testitem "Variation: 3D mul and constructors" tags = [:linearoperator, :Variation] setup=[TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
+    verb && println(" --- Testing Variation: 3D mul and constructors --- ")
+
+    for threaded in (false, true)
         n, m, l = 100, 50, 30
         verb && println("  - threaded = $threaded")
         op = Variation(Float64, (n, m, l); threaded)
@@ -70,6 +78,17 @@
         @test_throws ErrorException Variation(Float64, (n,))
         badX = randn(n, m + 1)
         @test_throws DimensionMismatch op * badX
+    end
+end
+
+@testitem "Variation: adjoint and properties" tags = [:linearoperator, :Variation] setup=[TestUtils] begin
+    using Random, LinearAlgebra, AbstractOperators
+    Random.seed!(0)
+    verb && println(" --- Testing Variation: adjoint and properties --- ")
+
+    for threaded in (false, true)
+        n, m, l = 100, 50, 30
+        op = Variation(Float64, (n, m, l); threaded)
 
         # Adjoint consistency: <Vx, Y> == <x, V'Y>
         x_test = randn(n, m)

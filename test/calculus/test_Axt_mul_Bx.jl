@@ -1,7 +1,8 @@
-@testitem "Axt_mul_Bx" tags = [:calculus, :Axt_mul_Bx] setup = [TestUtils] begin
+@testitem "Axt_mul_Bx: basic mul" tags = [:calculus, :Axt_mul_Bx] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing Axt_mul_Bx --- ")
+    verb && println(" --- Testing Axt_mul_Bx: basic mul --- ")
+
     n = 10
     A, B = Eye(n), Sin(n)
     P = Axt_mul_Bx(A, B)
@@ -35,6 +36,12 @@
     r = randn(m, m)
     y, grad = test_NLop(P, x, r, verb)
     @test norm((A * x)' * (B * x) - y) < 1.0e-8
+end
+
+@testitem "Axt_mul_Bx: HCAT and permute" tags = [:calculus, :Axt_mul_Bx] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
+    verb && println(" --- Testing Axt_mul_Bx: HCAT and permute --- ")
 
     # testing with HCAT
     m, n = 3, 5
@@ -64,6 +71,12 @@
 
     @test_throws Exception Axt_mul_Bx(Eye(2, 2), Eye(2, 1))
     @test_throws Exception Axt_mul_Bx(Eye(2, 2, 2), Eye(2, 2, 2))
+end
+
+@testitem "Axt_mul_Bx: error paths and equality" tags = [:calculus, :Axt_mul_Bx] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
+    verb && println(" --- Testing Axt_mul_Bx: error paths and equality --- ")
 
     # ndims==2 branch with mismatched first codomain dimension
     struct AxtDummy2D <: AbstractOperator
@@ -95,6 +108,8 @@
     # test equality
     n, m = 3, 4
     A, B = MatrixOp(randn(n, m)), MatrixOp(randn(n, m))
+    # x matches the HCAT ArrayPartition context used in original test
+    x = ArrayPartition(randn(3), randn(5))
     @test Axt_mul_Bx(A, B) == Axt_mul_Bx(A, B)
     @test Jacobian(Axt_mul_Bx(A, B), x) == Jacobian(Axt_mul_Bx(A, B), x)
 end

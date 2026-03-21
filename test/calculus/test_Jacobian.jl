@@ -1,6 +1,6 @@
-@testitem "Jacobian" tags = [:calculus, :Jacobian] setup = [TestUtils] begin
+@testitem "Jacobian: basic HCAT" tags = [:calculus, :Jacobian] setup = [TestUtils] begin
     using AbstractOperators
-    verb && println(" --- Testing Jacobian --- ")
+    verb && println(" --- Testing Jacobian: basic HCAT --- ")
 
     m, n = 3, 5
     x = ArrayPartition(randn(m), randn(n))
@@ -16,8 +16,11 @@
     J = Jacobian(opP, xp)'
     verb && println(size(J, 1))
     y, grad = test_NLop(opP, xp, r, verb)
+end
 
-    # Additional coverage-oriented tests appended (no new testset created)
+@testitem "Jacobian: LinearOperator and Scale paths" tags = [:calculus, :Jacobian] setup = [TestUtils] begin
+    using AbstractOperators
+    verb && println(" --- Testing Jacobian: LinearOperator and Scale paths --- ")
 
     # 1. LinearOperator path (Jacobian of a LinearOperator returns itself)
     n_lin = 6
@@ -35,6 +38,11 @@
     @test JS isa Scale
     @test JS.coeff == 2.5
     @test JS.A == Jacobian(base_op, x_sc)
+end
+
+@testitem "Jacobian: AffineAdd and Transpose paths" tags = [:calculus, :Jacobian] setup = [TestUtils] begin
+    using AbstractOperators
+    verb && println(" --- Testing Jacobian: AffineAdd and Transpose paths --- ")
 
     # 3. AffineAdd path (Jacobian should drop displacement)
     n_aff = 4
@@ -49,6 +57,11 @@
     n_tr = 5
     op_tr = Sigmoid(Float64, (n_tr,), 2)
     @test_throws ErrorException op_tr'
+end
+
+@testitem "Jacobian: Compose Sum VCAT paths" tags = [:calculus, :Jacobian] setup = [TestUtils] begin
+    using AbstractOperators
+    verb && println(" --- Testing Jacobian: Compose Sum VCAT paths --- ")
 
     # 5. Compose path (single op) with tuple input to trigger second Compose method
     n_cp = 3
@@ -80,6 +93,11 @@
     JV = Jacobian(Vop, x_v)
     @test JV.A[1] == Jacobian(op_v1, x_v)
     @test JV.A[2] == Jacobian(op_v2, x_v)
+end
+
+@testitem "Jacobian: HCAT and DCAT paths" tags = [:calculus, :Jacobian] setup = [TestUtils] begin
+    using AbstractOperators
+    verb && println(" --- Testing Jacobian: HCAT and DCAT paths --- ")
 
     # 8. HCAT path with multi-index block (length(idx) > 1) to cover else branch
     m_h1, m_h2 = 3, 2
@@ -104,6 +122,11 @@
     JD = Jacobian(D, xh)
     @test JD.A[1] == Jacobian(op_joint, (xh.x[1], xh.x[2]))
     @test JD.A[2] == Jacobian(Ah1, xh.x[3])
+end
+
+@testitem "Jacobian: Reshape and BroadCast paths" tags = [:calculus, :Jacobian] setup = [TestUtils] begin
+    using AbstractOperators
+    verb && println(" --- Testing Jacobian: Reshape and BroadCast paths --- ")
 
     # 10. Reshape path
     n_rs = 6
@@ -121,6 +144,11 @@
     JBc = Jacobian(Bc, x_bc)
     # ensure repeating structure consistent
     @test size(JBc) == ((n_bc, l_bc), (n_bc,))
+end
+
+@testitem "Jacobian: equality and properties" tags = [:calculus, :Jacobian] setup = [TestUtils] begin
+    using AbstractOperators
+    verb && println(" --- Testing Jacobian: equality and properties --- ")
 
     # 12. Equality and show output
     n_eq = 4
