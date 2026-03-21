@@ -51,7 +51,7 @@ end
     @test is_diagonal(opC2) == true
     @test diag(opC2) == d
 
-    Z = Zeros(Float64, (m2,), Float64, (m2,))
+    Z = Zeros(Float64, (m2,), Float64, (m2 - 1,))
     ZC = Compose(opA2, Z)
     @test is_null(ZC)
 end

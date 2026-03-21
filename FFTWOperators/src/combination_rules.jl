@@ -27,13 +27,13 @@ function combine(T1::DFT{N, C, D, Dir}, T2::AdjointOperator{<:DFT}) where {N, C,
     scaling = _dft_scaling(T1.dim_in, Dir, FORWARD)
     scaling /= _dft_scaling(T1.dim_in, Dir, T1.normalization)
     scaling /= _dft_scaling(T1.dim_in, Dir, T2.A.normalization)
-    return scaling * Eye(domain_type(T2), T1.dim_in, domain_storage_type(T2))
+    return scaling * Eye(domain_type(T2), T1.dim_in; array_type=domain_storage_type(T2))
 end
 function combine(T1::AdjointOperator{<:DFT}, T2::DFT{N, C, D, Dir}) where {N, C, D, Dir}
     scaling = _dft_scaling(T2.dim_in, Dir, FORWARD)
     scaling /= _dft_scaling(T2.dim_in, Dir, T1.A.normalization)
     scaling /= _dft_scaling(T2.dim_in, Dir, T2.normalization)
-    return scaling * Eye(domain_type(T2), T2.dim_in, domain_storage_type(T2))
+    return scaling * Eye(domain_type(T2), T2.dim_in; array_type=domain_storage_type(T2))
 end
 
 # FFTShift/IFFTShift with DFT

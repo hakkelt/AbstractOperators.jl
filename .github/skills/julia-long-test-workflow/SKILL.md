@@ -77,3 +77,7 @@ benchpkgtable \
 - In `test/runtests.jl`, filter backend-tagged testitems when corresponding runtimes are unavailable, but keep per-test safety checks too.
 - Add explicit tests for `domain_storage_type`/`codomain_storage_type` and that `op * x` allocates on the active backend.
 - In benchmark setup code for normal operators, normalize potentially wrapped domain/codomain type traits to scalar element types before calling `randn`/`zeros`.
+- Agent sub-tasks frequently generate `Eye(T, dims, array_type)` (3 positional args) instead of the correct `Eye(T, dims; array_type=...)` (keyword). Always verify agent output for this mistake.
+- When fixing "unexpected pass" Aqua errors: remove the `broken=true` or `persistent_tasks=false` workaround and use `Aqua.test_all(pkg)` once the underlying issue is resolved.
+- JET `@test_opt` catches runtime dispatch from `array_type::Type` (unparameterized). Use `array_type::Type{<:AbstractArray}` annotations AND avoid forwarding kwargs between kwarg-accepting functions (use an internal positional-arg helper like `_make_eye` instead of `Eye(t, dims; array_type) = Eye(t, dims; array_type)`).
+- Stochastic test assertions like `op * randn(n) ≈ op' * (op * randn(n))` are always wrong when the two `randn` calls produce different vectors; capture the vector first.

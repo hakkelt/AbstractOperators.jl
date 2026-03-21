@@ -108,7 +108,7 @@ end
 
     # Use GPU-typed Eye so forward output is GPU
     n = 3
-    P = Ax_mul_Bx(Eye(Float64, (n, n), JLArray{Float64}), Eye(Float64, (n, n), JLArray{Float64}))
+    P = Ax_mul_Bx(Eye(Float64, (n, n); array_type=JLArray{Float64}), Eye(Float64, (n, n); array_type=JLArray{Float64}))
     x = jl(randn(n, n))
     r = jl(randn(n, n))
     test_NLop_gpu(P, x, r, false)

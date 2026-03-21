@@ -245,7 +245,7 @@ end
     B = randn(n2, m)
     C = randn(n3, m)
     x1 = randn(m)
-    x3 = randn(n3)
+    x3 = randn(m)
     opA = MatrixOp(A)
     opB = MatrixOp(B)
     opC = MatrixOp(C)

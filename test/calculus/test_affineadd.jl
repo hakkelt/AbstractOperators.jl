@@ -8,7 +8,8 @@
     T = AffineAdd(opA, d)
     x1 = randn(m)
     @test norm(T * x1 - (A * x1 + d)) < 1.0e-9
-    @test norm(T' * randn(n) - (A' * randn(n))) < 1.0e-9
+    r = randn(n)
+    @test norm(T' * r - (A' * r)) < 1.0e-9
     @test displacement(T) == d
     @test norm(remove_displacement(T) * x1 - A * x1) < 1.0e-9
 

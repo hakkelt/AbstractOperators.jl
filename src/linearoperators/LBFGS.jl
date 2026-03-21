@@ -34,7 +34,7 @@ end
 
 #default constructor
 
-function LBFGS(x::T, M::I) where {T <: AbstractArray, I <: Integer}
+function LBFGS(x::T, M::I; array_type::Type = _array_wrapper(x)) where {T <: AbstractArray, I <: Integer}
     s_M = [zero(x) for i in 1:M]
     y_M = [zero(x) for i in 1:M]
     s = zero(x)

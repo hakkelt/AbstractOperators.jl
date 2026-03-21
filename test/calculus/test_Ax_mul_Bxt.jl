@@ -118,7 +118,7 @@ end
 
     # Use GPU-typed Eye and Sin
     n = 10
-    P = Ax_mul_Bxt(Eye(Float64, (n,), JLArray{Float64}), Sin(jl(zeros(n))))
+    P = Ax_mul_Bxt(Eye(Float64, (n,); array_type=JLArray{Float64}), Sin(jl(zeros(n))))
     x = jl(randn(n))
     r = jl(randn(n, n))
     test_NLop_gpu(P, x, r, false)

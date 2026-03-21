@@ -23,3 +23,7 @@ applyTo: "test/**/*.jl,docs/**/*.md"
 - In non-FFTW/non-DSP operator tests, prefer JLArray backend checks over CUDA/AMDGPU device checks.
 - Use direct `import CUDA` / `import AMDGPU` + `functional()` guards in testitems; avoid try/catch gating.
 - When `VERB` is enabled, print each running testitem name at test-runner filter time.
+- JET `@test_opt` flags `array_type::Type` (unparameterized keyword) as a source of runtime dispatch. Use `array_type::Type{<:AbstractArray}` and avoid kwarg-to-kwarg forwarding; use a typed positional-arg helper (e.g., `_make_eye(T, dims, S)`) so JET can resolve dispatch statically.
+- When Aqua reports "Unexpected Pass" on a `@test_broken`/`broken=true` check, the underlying issue is now fixed — remove the workaround and use `Aqua.test_all(pkg)` unconditionally.
+- Agent sub-tasks frequently generate `Eye(T, dims, array_type)` (3 positional args) instead of `Eye(T, dims; array_type=...)` (keyword). Always verify agent output for this pattern.
+- Stochastic test assertions `op * randn(n) ≈ other_op * (op * randn(n))` are wrong when the two `randn` calls produce different vectors; always capture into a variable first.

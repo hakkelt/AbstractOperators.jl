@@ -25,19 +25,22 @@ struct Eye{T, N, S <: AbstractArray{T}} <: AbstractEye{T, N, S}
 end
 
 # Constructors
-###standard constructor Operator{N}(domain_type::Type, DomainDim::NTuple{N,Int})
-function Eye(
-        domain_type::Type{T}, domainDim::NTuple{N, <:Integer}; array_type::Type = Array{T}
-    ) where {N, T}
-    S = _normalize_array_type(array_type, T)
-    return Eye{domain_type, N, S}(map(Int, domainDim))
-end
-###
+@inline _make_eye(::Type{T}, dims::NTuple{N, Int}, ::Type{S}) where {T, N, S <: AbstractArray} =
+    Eye{T, N, _normalize_array_type(S, T)}(dims)
 
-Eye(t::Type, dims::Vararg{Integer}; array_type::Type = Array{t}) = Eye(t, dims; array_type)
-Eye(dims::NTuple{N, Integer}; array_type::Type = Array{Float64}) where {N} = Eye(Float64, dims; array_type)
-Eye(dims::Vararg{Integer}; array_type::Type = Array{Float64}) = Eye(Float64, dims; array_type)
-Eye(x::A) where {A <: AbstractArray} = Eye(eltype(x), size(x); array_type = _array_wrapper(x){eltype(x)})
+function Eye(
+        domain_type::Type{T}, domainDim::NTuple{N, <:Integer}; array_type::Type{<:AbstractArray} = Array{T}
+    ) where {N, T}
+    return _make_eye(domain_type, map(Int, domainDim), array_type)
+end
+
+Eye(t::Type{T}, dims::Vararg{Integer}; array_type::Type{<:AbstractArray} = Array{T}) where {T} =
+    _make_eye(t, map(Int, dims), array_type)
+Eye(dims::NTuple{N, Integer}; array_type::Type{<:AbstractArray} = Array{Float64}) where {N} =
+    _make_eye(Float64, map(Int, dims), array_type)
+Eye(dims::Vararg{Integer}; array_type::Type{<:AbstractArray} = Array{Float64}) =
+    _make_eye(Float64, map(Int, dims), array_type)
+Eye(x::A) where {A <: AbstractArray} = _make_eye(eltype(x), size(x), _array_wrapper(x){eltype(x)})
 
 # Mappings
 

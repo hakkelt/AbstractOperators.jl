@@ -25,33 +25,45 @@ end
 # Constructors
 
 ###standard constructor Operator{N}(D::Type, domain_dim::NTuple{N,Int})
-function DiagOp(D::Type, domain_dim::NTuple{N, Int}, d::T; threaded::Bool = true) where {N, T <: AbstractArray}
+function DiagOp(
+        D::Type, domain_dim::NTuple{N, Int}, d::T;
+        threaded::Bool = true, array_type::Type = _array_wrapper(d),
+    ) where {N, T <: AbstractArray}
     size(d) != domain_dim && error("dimension of d must coincide with domain_dim")
     C = promote_type(eltype(d), D)
     threaded = threaded && _should_thread(d)
     B = threaded ? FastBroadcast.True() : FastBroadcast.False()
-    dS = typeof(d isa SubArray ? parent(d) : d).name.wrapper{D}
-    cS = typeof(d isa SubArray ? parent(d) : d).name.wrapper{C}
+    dS = _normalize_array_type(array_type, D)
+    cS = _normalize_array_type(array_type, C)
     return DiagOp{B, D, C, N, dS, cS, T}(domain_dim, d)
 end
 
 ###standard constructor with Scalar
-function DiagOp(D::Type, domain_dim::NTuple{N, Int}, d::T; threaded::Bool = true) where {N, T <: Number}
+function DiagOp(
+        D::Type, domain_dim::NTuple{N, Int}, d::T;
+        threaded::Bool = true, array_type::Type = Array{D},
+    ) where {N, T <: Number}
     C = promote_type(eltype(d), D)
     threaded = threaded && _should_thread(d)
     B = threaded ? FastBroadcast.True() : FastBroadcast.False()
-    return DiagOp{B, D, C, N, Array{D}, Array{C}, T}(domain_dim, d)
+    dS = _normalize_array_type(array_type, D)
+    cS = _normalize_array_type(array_type, C)
+    return DiagOp{B, D, C, N, dS, cS, T}(domain_dim, d)
 end
 
 # other constructors
-function DiagOp(d::AbstractArray{T, N}; threaded::Bool = true) where {N, T <: Number}
+function DiagOp(
+        d::AbstractArray{T, N};
+        threaded::Bool = true, array_type::Type = _array_wrapper(d),
+    ) where {N, T <: Number}
     C = eltype(d)
     threaded = threaded && _should_thread(d)
     B = threaded ? FastBroadcast.True() : FastBroadcast.False()
-    S = typeof(d isa SubArray ? parent(d) : d).name.wrapper{T}
+    S = _normalize_array_type(array_type, T)
     return DiagOp{B, eltype(d), C, N, S, S, typeof(d)}(size(d), d)
 end
-DiagOp(domain_dim::NTuple{N, Int}, d::A; threaded::Bool = true) where {N, A <: Number} = DiagOp(Float64, domain_dim, d; threaded)
+DiagOp(domain_dim::NTuple{N, Int}, d::A; threaded::Bool = true, array_type::Type = Array{Float64}) where {N, A <: Number} =
+    DiagOp(Float64, domain_dim, d; threaded, array_type)
 
 
 # scale of DiagOp

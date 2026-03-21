@@ -92,7 +92,8 @@ end
     @test Cop' * xr ≈ real.(Cmat' * xr)
 
     Nop = AbstractOperators.get_normal_op(Qop)
-    @test Nop * randn(5) ≈ Qop' * (Qop * randn(5))
+    v = randn(5)
+    @test Nop * v ≈ Qop' * (Qop * v)
 
     @test opnorm(Qop) ≈ estimate_opnorm(Qop) rtol = 0.02
 end
