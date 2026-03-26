@@ -9,7 +9,7 @@ e^{ \\mathbf{x} }.
 ```
 
 """
-struct Exp{T, N, S<:AbstractArray{T}} <: NonLinearOperator
+struct Exp{T, N, S <: AbstractArray{T}} <: NonLinearOperator
     dim::NTuple{N, Int}
 end
 

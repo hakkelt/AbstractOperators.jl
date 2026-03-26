@@ -9,7 +9,7 @@ Creates an hyperbolic tangent non-linear operator with input dimensions `dim_in`
 ```
 
 """
-struct Tanh{T, N, S<:AbstractArray{T}} <: NonLinearOperator
+struct Tanh{T, N, S <: AbstractArray{T}} <: NonLinearOperator
     dim::NTuple{N, Int}
 end
 

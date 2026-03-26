@@ -83,8 +83,8 @@ end
 
 domain_type(::Zeros{C, N, D, M}) where {C, N, D, M} = D
 codomain_type(::Zeros{C, N, D, M}) where {C, N, D, M} = C
-domain_storage_type(::Zeros{C,N,D,M,dS}) where {C,N,D,M,dS} = dS
-codomain_storage_type(::Zeros{C,N,D,M,dS,cS}) where {C,N,D,M,dS,cS} = cS
+domain_storage_type(::Zeros{C, N, D, M, dS}) where {C, N, D, M, dS} = dS
+codomain_storage_type(::Zeros{C, N, D, M, dS, cS}) where {C, N, D, M, dS, cS} = cS
 is_thread_safe(::Zeros) = true
 
 size(L::Zeros) = (L.dim_out, L.dim_in)

@@ -17,7 +17,7 @@ julia> Z*ones(2,2)
 	
 ```
 """
-struct ZeroPad{N, T, S<:AbstractArray{T}} <: LinearOperator
+struct ZeroPad{N, T, S <: AbstractArray{T}} <: LinearOperator
     dim_in::NTuple{N, Int}
     zp::NTuple{N, Int}
 end
@@ -96,8 +96,8 @@ end
 
 domain_type(::ZeroPad{<:Any, T}) where {T} = T
 codomain_type(::ZeroPad{<:Any, T}) where {T} = T
-domain_storage_type(::ZeroPad{N,T,S}) where {N,T,S} = S
-codomain_storage_type(::ZeroPad{N,T,S}) where {N,T,S} = S
+domain_storage_type(::ZeroPad{N, T, S}) where {N, T, S} = S
+codomain_storage_type(::ZeroPad{N, T, S}) where {N, T, S} = S
 is_thread_safe(::ZeroPad) = true
 
 size(L::ZeroPad) = L.dim_in .+ L.zp, L.dim_in

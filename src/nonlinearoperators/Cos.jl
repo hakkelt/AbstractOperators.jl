@@ -9,7 +9,7 @@ Creates a cosine non-linear operator with input dimensions `dim_in`:
 ```
 
 """
-struct Cos{T, N, S<:AbstractArray{T}} <: NonLinearOperator
+struct Cos{T, N, S <: AbstractArray{T}} <: NonLinearOperator
     dim::NTuple{N, Int}
 end
 

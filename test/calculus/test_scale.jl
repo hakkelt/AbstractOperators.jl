@@ -175,7 +175,7 @@
 
 end
 
-@testitem "Scale constructors and basic mapping" tags = [:calculus, :Scale] setup=[TestUtils] begin
+@testitem "Scale constructors and basic mapping" tags = [:calculus, :Scale] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     A = MatrixOp(randn(6, 4))
@@ -188,7 +188,7 @@ end
     @test S' * z ≈ α * (A' * z)
 end
 
-@testitem "Scale special constructor scale-of-scale" tags = [:calculus, :Scale] setup=[TestUtils] begin
+@testitem "Scale special constructor scale-of-scale" tags = [:calculus, :Scale] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     A = FiniteDiff((10, 2))
@@ -201,7 +201,7 @@ end
     @test S2 * x ≈ (β * α) * (A * x)
 end
 
-@testitem "Scale coeff==1 returns original" tags = [:calculus, :Scale] setup=[TestUtils] begin
+@testitem "Scale coeff==1 returns original" tags = [:calculus, :Scale] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     A = MatrixOp(randn(5, 5))
@@ -211,7 +211,7 @@ end
     @test S * x ≈ A * x
 end
 
-@testitem "Scale properties delegation" tags = [:calculus, :Scale] setup=[TestUtils] begin
+@testitem "Scale properties delegation" tags = [:calculus, :Scale] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     A = Eye(7)
@@ -233,13 +233,13 @@ end
     @test is_full_column_rank(S) == is_full_column_rank(A)
 end
 
-@testitem "Scale real vs complex coefficient error path" tags = [:calculus, :Scale] setup=[TestUtils] begin
+@testitem "Scale real vs complex coefficient error path" tags = [:calculus, :Scale] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     @test_throws ErrorException Scale(1.0 + 2.0im, Eye(5))
 end
 
-@testitem "Scale get_normal_op paths" tags = [:calculus, :Scale] setup=[TestUtils] begin
+@testitem "Scale get_normal_op paths" tags = [:calculus, :Scale] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     A = Eye(8)
@@ -255,7 +255,7 @@ end
     @test_throws ErrorException AbstractOperators.get_normal_op(S2)
 end
 
-@testitem "Scale equality and remove_displacement" tags = [:calculus, :Scale] setup=[TestUtils] begin
+@testitem "Scale equality and remove_displacement" tags = [:calculus, :Scale] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     A = AffineAdd(Eye(6), randn(6))
@@ -268,7 +268,7 @@ end
     @test Srd.coeff == α
 end
 
-@testitem "Scale slicing and remove_slicing" tags = [:calculus, :Scale] setup=[TestUtils] begin
+@testitem "Scale slicing and remove_slicing" tags = [:calculus, :Scale] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     A = Eye(11)
@@ -281,7 +281,7 @@ end
     @test Sr == Scale(α, AbstractOperators.remove_slicing(As))
 end
 
-@testitem "Scale opnorm and estimate_opnorm" tags = [:calculus, :Scale] setup=[TestUtils] begin
+@testitem "Scale opnorm and estimate_opnorm" tags = [:calculus, :Scale] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     A = MatrixOp(randn(7, 4))
@@ -292,7 +292,7 @@ end
     @test estimate_opnorm(S) ≈ opnorm(S) rtol = 0.05
 end
 
-@testitem "Scale permute utility" tags = [:calculus, :Scale] setup=[TestUtils] begin
+@testitem "Scale permute utility" tags = [:calculus, :Scale] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     A = HCAT(Eye(5), Eye(5))
@@ -308,7 +308,7 @@ end
     @test y_original ≈ y_permuted
 end
 
-@testitem "Scale threaded behavior" tags = [:calculus, :Scale] setup=[TestUtils] begin
+@testitem "Scale threaded behavior" tags = [:calculus, :Scale] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     A = MatrixOp(randn(20000, 5))
@@ -318,7 +318,7 @@ end
     @test S * x ≈ α * (A * x)
 end
 
-@testitem "Scale (GPU)" tags = [:gpu, :calculus, :Scale] setup=[TestUtils] begin
+@testitem "Scale (GPU)" tags = [:gpu, :calculus, :Scale] setup = [TestUtils] begin
     using Random, AbstractOperators, JLArrays
     Random.seed!(0)
 

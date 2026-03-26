@@ -103,7 +103,7 @@ end
     @test norm(A * (opB * (opC * x)) - y) < 1.0e-8
 end
 
-@testitem "Compose internal buffer mismatch" tags = [:calculus, :Compose] setup=[TestUtils] begin
+@testitem "Compose internal buffer mismatch" tags = [:calculus, :Compose] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     A = MatrixOp(randn(3, 3))
@@ -111,7 +111,7 @@ end
     @test_throws DimensionMismatch AbstractOperators.Compose((B, A), ())
 end
 
-@testitem "Adjacent adjoint optimized normal (GetIndex*GetIndex')" tags = [:calculus, :Compose] setup=[TestUtils] begin
+@testitem "Adjacent adjoint optimized normal (GetIndex*GetIndex')" tags = [:calculus, :Compose] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     G = GetIndex((5,), 2:4)
@@ -121,7 +121,7 @@ end
     @test is_diagonal(L)
 end
 
-@testitem "Combine branch producing nested Compose is inlined" tags = [:calculus, :Compose] setup=[TestUtils] begin
+@testitem "Combine branch producing nested Compose is inlined" tags = [:calculus, :Compose] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     M = MatrixOp(randn(3, 3))
@@ -133,7 +133,7 @@ end
     @test L isa AbstractOperator
 end
 
-@testitem "remove_slicing first op GetIndex" tags = [:calculus, :Compose] setup=[TestUtils] begin
+@testitem "remove_slicing first op GetIndex" tags = [:calculus, :Compose] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     G = GetIndex((5,), 2:4)
@@ -149,7 +149,7 @@ end
     @test L * xfull ≈ L2 * v
 end
 
-@testitem "remove_slicing first op Scale(GetIndex)" tags = [:calculus, :Compose] setup=[TestUtils] begin
+@testitem "remove_slicing first op Scale(GetIndex)" tags = [:calculus, :Compose] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     G = GetIndex((5,), 2:4)
@@ -171,7 +171,7 @@ end
     @test L3 * xfull ≈ L4 * v
 end
 
-@testitem "remove_slicing error path first not sliced" tags = [:calculus, :Compose] setup=[TestUtils] begin
+@testitem "remove_slicing error path first not sliced" tags = [:calculus, :Compose] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     op1 = MyLinOp(Float64, (3,), Float64, (3,), (y, x) -> (y .= x), (y, x) -> (y .= x))
@@ -180,7 +180,7 @@ end
     @test_throws ArgumentError AbstractOperators.remove_slicing(L)
 end
 
-@testitem "diag_AAc on Compose ok and error" tags = [:calculus, :Compose] setup=[TestUtils] begin
+@testitem "diag_AAc on Compose ok and error" tags = [:calculus, :Compose] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     d = randn(5)
@@ -193,7 +193,7 @@ end
     @test_throws ErrorException AbstractOperators.diag_AAc(L_bad)
 end
 
-@testitem "get_normal_op on Compose fallback path" tags = [:calculus, :Compose] setup=[TestUtils] begin
+@testitem "get_normal_op on Compose fallback path" tags = [:calculus, :Compose] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     L = Compose(FiniteDiff((3,)), MatrixOp(randn(3, 3)))
@@ -203,7 +203,7 @@ end
     @test N * x ≈ L' * (L * x)
 end
 
-@testitem "Scale(coeff, L::Compose) specialized paths" tags = [:calculus, :Compose] setup=[TestUtils] begin
+@testitem "Scale(coeff, L::Compose) specialized paths" tags = [:calculus, :Compose] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     Llin = FiniteDiff((3,)) * MatrixOp(randn(3, 3)) * FiniteDiff((4,))
@@ -218,7 +218,7 @@ end
     @test Snl * x2 ≈ 2.0 * (Lnl * x2)
 end
 
-@testitem "get_normal_op(Compose) else branch" tags = [:calculus, :Compose] setup=[TestUtils] begin
+@testitem "get_normal_op(Compose) else branch" tags = [:calculus, :Compose] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     F1 = FiniteDiff((5,))
@@ -230,7 +230,7 @@ end
     @test N * x ≈ L' * (L * x)
 end
 
-@testitem "Buffer reuse in 4-operator chain" tags = [:calculus, :Compose] setup=[TestUtils] begin
+@testitem "Buffer reuse in 4-operator chain" tags = [:calculus, :Compose] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     F1 = FiniteDiff((10,))
@@ -244,7 +244,7 @@ end
     @test L.buf[1] === L.buf[3]
 end
 
-@testitem "DEBUG_COMPOSE logging branches" tags = [:calculus, :Compose] setup=[TestUtils] begin
+@testitem "DEBUG_COMPOSE logging branches" tags = [:calculus, :Compose] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     old_debug = AbstractOperators.DEBUG_COMPOSE[]
@@ -266,7 +266,7 @@ end
     end
 end
 
-@testitem "Triple combination path" tags = [:calculus, :Compose] setup=[TestUtils] begin
+@testitem "Triple combination path" tags = [:calculus, :Compose] setup = [TestUtils] begin
     using Random, LinearAlgebra, AbstractOperators
     Random.seed!(0)
     struct TripleCombTestOp <: LinearOperator end
@@ -341,7 +341,7 @@ end
     end
 end
 
-@testitem "Compose (GPU)" tags = [:gpu, :calculus, :Compose] setup=[TestUtils] begin
+@testitem "Compose (GPU)" tags = [:gpu, :calculus, :Compose] setup = [TestUtils] begin
     using Random, AbstractOperators, JLArrays
     Random.seed!(0)
 

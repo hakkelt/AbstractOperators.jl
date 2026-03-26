@@ -1,4 +1,4 @@
-@testitem "LMatrixOp: basic mul" tags = [:linearoperator, :LMatrixOp] setup=[TestUtils] begin
+@testitem "LMatrixOp: basic mul" tags = [:linearoperator, :LMatrixOp] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     verb && println(" --- Testing LMatrixOp: basic mul --- ")
@@ -55,7 +55,7 @@
     @test size(op) == ((n, l), (n, m))
 end
 
-@testitem "LMatrixOp: other constructors" tags = [:linearoperator, :LMatrixOp] setup=[TestUtils] begin
+@testitem "LMatrixOp: other constructors" tags = [:linearoperator, :LMatrixOp] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     verb && println(" --- Testing LMatrixOp: other constructors --- ")
@@ -97,7 +97,7 @@ end
     @test Zout2 ≈ Zrhs * b_mat'
 end
 
-@testitem "LMatrixOp: scale and properties" tags = [:linearoperator, :LMatrixOp] setup=[TestUtils] begin
+@testitem "LMatrixOp: scale and properties" tags = [:linearoperator, :LMatrixOp] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     verb && println(" --- Testing LMatrixOp: scale and properties --- ")
@@ -141,7 +141,7 @@ end
     @test occursin("(⋅)b", s)
 end
 
-@testitem "LMatrixOp (JLArray)" tags = [:linearoperator, :LMatrixOp, :gpu, :jlarray] setup=[TestUtils] begin
+@testitem "LMatrixOp (JLArray)" tags = [:linearoperator, :LMatrixOp, :gpu, :jlarray] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     n, m = 5, 6

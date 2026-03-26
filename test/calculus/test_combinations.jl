@@ -294,7 +294,7 @@ end
     @test norm(y - (sin.(exp.(x + d1) - d2) .+ d3)) < 1.0e-8
 end
 
-@testitem "Combinations (GPU)" tags = [:gpu, :calculus, :Combinations] setup=[TestUtils] begin
+@testitem "Combinations (GPU)" tags = [:gpu, :calculus, :Combinations] setup = [TestUtils] begin
     using Random, AbstractOperators, JLArrays
     Random.seed!(0)
 

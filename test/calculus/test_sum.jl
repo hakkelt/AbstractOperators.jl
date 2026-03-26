@@ -81,7 +81,7 @@ end
     @test norm(A * x + opB * x - y) < 1.0e-8
 end
 
-@testitem "Sum (GPU)" tags = [:gpu, :calculus, :Sum] setup=[TestUtils] begin
+@testitem "Sum (GPU)" tags = [:gpu, :calculus, :Sum] setup = [TestUtils] begin
     using Random, AbstractOperators, JLArrays
     Random.seed!(0)
 

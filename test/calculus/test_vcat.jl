@@ -128,7 +128,7 @@ end
     @test VCAT(Aeq1, Aeq2) != VCAT(Aeq2, Aeq1)
 end
 
-@testitem "VCAT (GPU)" tags = [:gpu, :calculus, :VCAT] setup=[TestUtils] begin
+@testitem "VCAT (GPU)" tags = [:gpu, :calculus, :VCAT] setup = [TestUtils] begin
     using Random, AbstractOperators, JLArrays
     Random.seed!(0)
 

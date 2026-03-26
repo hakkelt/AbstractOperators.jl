@@ -220,7 +220,7 @@ end
     @test H_single === A
 end
 
-@testitem "HCAT (GPU)" tags = [:gpu, :calculus, :HCAT] setup=[TestUtils] begin
+@testitem "HCAT (GPU)" tags = [:gpu, :calculus, :HCAT] setup = [TestUtils] begin
     using Random, AbstractOperators, JLArrays
     Random.seed!(0)
 

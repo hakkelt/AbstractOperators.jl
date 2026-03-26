@@ -9,7 +9,7 @@ Creates an hyperbolic secant non-linear operator with input dimensions `dim_in`:
 ```
 
 """
-struct Sech{T, N, S<:AbstractArray{T}} <: NonLinearOperator
+struct Sech{T, N, S <: AbstractArray{T}} <: NonLinearOperator
     dim::NTuple{N, Int}
 end
 

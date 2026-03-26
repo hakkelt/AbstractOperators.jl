@@ -1,28 +1,28 @@
 @testmodule DiagOpTestHelper begin
-using Test, AbstractOperators, LinearAlgebra
+    using Test, AbstractOperators, LinearAlgebra
 
-export test_diagop_mul
+    export test_diagop_mul
 
-function test_diagop_mul(conv, verb, test_op, to_cpu, norm)
-    n = 4
-    d = conv(randn(n))
-    op = DiagOp(d)
-    x1 = conv(randn(n))
-    y1 = test_op(op, x1, conv(randn(n)), verb)
-    y2 = d .* x1
-    @test norm(to_cpu(y1) .- to_cpu(y2)) <= 1.0e-12
+    function test_diagop_mul(conv, verb, test_op, to_cpu, norm)
+        n = 4
+        d = conv(randn(n))
+        op = DiagOp(d)
+        x1 = conv(randn(n))
+        y1 = test_op(op, x1, conv(randn(n)), verb)
+        y2 = d .* x1
+        @test norm(to_cpu(y1) .- to_cpu(y2)) <= 1.0e-12
 
-    d = conv(randn(n) + im * randn(n))
-    op = DiagOp(d)
-    x1 = conv(randn(n) .+ im * randn(n))
-    y1 = test_op(op, x1, conv(randn(n) .+ im * randn(n)), verb)
-    y2 = d .* x1
-    @test norm(to_cpu(y1) .- to_cpu(y2)) <= 1.0e-12
-end
+        d = conv(randn(n) + im * randn(n))
+        op = DiagOp(d)
+        x1 = conv(randn(n) .+ im * randn(n))
+        y1 = test_op(op, x1, conv(randn(n) .+ im * randn(n)), verb)
+        y2 = d .* x1
+        @test norm(to_cpu(y1) .- to_cpu(y2)) <= 1.0e-12
+    end
 
 end  # @testmodule DiagOpTestHelper
 
-@testitem "DiagOp: mul and constructors" tags = [:linearoperator, :DiagOp] setup=[TestUtils, DiagOpTestHelper] begin
+@testitem "DiagOp: mul and constructors" tags = [:linearoperator, :DiagOp] setup = [TestUtils, DiagOpTestHelper] begin
     using Random, AbstractOperators, JLArrays
     Random.seed!(0)
     verb && println(" --- Testing DiagOp --- ")
@@ -49,7 +49,7 @@ end  # @testmodule DiagOpTestHelper
     op = DiagOp((n,), pi)
 end
 
-@testitem "DiagOp: properties and helpers" tags = [:linearoperator, :DiagOp] setup=[TestUtils, DiagOpTestHelper] begin
+@testitem "DiagOp: properties and helpers" tags = [:linearoperator, :DiagOp] setup = [TestUtils, DiagOpTestHelper] begin
     using Random, AbstractOperators
     Random.seed!(0)
     n = 4
@@ -104,7 +104,7 @@ end
     @test size(op) == ((n,), (n,))
 end
 
-@testitem "DiagOp (GPU)" tags = [:gpu, :linearoperator, :DiagOp] setup=[TestUtils, DiagOpTestHelper] begin
+@testitem "DiagOp (GPU)" tags = [:gpu, :linearoperator, :DiagOp] setup = [TestUtils, DiagOpTestHelper] begin
     using Random, AbstractOperators, JLArrays
     Random.seed!(0)
     test_diagop_mul(jl, false, test_op, to_cpu, norm)

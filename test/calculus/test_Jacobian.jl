@@ -186,7 +186,7 @@ end
     @test length(JJ.A) == 2
 end
 
-@testitem "Jacobian (GPU)" tags = [:gpu, :calculus, :Jacobian] setup=[TestUtils] begin
+@testitem "Jacobian (GPU)" tags = [:gpu, :calculus, :Jacobian] setup = [TestUtils] begin
     using AbstractOperators, JLArrays
 
     # Construct Sin from GPU array to get GPU storage type

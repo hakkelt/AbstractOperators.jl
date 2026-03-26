@@ -1,4 +1,4 @@
-@testitem "MatrixOp: basic mul" tags = [:linearoperator, :MatrixOp] setup=[TestUtils] begin
+@testitem "MatrixOp: basic mul" tags = [:linearoperator, :MatrixOp] setup = [TestUtils] begin
     using Random, SparseArrays, LinearAlgebra, AbstractOperators
     Random.seed!(0)
     verb && println(" --- Testing MatrixOp --- ")
@@ -27,7 +27,7 @@
     @test all(norm.(y1 .- A * x1) .<= 1.0e-12)
 end
 
-@testitem "MatrixOp: constructors" tags = [:linearoperator, :MatrixOp] setup=[TestUtils] begin
+@testitem "MatrixOp: constructors" tags = [:linearoperator, :MatrixOp] setup = [TestUtils] begin
     using Random, LinearAlgebra, AbstractOperators
     Random.seed!(0)
 
@@ -46,7 +46,7 @@ end
     @test_throws MethodError MatrixOp(Float64, (m, c), randn(n, m, 2))
 end
 
-@testitem "MatrixOp: properties" tags = [:linearoperator, :MatrixOp] setup=[TestUtils] begin
+@testitem "MatrixOp: properties" tags = [:linearoperator, :MatrixOp] setup = [TestUtils] begin
     using Random, LinearAlgebra, AbstractOperators
     Random.seed!(0)
 
@@ -81,7 +81,7 @@ end
     @test is_AAc_diagonal(Dop) == true
 end
 
-@testitem "MatrixOp: adjoint and in-place" tags = [:linearoperator, :MatrixOp] setup=[TestUtils] begin
+@testitem "MatrixOp: adjoint and in-place" tags = [:linearoperator, :MatrixOp] setup = [TestUtils] begin
     using Random, LinearAlgebra, AbstractOperators
     Random.seed!(0)
 
@@ -109,7 +109,7 @@ end
     @test opnorm(Qop) ≈ estimate_opnorm(Qop) rtol = 0.02
 end
 
-@testitem "MatrixOp (JLArray)" tags = [:linearoperator, :MatrixOp, :gpu, :jlarray] setup=[TestUtils] begin
+@testitem "MatrixOp (JLArray)" tags = [:linearoperator, :MatrixOp, :gpu, :jlarray] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     n, m = 5, 4

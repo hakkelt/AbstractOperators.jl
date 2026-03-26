@@ -49,7 +49,7 @@ end
     @test norm(y - (exp.(x) - d)) < 1.0e-8
 end
 
-@testitem "AffineAdd equality operator" tags = [:calculus, :AffineAdd] setup=[TestUtils] begin
+@testitem "AffineAdd equality operator" tags = [:calculus, :AffineAdd] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     n, m = 5, 6
@@ -60,7 +60,7 @@ end
     @test !(AffineAdd(A, d1) == AffineAdd(A, d2))
 end
 
-@testitem "AffineAdd property delegations (invertible, rank, diagonal)" tags = [:calculus, :AffineAdd] setup=[TestUtils] begin
+@testitem "AffineAdd property delegations (invertible, rank, diagonal)" tags = [:calculus, :AffineAdd] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     n = 5
@@ -82,7 +82,7 @@ end
     @test diag_AAc(TD2) == diag_AAc(D2)
 end
 
-@testitem "AffineAdd slicing property delegation" tags = [:calculus, :AffineAdd] setup=[TestUtils] begin
+@testitem "AffineAdd slicing property delegation" tags = [:calculus, :AffineAdd] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     G = GetIndex(Float64, (10,), 2:5)
@@ -93,7 +93,7 @@ end
     @test AbstractOperators.remove_slicing(TG) isa Eye
 end
 
-@testitem "AffineAdd normal operator" tags = [:calculus, :AffineAdd] setup=[TestUtils] begin
+@testitem "AffineAdd normal operator" tags = [:calculus, :AffineAdd] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     n, m = 5, 6
@@ -107,7 +107,7 @@ end
     @test N * x ≈ TG.A' * (TG.A * x + TG.d)
 end
 
-@testitem "AffineAdd is_thread_safe delegation" tags = [:calculus, :AffineAdd] setup=[TestUtils] begin
+@testitem "AffineAdd is_thread_safe delegation" tags = [:calculus, :AffineAdd] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     @test is_thread_safe(AffineAdd(DiagOp(randn(5)), randn(5))) == true
@@ -115,7 +115,7 @@ end
     @test is_thread_safe(AffineAdd(C, randn(5))) == false
 end
 
-@testitem "AffineAdd sign function" tags = [:calculus, :AffineAdd] setup=[TestUtils] begin
+@testitem "AffineAdd sign function" tags = [:calculus, :AffineAdd] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     n, m = 5, 6
@@ -125,7 +125,7 @@ end
     @test sign(AffineAdd(opA, d, false)) == -1
 end
 
-@testitem "AffineAdd (GPU)" tags = [:gpu, :calculus, :AffineAdd] setup=[TestUtils] begin
+@testitem "AffineAdd (GPU)" tags = [:gpu, :calculus, :AffineAdd] setup = [TestUtils] begin
     using Random, AbstractOperators, JLArrays
     Random.seed!(0)
 

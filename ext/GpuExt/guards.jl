@@ -24,7 +24,7 @@ function check(y::AbstractGPUArray, A, b::AbstractArray)
     throw(
         ArgumentError(
             "Cannot use CPU input $(typeof(b)) with GPU output $(typeof(y)). " *
-            "Ensure both arrays have the same storage type.",
+                "Ensure both arrays have the same storage type.",
         ),
     )
 end
@@ -34,7 +34,7 @@ function check(y::AbstractArray, A, b::AbstractGPUArray)
     throw(
         ArgumentError(
             "Cannot use GPU input $(typeof(b)) with CPU output $(typeof(y)). " *
-            "Ensure both arrays have the same storage type.",
+                "Ensure both arrays have the same storage type.",
         ),
     )
 end

@@ -1,36 +1,36 @@
 @testmodule ZeroPadTestHelper begin
-using Test, AbstractOperators, LinearAlgebra
+    using Test, AbstractOperators, LinearAlgebra
 
-export test_zeropad_mul
+    export test_zeropad_mul
 
-function test_zeropad_mul(conv, verb, test_op, to_cpu, norm)
-    n = (3,)
-    z = (5,)
-    op = ZeroPad(conv(zeros(Float64, n)), z)
-    x1 = conv(randn(n))
-    y1 = test_op(op, x1, conv(randn(n .+ z)), verb)
-    y2 = conv([collect(x1); zeros(5)])
-    @test norm(to_cpu(y1) .- to_cpu(y2)) <= 1.0e-12
+    function test_zeropad_mul(conv, verb, test_op, to_cpu, norm)
+        n = (3,)
+        z = (5,)
+        op = ZeroPad(conv(zeros(Float64, n)), z)
+        x1 = conv(randn(n))
+        y1 = test_op(op, x1, conv(randn(n .+ z)), verb)
+        y2 = conv([collect(x1); zeros(5)])
+        @test norm(to_cpu(y1) .- to_cpu(y2)) <= 1.0e-12
 
-    n = (3, 2)
-    z = (5, 3)
-    op = ZeroPad(conv(zeros(Float64, n)), z)
-    x1 = conv(randn(n))
-    y1 = test_op(op, x1, conv(randn(n .+ z)), verb)
+        n = (3, 2)
+        z = (5, 3)
+        op = ZeroPad(conv(zeros(Float64, n)), z)
+        x1 = conv(randn(n))
+        y1 = test_op(op, x1, conv(randn(n .+ z)), verb)
         y2c = zeros(n .+ z)
         y2c[1:n[1], 1:n[2]] = collect(x1)
-    @test norm(to_cpu(y1) .- y2c) <= 1.0e-12
+        @test norm(to_cpu(y1) .- y2c) <= 1.0e-12
 
-    n = (3, 2, 2)
-    z = (5, 3, 1)
-    op = ZeroPad(conv(zeros(Float64, n)), z)
-    x1 = conv(randn(n))
-    test_op(op, x1, conv(randn(n .+ z)), verb)
-end
+        n = (3, 2, 2)
+        z = (5, 3, 1)
+        op = ZeroPad(conv(zeros(Float64, n)), z)
+        x1 = conv(randn(n))
+        test_op(op, x1, conv(randn(n .+ z)), verb)
+    end
 
 end  # @testmodule ZeroPadTestHelper
 
-@testitem "ZeroPad" tags = [:linearoperator, :ZeroPad] setup=[TestUtils, ZeroPadTestHelper] begin
+@testitem "ZeroPad" tags = [:linearoperator, :ZeroPad] setup = [TestUtils, ZeroPadTestHelper] begin
     using Random, AbstractOperators, JLArrays
     Random.seed!(0)
     verb && println(" --- Testing ZeroPad --- ")
@@ -99,7 +99,7 @@ end  # @testmodule ZeroPadTestHelper
     @test occursin("[I;0]", s)
 end
 
-@testitem "ZeroPad (GPU)" tags = [:gpu, :linearoperator, :ZeroPad] setup=[TestUtils, ZeroPadTestHelper] begin
+@testitem "ZeroPad (GPU)" tags = [:gpu, :linearoperator, :ZeroPad] setup = [TestUtils, ZeroPadTestHelper] begin
     using Random, AbstractOperators, JLArrays
     Random.seed!(0)
     test_zeropad_mul(jl, false, test_op, to_cpu, norm)

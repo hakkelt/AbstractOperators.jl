@@ -114,7 +114,7 @@ end
     @test Jacobian(Axt_mul_Bx(A, B), x) == Jacobian(Axt_mul_Bx(A, B), x)
 end
 
-@testitem "Axt_mul_Bx (GPU)" tags = [:gpu, :calculus, :Axt_mul_Bx] setup=[TestUtils] begin
+@testitem "Axt_mul_Bx (GPU)" tags = [:gpu, :calculus, :Axt_mul_Bx] setup = [TestUtils] begin
     using Random, AbstractOperators, JLArrays, LinearAlgebra
     Random.seed!(0)
 

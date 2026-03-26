@@ -6,7 +6,7 @@ export Pow
 Elementwise power `p` non-linear operator with input dimensions `dim_in`.
 
 """
-struct Pow{T, N, I <: Real, S<:AbstractArray{T}} <: NonLinearOperator
+struct Pow{T, N, I <: Real, S <: AbstractArray{T}} <: NonLinearOperator
     dim::NTuple{N, Int}
     p::I
 end

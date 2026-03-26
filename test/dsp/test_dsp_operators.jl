@@ -231,7 +231,7 @@ end
     @test is_full_column_rank(op) == true
 end
 
-@testitem "Conv (CUDA)" tags = [:dsp, :gpu, :cuda, :Conv] setup=[TestUtils] begin
+@testitem "Conv (CUDA)" tags = [:dsp, :gpu, :cuda, :Conv] setup = [TestUtils] begin
     using DSPOperators, DSP, LinearAlgebra, Random
     using CUDA
     if CUDA.functional()
@@ -261,7 +261,7 @@ end
     end
 end
 
-@testitem "Conv (AMDGPU)" tags = [:dsp, :gpu, :amdgpu, :Conv] setup=[TestUtils] begin
+@testitem "Conv (AMDGPU)" tags = [:dsp, :gpu, :amdgpu, :Conv] setup = [TestUtils] begin
     using DSPOperators, DSP, LinearAlgebra, Random
     using AMDGPU
     if AMDGPU.functional()
@@ -291,7 +291,7 @@ end
     end
 end
 
-@testitem "Xcorr (CUDA)" tags = [:dsp, :gpu, :cuda, :Xcorr] setup=[TestUtils] begin
+@testitem "Xcorr (CUDA)" tags = [:dsp, :gpu, :cuda, :Xcorr] setup = [TestUtils] begin
     using DSPOperators, DSP, LinearAlgebra, Random
     using CUDA
     if CUDA.functional()
@@ -322,7 +322,7 @@ end
     end
 end
 
-@testitem "Xcorr (AMDGPU)" tags = [:dsp, :gpu, :amdgpu, :Xcorr] setup=[TestUtils] begin
+@testitem "Xcorr (AMDGPU)" tags = [:dsp, :gpu, :amdgpu, :Xcorr] setup = [TestUtils] begin
     using DSPOperators, DSP, LinearAlgebra, Random
     using AMDGPU
     if AMDGPU.functional()
@@ -353,7 +353,7 @@ end
     end
 end
 
-@testitem "Filt (CUDA, FIR)" tags = [:dsp, :gpu, :cuda, :Filt] setup=[TestUtils] begin
+@testitem "Filt (CUDA, FIR)" tags = [:dsp, :gpu, :cuda, :Filt] setup = [TestUtils] begin
     using DSPOperators, DSP, LinearAlgebra, Random
     using CUDA
     if CUDA.functional()
@@ -382,7 +382,7 @@ end
     end
 end
 
-@testitem "Filt (AMDGPU, FIR)" tags = [:dsp, :gpu, :amdgpu, :Filt] setup=[TestUtils] begin
+@testitem "Filt (AMDGPU, FIR)" tags = [:dsp, :gpu, :amdgpu, :Filt] setup = [TestUtils] begin
     using DSPOperators, DSP, LinearAlgebra, Random
     using AMDGPU
     if AMDGPU.functional()
@@ -411,7 +411,7 @@ end
     end
 end
 
-@testitem "MIMOFilt (CUDA, FIR)" tags = [:dsp, :gpu, :cuda, :MIMOFilt] setup=[TestUtils] begin
+@testitem "MIMOFilt (CUDA, FIR)" tags = [:dsp, :gpu, :cuda, :MIMOFilt] setup = [TestUtils] begin
     using DSPOperators, DSP, LinearAlgebra, Random
     using CUDA
     if CUDA.functional()
@@ -441,7 +441,7 @@ end
     end
 end
 
-@testitem "MIMOFilt (AMDGPU, FIR)" tags = [:dsp, :gpu, :amdgpu, :MIMOFilt] setup=[TestUtils] begin
+@testitem "MIMOFilt (AMDGPU, FIR)" tags = [:dsp, :gpu, :amdgpu, :MIMOFilt] setup = [TestUtils] begin
     using DSPOperators, DSP, LinearAlgebra, Random
     using AMDGPU
     if AMDGPU.functional()

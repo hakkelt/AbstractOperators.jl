@@ -16,7 +16,7 @@ const FILTER = if length(ARGS) > 0
 else
     ti -> begin
         run_item = (!(:cuda in ti.tags) || CUDA.functional()) &&
-                (!(:amdgpu in ti.tags) || AMDGPU.functional())
+            (!(:amdgpu in ti.tags) || AMDGPU.functional())
         if VERB && run_item
             println("Running @testitem: ", ti.name)
         end

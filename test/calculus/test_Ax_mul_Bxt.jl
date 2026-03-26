@@ -112,13 +112,13 @@ end
     @test Jacobian(Ax_mul_Bxt(A, B), x) == Jacobian(Ax_mul_Bxt(A, B), x)
 end
 
-@testitem "Ax_mul_Bxt (GPU)" tags = [:gpu, :calculus, :Ax_mul_Bxt] setup=[TestUtils] begin
+@testitem "Ax_mul_Bxt (GPU)" tags = [:gpu, :calculus, :Ax_mul_Bxt] setup = [TestUtils] begin
     using Random, AbstractOperators, JLArrays
     Random.seed!(0)
 
     # Use GPU-typed Eye and Sin
     n = 10
-    P = Ax_mul_Bxt(Eye(Float64, (n,); array_type=JLArray{Float64}), Sin(jl(zeros(n))))
+    P = Ax_mul_Bxt(Eye(Float64, (n,); array_type = JLArray{Float64}), Sin(jl(zeros(n))))
     x = jl(randn(n))
     r = jl(randn(n, n))
     test_NLop_gpu(P, x, r, false)

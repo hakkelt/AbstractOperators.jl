@@ -90,7 +90,7 @@
     @test opA1' == opA1'
 end
 
-@testitem "AdjointOperator (GPU)" tags = [:gpu, :calculus, :AdjointOperator] setup=[TestUtils] begin
+@testitem "AdjointOperator (GPU)" tags = [:gpu, :calculus, :AdjointOperator] setup = [TestUtils] begin
     using Random, AbstractOperators, JLArrays
     Random.seed!(0)
 

@@ -15,10 +15,10 @@ julia> Xcorr(Float64, (10,), [1.0, 0.5, 0.2])
 ```
 """
 struct Xcorr{
-    T, H <: AbstractVector{T}, Hc <: AbstractVector,
-    P1 <: AbstractFFTs.Plan, P2 <: AbstractFFTs.Plan,
-    P3 <: AbstractFFTs.Plan, P4 <: AbstractFFTs.Plan,
-} <: LinearOperator
+        T, H <: AbstractVector{T}, Hc <: AbstractVector,
+        P1 <: AbstractFFTs.Plan, P2 <: AbstractFFTs.Plan,
+        P3 <: AbstractFFTs.Plan, P4 <: AbstractFFTs.Plan,
+    } <: LinearOperator
     dim_in::Tuple{Int}
     h::H
     # Forward pass (xcorr)

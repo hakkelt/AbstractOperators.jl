@@ -1,4 +1,4 @@
-@testitem "Variation: basic mul" tags = [:linearoperator, :Variation] setup=[TestUtils] begin
+@testitem "Variation: basic mul" tags = [:linearoperator, :Variation] setup = [TestUtils] begin
     using Random, SparseArrays, LinearAlgebra, AbstractOperators
     Random.seed!(0)
     verb && println(" --- Testing Variation: basic mul --- ")
@@ -48,7 +48,7 @@
     end
 end
 
-@testitem "Variation: 3D mul and constructors" tags = [:linearoperator, :Variation] setup=[TestUtils] begin
+@testitem "Variation: 3D mul and constructors" tags = [:linearoperator, :Variation] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     verb && println(" --- Testing Variation: 3D mul and constructors --- ")
@@ -81,7 +81,7 @@ end
     end
 end
 
-@testitem "Variation: adjoint and properties" tags = [:linearoperator, :Variation] setup=[TestUtils] begin
+@testitem "Variation: adjoint and properties" tags = [:linearoperator, :Variation] setup = [TestUtils] begin
     using Random, LinearAlgebra, AbstractOperators
     Random.seed!(0)
     verb && println(" --- Testing Variation: adjoint and properties --- ")
@@ -134,7 +134,7 @@ end
     end
 end
 
-@testitem "Variation (JLArray)" tags = [:linearoperator, :Variation, :gpu, :jlarray] setup=[TestUtils] begin
+@testitem "Variation (JLArray)" tags = [:linearoperator, :Variation, :gpu, :jlarray] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     n, m = 10, 5

@@ -1,4 +1,4 @@
-@testitem "Zeros" tags = [:linearoperator, :Zeros] setup=[TestUtils] begin
+@testitem "Zeros" tags = [:linearoperator, :Zeros] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     verb && println(" --- Testing Zeros --- ")
@@ -76,7 +76,7 @@
     @test occursin("0", s)
 end
 
-@testitem "Zeros (JLArray)" tags = [:linearoperator, :Zeros, :gpu, :jlarray] setup=[TestUtils] begin
+@testitem "Zeros (JLArray)" tags = [:linearoperator, :Zeros, :gpu, :jlarray] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     n = (3, 4)

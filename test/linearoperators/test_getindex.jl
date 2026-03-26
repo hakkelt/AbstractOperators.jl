@@ -1,4 +1,4 @@
-@testitem "GetIndex: basic mul" tags = [:linearoperator, :GetIndex] setup=[TestUtils] begin
+@testitem "GetIndex: basic mul" tags = [:linearoperator, :GetIndex] setup = [TestUtils] begin
     using Random, LinearAlgebra, AbstractOperators
     Random.seed!(0)
     verb && println(" --- Testing GetIndex --- ")
@@ -22,7 +22,7 @@
     @test typeof(GetIndex(Float64, (n, m), (1:n, 1:m))) <: Eye
 end
 
-@testitem "GetIndex: properties" tags = [:linearoperator, :GetIndex] setup=[TestUtils] begin
+@testitem "GetIndex: properties" tags = [:linearoperator, :GetIndex] setup = [TestUtils] begin
     using Random, LinearAlgebra, AbstractOperators
     Random.seed!(0)
 
@@ -44,7 +44,7 @@ end
     @test opnorm(op) == estimate_opnorm(op)
 end
 
-@testitem "GetIndex: boolean mask and CartesianIndex" tags = [:linearoperator, :GetIndex] setup=[TestUtils] begin
+@testitem "GetIndex: boolean mask and CartesianIndex" tags = [:linearoperator, :GetIndex] setup = [TestUtils] begin
     using Random, LinearAlgebra, AbstractOperators
     Random.seed!(0)
 
@@ -78,7 +78,7 @@ end
     @test op_cart * xcart == xcart[cart]
 end
 
-@testitem "GetIndex: normal op and slicing helpers" tags = [:linearoperator, :GetIndex] setup=[TestUtils] begin
+@testitem "GetIndex: normal op and slicing helpers" tags = [:linearoperator, :GetIndex] setup = [TestUtils] begin
     using Random, LinearAlgebra, AbstractOperators
     Random.seed!(0)
 
@@ -108,7 +108,7 @@ end
     @test occursin("↓", String(take!(io)))
 end
 
-@testitem "GetIndex (JLArray)" tags = [:linearoperator, :GetIndex, :gpu, :jlarray] setup=[TestUtils] begin
+@testitem "GetIndex (JLArray)" tags = [:linearoperator, :GetIndex, :gpu, :jlarray] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     n, m, k = 5, 4, 3
@@ -274,7 +274,7 @@ end
     @test y[1] == x[2, 3]
 end
 
-@testitem "GetIndex boolean mask inside tuple branch" tags = [:linearoperator, :GetIndex] setup=[TestUtils] begin
+@testitem "GetIndex boolean mask inside tuple branch" tags = [:linearoperator, :GetIndex] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     n, m, l = 5, 4, 3
@@ -287,7 +287,7 @@ end
     @test y == x[mask_first, :, 2]
 end
 
-@testitem "GetIndex AbstractArray of Int indices (multi-dim)" tags = [:linearoperator, :GetIndex] setup=[TestUtils] begin
+@testitem "GetIndex AbstractArray of Int indices (multi-dim)" tags = [:linearoperator, :GetIndex] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     arr_idx = reshape([1, 2, 3, 4], 2, 2)
@@ -298,13 +298,13 @@ end
     @test y == x[arr_idx]
 end
 
-@testitem "GetIndex unsupported index type error path" tags = [:linearoperator, :GetIndex] setup=[TestUtils] begin
+@testitem "GetIndex unsupported index type error path" tags = [:linearoperator, :GetIndex] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     @test_throws ArgumentError GetIndex(Float64, (5, 4), (1:2, "bad"))
 end
 
-@testitem "NormalGetIndex non-tuple idx conversion" tags = [:linearoperator, :GetIndex] setup=[TestUtils] begin
+@testitem "NormalGetIndex non-tuple idx conversion" tags = [:linearoperator, :GetIndex] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     n = 8
@@ -317,7 +317,7 @@ end
     @test AbstractOperators.diag(N1) == expected
 end
 
-@testitem "NormalGetIndex vector idx conversion" tags = [:linearoperator, :GetIndex] setup=[TestUtils] begin
+@testitem "NormalGetIndex vector idx conversion" tags = [:linearoperator, :GetIndex] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     idx_vec = [2, 4, 5]
@@ -327,13 +327,13 @@ end
     @test sum(d) == length(idx_vec)
 end
 
-@testitem "GetIndex get_idx accessor" tags = [:linearoperator, :GetIndex] setup=[TestUtils] begin
+@testitem "GetIndex get_idx accessor" tags = [:linearoperator, :GetIndex] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     @test AbstractOperators.get_idx(GetIndex(Float64, (7,), (2:5,))) == (2:5,)
 end
 
-@testitem "GetIndex array-first overloads and BitArray mask" tags = [:linearoperator, :GetIndex] setup=[TestUtils] begin
+@testitem "GetIndex array-first overloads and BitArray mask" tags = [:linearoperator, :GetIndex] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     x2 = randn(4, 3)
@@ -358,13 +358,13 @@ end
     @test op_bool_vec * xv == xv[bool_vec]
 end
 
-@testitem "get_dim_out missing indices error" tags = [:linearoperator, :GetIndex] setup=[TestUtils] begin
+@testitem "get_dim_out missing indices error" tags = [:linearoperator, :GetIndex] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     @test_throws ErrorException AbstractOperators.get_dim_out((2, 3))
 end
 
-@testitem "AdjointOperator(NormalGetIndex) identity" tags = [:linearoperator, :GetIndex] setup=[TestUtils] begin
+@testitem "AdjointOperator(NormalGetIndex) identity" tags = [:linearoperator, :GetIndex] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     N = AbstractOperators.NormalGetIndex(Float64, Array{Float64}, (5,), 2:3)
@@ -372,7 +372,7 @@ end
     @test AbstractOperators.codomain_storage_type(N) == Array{Float64}
 end
 
-@testitem "GetIndex vector of CartesianIndex via tuple" tags = [:linearoperator, :GetIndex] setup=[TestUtils] begin
+@testitem "GetIndex vector of CartesianIndex via tuple" tags = [:linearoperator, :GetIndex] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
     n, m = 6, 5

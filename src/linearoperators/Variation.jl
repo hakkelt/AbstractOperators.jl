@@ -23,7 +23,7 @@ julia> Variation(ones(2,2))*[1. 2.; 1. 2.]
 
 ```
 """
-struct Variation{T, N, Th, S<:AbstractArray{T}} <: LinearOperator
+struct Variation{T, N, Th, S <: AbstractArray{T}} <: LinearOperator
     dim_in::NTuple{N, Int}
 end
 
@@ -209,8 +209,8 @@ end
 
 domain_type(::Variation{T}) where {T} = T
 codomain_type(::Variation{T}) where {T} = T
-domain_storage_type(::Variation{T,N,Th,S}) where {T,N,Th,S} = S
-codomain_storage_type(::Variation{T,N,Th,S}) where {T,N,Th,S} = S
+domain_storage_type(::Variation{T, N, Th, S}) where {T, N, Th, S} = S
+codomain_storage_type(::Variation{T, N, Th, S}) where {T, N, Th, S} = S
 is_thread_safe(::Variation) = true
 
 size(L::Variation{T, N}) where {T, N} = ((prod(L.dim_in), N), L.dim_in)

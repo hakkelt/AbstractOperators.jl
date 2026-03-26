@@ -9,7 +9,7 @@ Creates the sigmoid non-linear operator with input dimensions `dim_in`.
 ```
 
 """
-struct Sigmoid{T, N, G <: Real, S<:AbstractArray{T}} <: NonLinearOperator
+struct Sigmoid{T, N, G <: Real, S <: AbstractArray{T}} <: NonLinearOperator
     dim::NTuple{N, Int}
     gamma::G
 end

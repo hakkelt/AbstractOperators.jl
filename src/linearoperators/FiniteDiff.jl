@@ -20,9 +20,9 @@ true
 	
 ```
 """
-struct FiniteDiff{N, D, T, S<:AbstractArray{T}} <: LinearOperator
+struct FiniteDiff{N, D, T, S <: AbstractArray{T}} <: LinearOperator
     dim_in::NTuple{N, Int}
-    function FiniteDiff{N, D, T, S}(dim_in) where {N, D, T, S<:AbstractArray{T}}
+    function FiniteDiff{N, D, T, S}(dim_in) where {N, D, T, S <: AbstractArray{T}}
         D > N && error("direction is bigger the number of dimension $N")
         return new{N, D, T, S}(dim_in)
     end
@@ -88,8 +88,8 @@ end
 
 domain_type(::FiniteDiff{<:Any, <:Any, T}) where {T} = T
 codomain_type(::FiniteDiff{<:Any, <:Any, T}) where {T} = T
-domain_storage_type(::FiniteDiff{N,D,T,S}) where {N,D,T,S} = S
-codomain_storage_type(::FiniteDiff{N,D,T,S}) where {N,D,T,S} = S
+domain_storage_type(::FiniteDiff{N, D, T, S}) where {N, D, T, S} = S
+codomain_storage_type(::FiniteDiff{N, D, T, S}) where {N, D, T, S} = S
 is_thread_safe(::FiniteDiff) = true
 
 function size(L::FiniteDiff{N, D}) where {N, D}

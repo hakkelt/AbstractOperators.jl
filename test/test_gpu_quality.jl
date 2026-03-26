@@ -40,20 +40,20 @@ end
     # DiagOp GPU mul!  — target_modules restricts JET to AbstractOperators code only,
     # avoiding false positives from KernelAbstractions (transitive dep of JLArrays).
     op_diag = DiagOp(d)
-    @test_call target_modules=(AbstractOperators,) mul!(y, op_diag, x)
+    @test_call target_modules = (AbstractOperators,) mul!(y, op_diag, x)
 
     # GetIndex GPU mul!
     op_gi = GetIndex(d, (2:4,))
     y3 = jl(zeros(3))
-    @test_call target_modules=(AbstractOperators,) mul!(y3, op_gi, x)
+    @test_call target_modules = (AbstractOperators,) mul!(y3, op_gi, x)
     x3 = jl(randn(3))
-    @test_call target_modules=(AbstractOperators,) mul!(y, op_gi', x3)
+    @test_call target_modules = (AbstractOperators,) mul!(y, op_gi', x3)
 
     # ZeroPad GPU mul!  — zp is a flat NTuple{N,Int} giving per-dimension padding
     op_zp = ZeroPad(d, (2,))
     y10 = jl(zeros(n + 2))
-    @test_call target_modules=(AbstractOperators,) mul!(y10, op_zp, x)
-    @test_call target_modules=(AbstractOperators,) mul!(x, op_zp', y10)
+    @test_call target_modules = (AbstractOperators,) mul!(y10, op_zp, x)
+    @test_call target_modules = (AbstractOperators,) mul!(x, op_zp', y10)
 
     # _should_thread dispatches to false for GPU arrays
     @test AbstractOperators._should_thread(typeof(d)) == false

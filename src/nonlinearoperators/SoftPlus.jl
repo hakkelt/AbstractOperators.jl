@@ -9,7 +9,7 @@ Creates the softplus non-linear operator with input dimensions `dim_in`.
 ```
 
 """
-struct SoftPlus{T, N, S<:AbstractArray{T}} <: NonLinearOperator
+struct SoftPlus{T, N, S <: AbstractArray{T}} <: NonLinearOperator
     dim::NTuple{N, Int}
 end
 

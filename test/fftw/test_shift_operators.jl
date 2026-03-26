@@ -187,7 +187,7 @@ end
     @test (c5 * X) ≈ ((dft2 * sh2) * X)
 end
 
-@testitem "FFTShift/IFFTShift (GPU)" tags = [:gpu, :fftw, :FFTShift] setup=[TestUtils] begin
+@testitem "FFTShift/IFFTShift (GPU)" tags = [:gpu, :fftw, :FFTShift] setup = [TestUtils] begin
     using LinearAlgebra, FFTWOperators, JLArrays
 
     # Test mul! directly since allocate_in_codomain is CPU for these operators
@@ -211,7 +211,7 @@ end
     @test collect(Y) ≈ ones(n2, m2)  # shifting all-ones stays all-ones
 end
 
-@testitem "SignAlternation (GPU)" tags = [:gpu, :fftw, :SignAlternation] setup=[TestUtils] begin
+@testitem "SignAlternation (GPU)" tags = [:gpu, :fftw, :SignAlternation] setup = [TestUtils] begin
     using LinearAlgebra, FFTWOperators, JLArrays
 
     # Test mul! directly; AdjointOperator{SignAlternation} has no mul! defined

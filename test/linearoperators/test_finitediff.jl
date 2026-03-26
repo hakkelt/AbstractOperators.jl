@@ -1,25 +1,25 @@
 @testmodule FiniteDiffTestHelper begin
-using Test, AbstractOperators, LinearAlgebra
+    using Test, AbstractOperators, LinearAlgebra
 
-export test_finitediff_mul
+    export test_finitediff_mul
 
-function test_finitediff_mul(conv, verb, test_op)
-    n = 10
-    op = FiniteDiff(conv(zeros(Float64, n)))
-    test_op(op, conv(randn(n)), conv(randn(n - 1)), verb)
+    function test_finitediff_mul(conv, verb, test_op)
+        n = 10
+        op = FiniteDiff(conv(zeros(Float64, n)))
+        test_op(op, conv(randn(n)), conv(randn(n - 1)), verb)
 
-    n, m = 10, 5
-    op = FiniteDiff(conv(zeros(Float64, n, m)))
-    test_op(op, conv(randn(n, m)), conv(randn(n - 1, m)), verb)
+        n, m = 10, 5
+        op = FiniteDiff(conv(zeros(Float64, n, m)))
+        test_op(op, conv(randn(n, m)), conv(randn(n - 1, m)), verb)
 
-    n, m = 10, 5
-    op = FiniteDiff(conv(zeros(Float64, n, m)), 2)
-    test_op(op, conv(randn(n, m)), conv(randn(n, m - 1)), verb)
-end
+        n, m = 10, 5
+        op = FiniteDiff(conv(zeros(Float64, n, m)), 2)
+        test_op(op, conv(randn(n, m)), conv(randn(n, m - 1)), verb)
+    end
 
 end  # @testmodule FiniteDiffTestHelper
 
-@testitem "FiniteDiff: basic mul" tags = [:linearoperator, :FiniteDiff] setup=[TestUtils, FiniteDiffTestHelper] begin
+@testitem "FiniteDiff: basic mul" tags = [:linearoperator, :FiniteDiff] setup = [TestUtils, FiniteDiffTestHelper] begin
     using Random, SparseArrays, AbstractOperators
     Random.seed!(0)
     verb && println(" --- Testing FiniteDiff --- ")
@@ -50,7 +50,7 @@ end  # @testmodule FiniteDiffTestHelper
     FiniteDiff(x1)
 end
 
-@testitem "FiniteDiff: properties" tags = [:linearoperator, :FiniteDiff] setup=[TestUtils, FiniteDiffTestHelper] begin
+@testitem "FiniteDiff: properties" tags = [:linearoperator, :FiniteDiff] setup = [TestUtils, FiniteDiffTestHelper] begin
     using Random, LinearAlgebra, AbstractOperators
     Random.seed!(0)
 
@@ -87,7 +87,7 @@ end
     @test size(FiniteDiff(Float64, (3, 4, 5), 2)) == ((3, 3, 5), (3, 4, 5))
 end
 
-@testitem "FiniteDiff (GPU)" tags = [:gpu, :linearoperator, :FiniteDiff] setup=[TestUtils, FiniteDiffTestHelper] begin
+@testitem "FiniteDiff (GPU)" tags = [:gpu, :linearoperator, :FiniteDiff] setup = [TestUtils, FiniteDiffTestHelper] begin
     using Random, AbstractOperators, JLArrays
     Random.seed!(0)
     test_finitediff_mul(jl, false, test_op)

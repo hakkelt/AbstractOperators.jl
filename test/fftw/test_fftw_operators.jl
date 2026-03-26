@@ -346,7 +346,7 @@ end
     @test is_full_column_rank(op) == false
 end
 
-@testitem "DCT (GPU via CpuOperatorWrapper)" tags = [:fftw, :gpu, :DCT] setup=[TestUtils] begin
+@testitem "DCT (GPU via CpuOperatorWrapper)" tags = [:fftw, :gpu, :DCT] setup = [TestUtils] begin
     using FFTW, LinearAlgebra, Random, FFTWOperators, JLArrays, AbstractOperators
 
     n = 4
@@ -364,7 +364,7 @@ end
     @test collect(z_gpu) ≈ idct(collect(b_gpu))
 end
 
-@testitem "DCT/IDCT (CUDA via AcceleratedDCTs)" tags = [:fftw, :gpu, :cuda, :DCT, :IDCT] setup=[TestUtils] begin
+@testitem "DCT/IDCT (CUDA via AcceleratedDCTs)" tags = [:fftw, :gpu, :cuda, :DCT, :IDCT] setup = [TestUtils] begin
     using AbstractOperators, FFTW, FFTWOperators, Random
     using AcceleratedDCTs, CUDA
     if CUDA.functional()
@@ -377,20 +377,20 @@ end
         y_gpu = similar(x_gpu)
         mul!(y_gpu, dct_op, x_gpu)
         @test y_gpu isa typeof(x_gpu)
-        @test collect(y_gpu) ≈ dct(x_cpu) rtol=1.0e-4 atol=1.0e-4
+        @test collect(y_gpu) ≈ dct(x_cpu) rtol = 1.0e-4 atol = 1.0e-4
 
         idct_op = IDCT(x_gpu)
         x_rec_gpu = similar(x_gpu)
         mul!(x_rec_gpu, idct_op, y_gpu)
-        @test collect(x_rec_gpu) ≈ x_cpu rtol=1.0e-4 atol=1.0e-4
+        @test collect(x_rec_gpu) ≈ x_cpu rtol = 1.0e-4 atol = 1.0e-4
 
         x_adj_gpu = similar(x_gpu)
         mul!(x_adj_gpu, dct_op', y_gpu)
-        @test collect(x_adj_gpu) ≈ x_cpu rtol=1.0e-4 atol=1.0e-4
+        @test collect(x_adj_gpu) ≈ x_cpu rtol = 1.0e-4 atol = 1.0e-4
     end
 end
 
-@testitem "DCT/IDCT (AMDGPU via AcceleratedDCTs)" tags = [:fftw, :gpu, :amdgpu, :DCT, :IDCT] setup=[TestUtils] begin
+@testitem "DCT/IDCT (AMDGPU via AcceleratedDCTs)" tags = [:fftw, :gpu, :amdgpu, :DCT, :IDCT] setup = [TestUtils] begin
     using AbstractOperators, FFTW, FFTWOperators, Random
     using AMDGPU
     using AcceleratedDCTs
@@ -404,16 +404,16 @@ end
         dct_op = DCT(x_gpu)
         y_gpu = similar(x_gpu)
         mul!(y_gpu, dct_op, x_gpu)
-        @test collect(y_gpu) ≈ dct(x_cpu) rtol=1.0e-4 atol=1.0e-4
+        @test collect(y_gpu) ≈ dct(x_cpu) rtol = 1.0e-4 atol = 1.0e-4
 
         idct_op = IDCT(x_gpu)
         x_rec_gpu = similar(x_gpu)
         mul!(x_rec_gpu, idct_op, y_gpu)
-        @test collect(x_rec_gpu) ≈ x_cpu rtol=1.0e-4 atol=1.0e-4
+        @test collect(x_rec_gpu) ≈ x_cpu rtol = 1.0e-4 atol = 1.0e-4
     end
 end
 
-@testitem "DFT/RDFT/IRDFT (CUDA)" tags = [:fftw, :gpu, :cuda] setup=[TestUtils] begin
+@testitem "DFT/RDFT/IRDFT (CUDA)" tags = [:fftw, :gpu, :cuda] setup = [TestUtils] begin
     using FFTWOperators, Random
     using CUDA
     if CUDA.functional()
@@ -440,7 +440,7 @@ end
     end
 end
 
-@testitem "DFT/RDFT/IRDFT (AMDGPU)" tags = [:fftw, :gpu, :amdgpu] setup=[TestUtils] begin
+@testitem "DFT/RDFT/IRDFT (AMDGPU)" tags = [:fftw, :gpu, :amdgpu] setup = [TestUtils] begin
     using FFTWOperators, Random
     using AMDGPU
     if AMDGPU.functional()

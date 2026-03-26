@@ -9,7 +9,7 @@ Creates an inverse tangent non-linear operator with input dimensions `dim_in`:
 ```
 
 """
-struct Atan{T, N, S<:AbstractArray{T}} <: NonLinearOperator
+struct Atan{T, N, S <: AbstractArray{T}} <: NonLinearOperator
     dim::NTuple{N, Int}
 end
 

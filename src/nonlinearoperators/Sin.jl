@@ -9,7 +9,7 @@ Creates a sinusoid non-linear operator with input dimensions `dim_in`:
 ```
 
 """
-struct Sin{T, N, S<:AbstractArray{T}} <: NonLinearOperator
+struct Sin{T, N, S <: AbstractArray{T}} <: NonLinearOperator
     dim::NTuple{N, Int}
 end
 

@@ -604,7 +604,7 @@ AbstractOperators._check_domain_storage(domain_array, ::SpreadingBatchOp) = noth
 AbstractOperators._check_codomain_storage(codomain_array, ::SpreadingBatchOp) = nothing
 AbstractOperators._check_domain_storage(domain_array::ArrayPartition, ::SpreadingBatchOp) = nothing
 function AbstractOperators._check_codomain_storage(
-    codomain_array::ArrayPartition, ::SpreadingBatchOp
+        codomain_array::ArrayPartition, ::SpreadingBatchOp
     )
     return nothing
 end
