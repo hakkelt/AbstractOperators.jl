@@ -66,9 +66,12 @@ function _get_normal_op(op::NFFTOp)
     shape = op.plan.N
     shape_ext = 2 .* shape
 
-    buf = allocate_in_domain(op, shape_ext...)
-    buf .= 0
-    tmp = allocate_in_codomain(op, size(op.plan.k, 2)...)
+    # Use similar() on concrete instances to avoid allocate_in_domain/codomain
+    # incompatibilities across AbstractOperators versions (master vs current).
+    C = complex(domain_type(op))
+    buf = similar(op.ksp_buffer, C, shape_ext...)
+    fill!(buf, 0)
+    tmp = similar(op.ksp_buffer, C, size(op.plan.k, 2))
     tmp .= vec(op.dcf)
 
     fftplan = FFTW.plan_fft!(buf)

@@ -20,9 +20,11 @@ import AbstractOperators:
     allocate_in_codomain,
     domain_storage_type,
     codomain_storage_type,
-    AdjointOperator,
-    _array_wrapper_type
+    AdjointOperator
 import Base.Threads: nthreads
+
+# Local definition — AbstractOperators exports this on current branch but not master.
+_array_wrapper_type(::Type{A}) where {A <: AbstractArray} = Base.typename(A).wrapper
 import FFTW: FFTW
 
 include("NFFTOp.jl")

@@ -390,7 +390,7 @@ function _check_shift_dirs(::NTuple{N, Int}, dirs::NTuple{M, Int}) where {N, M}
             throw(ArgumentError("dirs must be sorted in ascending order"))
         end
     end
-    return
+    return nothing
 end
 
 function _is_dft_op(op, side)

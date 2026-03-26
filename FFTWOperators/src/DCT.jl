@@ -29,10 +29,11 @@ julia> A*ones(3)
 	
 ```
 """
-struct DCT{N, C, T1 <: AbstractFFTs.Plan, T2 <: AbstractFFTs.Plan} <: CosineTransform{N, C, T1, T2}
+struct DCT{N, C, S, T1 <: AbstractFFTs.Plan, T2 <: AbstractFFTs.Plan, B} <: CosineTransform{N, C, T1, T2}
     dim_in::NTuple{N, Int}
     A::T1
     At::T2
+    buf::B
 end
 
 """
@@ -62,10 +63,11 @@ julia> A*[1.;0.;0.]
 
 ```
 """
-struct IDCT{N, C, T1 <: AbstractFFTs.Plan, T2 <: AbstractFFTs.Plan} <: CosineTransform{N, C, T1, T2}
+struct IDCT{N, C, S, T1 <: AbstractFFTs.Plan, T2 <: AbstractFFTs.Plan, B} <: CosineTransform{N, C, T1, T2}
     dim_in::NTuple{N, Int}
     A::T1
     At::T2
+    buf::B
 end
 
 # Constructors
@@ -78,7 +80,9 @@ DCT(T::Type, dim_in::Vararg{Int64}) = DCT(T, dim_in)
 
 function DCT(x::AbstractArray{C, N}) where {N, C}
     A, At = plan_dct(x), plan_idct(x)
-    return DCT{N, C, typeof(A), typeof(At)}(size(x), A, At)
+    S = typeof(x isa SubArray ? parent(x) : x).name.wrapper
+    buf = similar(x)
+    return DCT{N, C, S, typeof(A), typeof(At), typeof(buf)}(size(x), A, At, buf)
 end
 
 #standard constructor
@@ -90,33 +94,31 @@ IDCT(T::Type, dim_in::Vararg{Int64}) = IDCT(T, dim_in)
 
 function IDCT(x::AbstractArray{C, N}) where {N, C}
     A, At = plan_idct(x), plan_dct(x)
-    return IDCT{N, C, typeof(A), typeof(At)}(size(x), A, At)
+    S = typeof(x isa SubArray ? parent(x) : x).name.wrapper
+    buf = similar(x)
+    return IDCT{N, C, S, typeof(A), typeof(At), typeof(buf)}(size(x), A, At, buf)
 end
 
 # Mappings
 
-function mul!(
-        y::AbstractArray{C, N}, A::DCT{N, C, T1, T2}, b::AbstractArray{C, N}
-    ) where {N, C, T1, T2}
-    return mul!(y, A.A, b)
+function mul!(y::AbstractArray, A::DCT, b::AbstractArray)
+    return mul!(y, A.A, b)  # DCT plan (REDFT10): non-destructive to input
 end
 
-function mul!(
-        y::AbstractArray{C, N}, A::AdjointOperator{DCT{N, C, T1, T2}}, b::AbstractArray{C, N}
-    ) where {N, C, T1, T2}
-    return y .= A.A.At * b
+function mul!(y::AbstractArray, A::AdjointOperator{<:DCT}, b::AbstractArray)
+    # IDCT plan (REDFT01) modifies its input in-place; use scratch buffer
+    copyto!(A.A.buf, b)
+    return mul!(y, A.A.At, A.A.buf)
 end
 
-function mul!(
-        y::AbstractArray{C, N}, A::IDCT{N, C, T1, T2}, b::AbstractArray{C, N}
-    ) where {N, C, T1, T2}
-    return y .= A.A * b
+function mul!(y::AbstractArray, A::IDCT, b::AbstractArray)
+    # IDCT plan (REDFT01) modifies its input in-place; use scratch buffer
+    copyto!(A.buf, b)
+    return mul!(y, A.A, A.buf)
 end
 
-function mul!(
-        y::AbstractArray{C, N}, A::AdjointOperator{IDCT{N, C, T1, T2}}, b::AbstractArray{C, N}
-    ) where {N, C, T1, T2}
-    return mul!(y, A.A.At, b)
+function mul!(y::AbstractArray, A::AdjointOperator{<:IDCT}, b::AbstractArray)
+    return mul!(y, A.A.At, b)  # DCT plan (REDFT10): non-destructive to input
 end
 
 # Properties
@@ -128,8 +130,10 @@ fun_name(A::IDCT) = "ℱc⁻¹"
 
 domain_type(::CosineTransform{N, C, T1, T2}) where {N, C, T1, T2} = C
 codomain_type(::CosineTransform{N, C, T1, T2}) where {N, C, T1, T2} = C
-domain_storage_type(::CosineTransform{N, C}) where {N, C} = Array{C}
-codomain_storage_type(::CosineTransform{N, C}) where {N, C} = Array{C}
+domain_storage_type(::DCT{N, C, S}) where {N, C, S} = S{C}
+domain_storage_type(::IDCT{N, C, S}) where {N, C, S} = S{C}
+codomain_storage_type(::DCT{N, C, S}) where {N, C, S} = S{C}
+codomain_storage_type(::IDCT{N, C, S}) where {N, C, S} = S{C}
 is_thread_safe(::CosineTransform) = true
 
 is_AcA_diagonal(L::CosineTransform) = true

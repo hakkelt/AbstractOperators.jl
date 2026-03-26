@@ -364,10 +364,58 @@ end
     @test collect(z_gpu) ≈ idct(collect(b_gpu))
 end
 
+@testitem "DCT/IDCT (CUDA via AcceleratedDCTs)" tags = [:fftw, :gpu, :cuda, :DCT, :IDCT] setup=[TestUtils] begin
+    using AbstractOperators, FFTW, FFTWOperators, Random
+    using AcceleratedDCTs, CUDA
+    if CUDA.functional()
+        Random.seed!(0)
+        dims = (8, 10)
+        x_cpu = randn(Float32, dims...)
+        x_gpu = CuArray(x_cpu)
+
+        dct_op = DCT(x_gpu)
+        y_gpu = similar(x_gpu)
+        mul!(y_gpu, dct_op, x_gpu)
+        @test y_gpu isa typeof(x_gpu)
+        @test collect(y_gpu) ≈ dct(x_cpu) rtol=1.0e-4 atol=1.0e-4
+
+        idct_op = IDCT(x_gpu)
+        x_rec_gpu = similar(x_gpu)
+        mul!(x_rec_gpu, idct_op, y_gpu)
+        @test collect(x_rec_gpu) ≈ x_cpu rtol=1.0e-4 atol=1.0e-4
+
+        x_adj_gpu = similar(x_gpu)
+        mul!(x_adj_gpu, dct_op', y_gpu)
+        @test collect(x_adj_gpu) ≈ x_cpu rtol=1.0e-4 atol=1.0e-4
+    end
+end
+
+@testitem "DCT/IDCT (AMDGPU via AcceleratedDCTs)" tags = [:fftw, :gpu, :amdgpu, :DCT, :IDCT] setup=[TestUtils] begin
+    using AbstractOperators, FFTW, FFTWOperators, Random
+    using AMDGPU
+    using AcceleratedDCTs
+
+    if AMDGPU.functional()
+        Random.seed!(0)
+        dims = (8, 10)
+        x_cpu = randn(Float32, dims...)
+        x_gpu = AMDGPU.ROCArray(x_cpu)
+
+        dct_op = DCT(x_gpu)
+        y_gpu = similar(x_gpu)
+        mul!(y_gpu, dct_op, x_gpu)
+        @test collect(y_gpu) ≈ dct(x_cpu) rtol=1.0e-4 atol=1.0e-4
+
+        idct_op = IDCT(x_gpu)
+        x_rec_gpu = similar(x_gpu)
+        mul!(x_rec_gpu, idct_op, y_gpu)
+        @test collect(x_rec_gpu) ≈ x_cpu rtol=1.0e-4 atol=1.0e-4
+    end
+end
+
 @testitem "DFT/RDFT/IRDFT (CUDA)" tags = [:fftw, :gpu, :cuda] setup=[TestUtils] begin
-    using FFTWOperators, Random, Pkg
-    haskey(Pkg.project().dependencies, "CUDA") || (@test_skip "CUDA not in project"; return)
-    import CUDA
+    using FFTWOperators, Random
+    using CUDA
     if CUDA.functional()
         conv = CUDA.cu
         Random.seed!(11)
@@ -389,15 +437,12 @@ end
         out = conv(zeros(Float64, n))
         mul!(out, ir, ry)
         @test out isa typeof(xr)
-    else
-        @test_skip "CUDA not functional"
     end
 end
 
 @testitem "DFT/RDFT/IRDFT (AMDGPU)" tags = [:fftw, :gpu, :amdgpu] setup=[TestUtils] begin
-    using FFTWOperators, Random, Pkg
-    haskey(Pkg.project().dependencies, "AMDGPU") || (@test_skip "AMDGPU not in project"; return)
-    import AMDGPU
+    using FFTWOperators, Random
+    using AMDGPU
     if AMDGPU.functional()
         conv = AMDGPU.ROCArray
         Random.seed!(12)
@@ -419,7 +464,5 @@ end
         out = conv(zeros(Float64, n))
         mul!(out, ir, ry)
         @test out isa typeof(xr)
-    else
-        @test_skip "AMDGPU not functional"
     end
 end

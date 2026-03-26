@@ -138,8 +138,9 @@ end
 
 # FFTShift/IFFTShift with FFTShift/IFFTShift
 have_shifted_dims_even_length(T::ShiftOp) = all(iseven, size(T, 2)[collect(T.dirs)])
-are_shifted_dims_disjoint(T1::ShiftOp, T2::ShiftOp) =
-    all(d -> !(d in T1.dirs && d in T2.dirs), 1:ndims(T1))
+function are_shifted_dims_disjoint(T1::ShiftOp, T2::ShiftOp)
+    return all(d -> !(d in T1.dirs && d in T2.dirs), 1:ndims(T1))
+end
 does_fully_cover(T1::ShiftOp, T2::ShiftOp) = all(d -> (d in T1.dirs && d in T2.dirs), T1.dirs) # T1 fully covers T2
 function can_be_combined(T1::FFTShift, T2::FFTShift)
     return (have_shifted_dims_even_length(T1) && have_shifted_dims_even_length(T2)) || are_shifted_dims_disjoint(T1, T2)

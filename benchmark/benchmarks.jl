@@ -5,6 +5,8 @@ using Pkg
 using Random
 using RecursiveArrayTools: ArrayPartition
 
+Random.seed!(0)
+
 function _load_local_subpackage(pkg::Symbol, relpath::String)
     try
         @eval using $pkg
@@ -18,7 +20,7 @@ function _load_local_subpackage(pkg::Symbol, relpath::String)
             return false
         end
         try
-            Pkg.develop(path = local_path)
+            Pkg.develop(; path = local_path)
             @eval using $pkg
             return true
         catch
@@ -72,35 +74,37 @@ const BENCH_NFFT_IMAGE = (48, 48)
 const BENCH_NFFT_NSAMP = 48
 const BENCH_NFFT_NPROF = 24
 
-make_rng() = MersenneTwister(1234)
-
 function linear_state(op)
-    rng = make_rng()
-    x = randn(rng, domain_type(op), size(op, 2)...)
+    x = randn(domain_type(op), size(op, 2)...)
     y = zeros(codomain_type(op), size(op, 1)...)
     z = zeros(domain_type(op), size(op, 2)...)
     return (op = op, adj = op', x = x, y = y, z = z)
 end
 
 function nonlinear_state(op; positive = false)
-    rng = make_rng()
-    x = positive ? abs.(randn(rng, domain_type(op), size(op, 2)...)) : randn(rng, domain_type(op), size(op, 2)...)
+    x = if positive
+        abs.(randn(domain_type(op), size(op, 2)...))
+    else
+        randn(domain_type(op), size(op, 2)...)
+    end
     y = zeros(codomain_type(op), size(op, 1)...)
     return (op = op, x = x, y = y)
 end
 
 function jacobian_state(op; positive = false)
-    rng = make_rng()
-    x = positive ? abs.(randn(rng, domain_type(op), size(op, 2)...)) : randn(rng, domain_type(op), size(op, 2)...)
+    x = if positive
+        abs.(randn(domain_type(op), size(op, 2)...))
+    else
+        randn(domain_type(op), size(op, 2)...)
+    end
     jac = Jacobian(op, x)
-    b = randn(rng, codomain_type(jac), size(jac, 1)...)
+    b = randn(codomain_type(jac), size(jac, 1)...)
     y = zeros(domain_type(jac), size(jac, 2)...)
     return (jac = jac, adj = jac', b = b, y = y)
 end
 
 function mylinop_state()
-    rng = make_rng()
-    scale = randn(rng, BENCH_LINEAR_MYLIN_N)
+    scale = randn(BENCH_LINEAR_MYLIN_N)
     op = MyLinOp(
         Float64,
         (BENCH_LINEAR_MYLIN_N,),
@@ -112,25 +116,23 @@ function mylinop_state()
 end
 
 function lbfgs_update_state()
-    rng = make_rng()
-    x = randn(rng, BENCH_LINEAR_LBFGS_N)
-    x_prev = randn(rng, BENCH_LINEAR_LBFGS_N)
-    grad = randn(rng, BENCH_LINEAR_LBFGS_N)
-    grad_prev = randn(rng, BENCH_LINEAR_LBFGS_N)
+    x = randn(BENCH_LINEAR_LBFGS_N)
+    x_prev = randn(BENCH_LINEAR_LBFGS_N)
+    grad = randn(BENCH_LINEAR_LBFGS_N)
+    grad_prev = randn(BENCH_LINEAR_LBFGS_N)
     op = LBFGS(x, 5)
     return (op = op, x = x, x_prev = x_prev, grad = grad, grad_prev = grad_prev)
 end
 
 function lbfgs_mul_state()
-    rng = make_rng()
-    x_prev = randn(rng, BENCH_LINEAR_LBFGS_N)
-    grad_prev = randn(rng, BENCH_LINEAR_LBFGS_N)
+    x_prev = randn(BENCH_LINEAR_LBFGS_N)
+    grad_prev = randn(BENCH_LINEAR_LBFGS_N)
     op = LBFGS(x_prev, 5)
     x_curr = x_prev
     grad_curr = grad_prev
     for _ in 1:5
-        x_next = randn(rng, BENCH_LINEAR_LBFGS_N)
-        grad_next = randn(rng, BENCH_LINEAR_LBFGS_N)
+        x_next = randn(BENCH_LINEAR_LBFGS_N)
+        grad_next = randn(BENCH_LINEAR_LBFGS_N)
         update!(op, x_next, x_curr, grad_next, grad_curr)
         x_curr = x_next
         grad_curr = grad_next
@@ -139,155 +141,155 @@ function lbfgs_mul_state()
 end
 
 function hcat_state()
-    rng = make_rng()
-    op = HCAT(Eye(Float64, (BENCH_CALC_N,)), DiagOp(randn(rng, BENCH_CALC_N)))
-    x = ArrayPartition(randn(rng, BENCH_CALC_N), randn(rng, BENCH_CALC_N))
+    op = HCAT(Eye(Float64, (BENCH_CALC_N,)), DiagOp(randn(BENCH_CALC_N)))
+    x = ArrayPartition(randn(BENCH_CALC_N), randn(BENCH_CALC_N))
     y = zeros(BENCH_CALC_N)
     z = ArrayPartition(zeros(BENCH_CALC_N), zeros(BENCH_CALC_N))
     return (op = op, adj = op', x = x, y = y, z = z)
 end
 
 function vcat_state()
-    rng = make_rng()
-    op = VCAT(Eye(Float64, (BENCH_CALC_N,)), DiagOp(randn(rng, BENCH_CALC_N)))
-    x = randn(rng, BENCH_CALC_N)
+    op = VCAT(Eye(Float64, (BENCH_CALC_N,)), DiagOp(randn(BENCH_CALC_N)))
+    x = randn(BENCH_CALC_N)
     y = ArrayPartition(zeros(BENCH_CALC_N), zeros(BENCH_CALC_N))
     z = zeros(BENCH_CALC_N)
     return (op = op, adj = op', x = x, y = y, z = z)
 end
 
 function dcat_state()
-    rng = make_rng()
-    op = DCAT(Eye(Float64, (BENCH_CALC_N,)), DiagOp(randn(rng, BENCH_CALC_N)))
-    x = ArrayPartition(randn(rng, BENCH_CALC_N), randn(rng, BENCH_CALC_N))
+    op = DCAT(Eye(Float64, (BENCH_CALC_N,)), DiagOp(randn(BENCH_CALC_N)))
+    x = ArrayPartition(randn(BENCH_CALC_N), randn(BENCH_CALC_N))
     y = ArrayPartition(zeros(BENCH_CALC_N), zeros(BENCH_CALC_N))
     z = ArrayPartition(zeros(BENCH_CALC_N), zeros(BENCH_CALC_N))
     return (op = op, adj = op', x = x, y = y, z = z)
 end
 
 function affineadd_state()
-    rng = make_rng()
     A = Eye(Float64, (BENCH_CALC_N,))
-    op = AffineAdd(A, randn(rng, BENCH_CALC_N))
+    op = AffineAdd(A, randn(BENCH_CALC_N))
     return linear_state(op)
 end
 
 hadamardprod_jacobian_state() = jacobian_state(HadamardProd(Sin((BENCH_CALC_N,)), Cos((BENCH_CALC_N,))))
 
 function ax_mul_bxt_state()
-    rng = make_rng()
     # Ax_mul_Bxt(A,B): computes A(x) * B(x)'. Requires same domain and A,B output same codomain.
-    op = Ax_mul_Bxt(MatrixOp(randn(rng, BENCH_CALC_SQ, BENCH_CALC_SQ), BENCH_CALC_SQ), MatrixOp(randn(rng, BENCH_CALC_SQ, BENCH_CALC_SQ), BENCH_CALC_SQ))
+    op = Ax_mul_Bxt(
+        MatrixOp(randn(BENCH_CALC_SQ, BENCH_CALC_SQ), BENCH_CALC_SQ),
+        MatrixOp(randn(BENCH_CALC_SQ, BENCH_CALC_SQ), BENCH_CALC_SQ),
+    )
     return nonlinear_state(op)
 end
 
 function ax_mul_bxt_jacobian_state()
-    rng = make_rng()
-    op = Ax_mul_Bxt(MatrixOp(randn(rng, BENCH_CALC_SQ, BENCH_CALC_SQ), BENCH_CALC_SQ), MatrixOp(randn(rng, BENCH_CALC_SQ, BENCH_CALC_SQ), BENCH_CALC_SQ))
+    op = Ax_mul_Bxt(
+        MatrixOp(randn(BENCH_CALC_SQ, BENCH_CALC_SQ), BENCH_CALC_SQ),
+        MatrixOp(randn(BENCH_CALC_SQ, BENCH_CALC_SQ), BENCH_CALC_SQ),
+    )
     return jacobian_state(op)
 end
 
 function axt_mul_bx_state()
-    rng = make_rng()
     # Axt_mul_Bx(A,B): computes A(x)' * B(x). Requires A and B share domain; rows(A)==rows(B).
-    op = Axt_mul_Bx(MatrixOp(randn(rng, BENCH_CALC_SQ, BENCH_CALC_SQ), BENCH_CALC_SQ), MatrixOp(randn(rng, BENCH_CALC_SQ, BENCH_CALC_SQ), BENCH_CALC_SQ))
+    op = Axt_mul_Bx(
+        MatrixOp(randn(BENCH_CALC_SQ, BENCH_CALC_SQ), BENCH_CALC_SQ),
+        MatrixOp(randn(BENCH_CALC_SQ, BENCH_CALC_SQ), BENCH_CALC_SQ),
+    )
     return nonlinear_state(op)
 end
 
 function axt_mul_bx_jacobian_state()
-    rng = make_rng()
-    op = Axt_mul_Bx(MatrixOp(randn(rng, BENCH_CALC_SQ, BENCH_CALC_SQ), BENCH_CALC_SQ), MatrixOp(randn(rng, BENCH_CALC_SQ, BENCH_CALC_SQ), BENCH_CALC_SQ))
+    op = Axt_mul_Bx(
+        MatrixOp(randn(BENCH_CALC_SQ, BENCH_CALC_SQ), BENCH_CALC_SQ),
+        MatrixOp(randn(BENCH_CALC_SQ, BENCH_CALC_SQ), BENCH_CALC_SQ),
+    )
     return jacobian_state(op)
 end
 
 function ax_mul_bx_state()
-    rng = make_rng()
     # Ax_mul_Bx(A,B): computes A(x)*B(x). Requires size(A,1)[2] == size(B,1)[1].
     # Requires square codomain shape where col(A) == row(B).
-    op = Ax_mul_Bx(MatrixOp(randn(rng, BENCH_CALC_SQ, BENCH_CALC_SQ), BENCH_CALC_SQ), MatrixOp(randn(rng, BENCH_CALC_SQ, BENCH_CALC_SQ), BENCH_CALC_SQ))
+    op = Ax_mul_Bx(
+        MatrixOp(randn(BENCH_CALC_SQ, BENCH_CALC_SQ), BENCH_CALC_SQ),
+        MatrixOp(randn(BENCH_CALC_SQ, BENCH_CALC_SQ), BENCH_CALC_SQ),
+    )
     return nonlinear_state(op)
 end
 
 function ax_mul_bx_jacobian_state()
-    rng = make_rng()
-    op = Ax_mul_Bx(MatrixOp(randn(rng, BENCH_CALC_SQ, BENCH_CALC_SQ), BENCH_CALC_SQ), MatrixOp(randn(rng, BENCH_CALC_SQ, BENCH_CALC_SQ), BENCH_CALC_SQ))
+    op = Ax_mul_Bx(
+        MatrixOp(randn(BENCH_CALC_SQ, BENCH_CALC_SQ), BENCH_CALC_SQ),
+        MatrixOp(randn(BENCH_CALC_SQ, BENCH_CALC_SQ), BENCH_CALC_SQ),
+    )
     return jacobian_state(op)
 end
 
 function simple_batch_state(threaded)
-    rng = make_rng()
-    base = Compose(DiagOp(randn(rng, 255)), FiniteDiff(Float64, (256,), 1))
+    base = Compose(DiagOp(randn(255)), FiniteDiff(Float64, (256,), 1))
     op = BatchOp(base, (8, 8), (:_, :b, :b); threaded = threaded)
-    x = randn(rng, 256, 8, 8)
+    x = randn(256, 8, 8)
     y = zeros(255, 8, 8)
     z = zeros(256, 8, 8)
     return (op = op, adj = op', x = x, y = y, z = z)
 end
 
 function spreading_batch_state(threaded; strategy = nothing)
-    rng = make_rng()
-    ops = [DiagOp(randn(rng, 255)) * FiniteDiff(Float64, (256,), 1) for _ in 1:4]
+    ops = [DiagOp(randn(255)) * FiniteDiff(Float64, (256,), 1) for _ in 1:4]
     kwargs = threaded ? (; threaded = true, threading_strategy = strategy) : (; threaded = false)
     op = BatchOp(ops, 8, (:_, :s, :b); kwargs...)
-    x = randn(rng, 256, 4, 8)
+    x = randn(256, 4, 8)
     y = zeros(255, 4, 8)
     z = zeros(256, 4, 8)
     return (op = op, adj = op', x = x, y = y, z = z)
 end
 
 function dsp_filt_state()
-    rng = make_rng()
-    op = Filt((BENCH_DSP_FILT_N, 1), randn(rng, 7))
-    x = randn(rng, BENCH_DSP_FILT_N, 1)
+    op = Filt((BENCH_DSP_FILT_N, 1), randn(7))
+    x = randn(BENCH_DSP_FILT_N, 1)
     y = zeros(BENCH_DSP_FILT_N, 1)
     z = zeros(BENCH_DSP_FILT_N, 1)
     return (op = op, adj = op', x = x, y = y, z = z)
 end
 
 function dsp_xcorr_state()
-    rng = make_rng()
-    h = randn(rng, 21)
+    h = randn(21)
     op = Xcorr(Float64, (BENCH_DSP_XCORR_N,), h)
-    x = randn(rng, BENCH_DSP_XCORR_N)
+    x = randn(BENCH_DSP_XCORR_N)
     y = zeros(size(op, 1)...)
     z = zeros(BENCH_DSP_XCORR_N)
     return (op = op, adj = op', x = x, y = y, z = z)
 end
 
 function dsp_mimofilt_state()
-    rng = make_rng()
-    taps = [randn(rng, 5) for _ in 1:4]
+    taps = [randn(5) for _ in 1:4]
     op = MIMOFilt(BENCH_DSP_MIMO_SHAPE, taps)
-    x = randn(rng, BENCH_DSP_MIMO_SHAPE...)
+    x = randn(BENCH_DSP_MIMO_SHAPE...)
     y = zeros(size(op, 1)...)
     z = zeros(size(op, 2)...)
     return (op = op, adj = op', x = x, y = y, z = z)
 end
 
 function dft_state()
-    rng = make_rng()
     op = DFT(BENCH_DFT_SHAPE)
-    x = randn(rng, BENCH_DFT_SHAPE...)
+    x = randn(BENCH_DFT_SHAPE...)
     y = zeros(ComplexF64, BENCH_DFT_SHAPE...)
     z = zeros(Float64, BENCH_DFT_SHAPE...)
     return (op = op, adj = op', x = x, y = y, z = z)
 end
 
 function wavelet_state()
-    rng = make_rng()
     op = WaveletOp(wavelet(WT.db2), BENCH_WAVELET_N)
-    x = randn(rng, BENCH_WAVELET_N)
+    x = randn(BENCH_WAVELET_N)
     y = zeros(BENCH_WAVELET_N)
     z = zeros(BENCH_WAVELET_N)
     return (op = op, adj = op', x = x, y = y, z = z)
 end
 
 function nfft_state()
-    rng = make_rng()
-    traj = rand(rng, 2, BENCH_NFFT_NSAMP, BENCH_NFFT_NPROF) .- 0.5
+    traj = rand(2, BENCH_NFFT_NSAMP, BENCH_NFFT_NPROF) .- 0.5
     dcf = ones(eltype(traj), BENCH_NFFT_NSAMP, BENCH_NFFT_NPROF)
     op = NFFTOp(BENCH_NFFT_IMAGE, traj, dcf; threaded = false)
-    x = randn(rng, ComplexF64, BENCH_NFFT_IMAGE...)
+    x = randn(ComplexF64, BENCH_NFFT_IMAGE...)
     y = zeros(ComplexF64, BENCH_NFFT_NSAMP, BENCH_NFFT_NPROF)
     z = zeros(ComplexF64, BENCH_NFFT_IMAGE...)
     return (op = op, adj = op', x = x, y = y, z = z)
@@ -295,12 +297,11 @@ end
 
 function normal_state(op)
     nop = AbstractOperators.get_normal_op(op)
-    rng = make_rng()
     dT = domain_type(nop)
     cT = codomain_type(nop)
     dEl = dT <: AbstractArray ? eltype(dT) : dT
     cEl = cT <: AbstractArray ? eltype(cT) : cT
-    x = randn(rng, dEl, size(nop, 2)...)
+    x = randn(dEl, size(nop, 2)...)
     y = zeros(cEl, size(nop, 1)...)
     return (op = nop, x = x, y = y)
 end
@@ -321,16 +322,16 @@ linear["Eye"] = BenchmarkGroup()
 linear["Eye"]["forward"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = linear_state(Eye(Float64, (BENCH_LINEAR_EYE_N,))))
 
 linear["DiagOp"] = BenchmarkGroup()
-linear["DiagOp"]["forward-single"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = linear_state(DiagOp(randn(make_rng(), BENCH_LINEAR_DIAG_N); threaded = false)))
-linear["DiagOp"]["adjoint-single"] = @benchmarkable mul!(state.z, state.adj, state.y) setup = (state = linear_state(DiagOp(randn(make_rng(), BENCH_LINEAR_DIAG_N); threaded = false)))
+linear["DiagOp"]["forward-single"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = linear_state(DiagOp(randn(BENCH_LINEAR_DIAG_N); threaded = false)))
+linear["DiagOp"]["adjoint-single"] = @benchmarkable mul!(state.z, state.adj, state.y) setup = (state = linear_state(DiagOp(randn(BENCH_LINEAR_DIAG_N); threaded = false)))
 if Threads.nthreads() > 1
-    linear["DiagOp"]["forward-threaded"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = linear_state(DiagOp(randn(make_rng(), BENCH_LINEAR_DIAG_N); threaded = true)))
-    linear["DiagOp"]["adjoint-threaded"] = @benchmarkable mul!(state.z, state.adj, state.y) setup = (state = linear_state(DiagOp(randn(make_rng(), BENCH_LINEAR_DIAG_N); threaded = true)))
+    linear["DiagOp"]["forward-threaded"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = linear_state(DiagOp(randn(BENCH_LINEAR_DIAG_N); threaded = true)))
+    linear["DiagOp"]["adjoint-threaded"] = @benchmarkable mul!(state.z, state.adj, state.y) setup = (state = linear_state(DiagOp(randn(BENCH_LINEAR_DIAG_N); threaded = true)))
 end
 
 linear["MatrixOp"] = BenchmarkGroup()
-linear["MatrixOp"]["forward"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = linear_state(MatrixOp(randn(make_rng(), BENCH_LINEAR_MATRIX_SHAPE...), BENCH_LINEAR_MATRIX_DOMAIN)))
-linear["MatrixOp"]["adjoint"] = @benchmarkable mul!(state.z, state.adj, state.y) setup = (state = linear_state(MatrixOp(randn(make_rng(), BENCH_LINEAR_MATRIX_SHAPE...), BENCH_LINEAR_MATRIX_DOMAIN)))
+linear["MatrixOp"]["forward"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = linear_state(MatrixOp(randn(BENCH_LINEAR_MATRIX_SHAPE...), BENCH_LINEAR_MATRIX_DOMAIN)))
+linear["MatrixOp"]["adjoint"] = @benchmarkable mul!(state.z, state.adj, state.y) setup = (state = linear_state(MatrixOp(randn(BENCH_LINEAR_MATRIX_SHAPE...), BENCH_LINEAR_MATRIX_DOMAIN)))
 
 linear["FiniteDiff"] = BenchmarkGroup()
 linear["FiniteDiff"]["forward"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = linear_state(FiniteDiff(Float64, (BENCH_LINEAR_FD_N,), 1)))
@@ -356,8 +357,8 @@ linear["Zeros"] = BenchmarkGroup()
 linear["Zeros"]["forward"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = linear_state(Zeros(Float64, (BENCH_LINEAR_ZEROS_N,), Float64, (BENCH_LINEAR_ZEROS_N,))))
 
 linear["LMatrixOp"] = BenchmarkGroup()
-linear["LMatrixOp"]["forward"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = linear_state(LMatrixOp(randn(make_rng(), BENCH_LINEAR_LMATRIX_N), BENCH_LINEAR_LMATRIX_N)))
-linear["LMatrixOp"]["adjoint"] = @benchmarkable mul!(state.z, state.adj, state.y) setup = (state = linear_state(LMatrixOp(randn(make_rng(), BENCH_LINEAR_LMATRIX_N), BENCH_LINEAR_LMATRIX_N)))
+linear["LMatrixOp"]["forward"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = linear_state(LMatrixOp(randn(BENCH_LINEAR_LMATRIX_N), BENCH_LINEAR_LMATRIX_N)))
+linear["LMatrixOp"]["adjoint"] = @benchmarkable mul!(state.z, state.adj, state.y) setup = (state = linear_state(LMatrixOp(randn(BENCH_LINEAR_LMATRIX_N), BENCH_LINEAR_LMATRIX_N)))
 
 linear["MyLinOp"] = BenchmarkGroup()
 linear["MyLinOp"]["forward"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = mylinop_state())
@@ -368,8 +369,8 @@ linear["LBFGS"]["update"] = @benchmarkable update!(state.op, state.x, state.x_pr
 linear["LBFGS"]["mul"] = @benchmarkable mul!(state.d, state.op, state.grad) setup = (state = lbfgs_mul_state())
 
 calculus["Compose"] = BenchmarkGroup()
-calculus["Compose"]["forward"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = linear_state(Compose(DiagOp(randn(make_rng(), BENCH_CALC_N)), Eye(Float64, (BENCH_CALC_N,)))))
-calculus["Compose"]["adjoint"] = @benchmarkable mul!(state.z, state.adj, state.y) setup = (state = linear_state(Compose(DiagOp(randn(make_rng(), BENCH_CALC_N)), Eye(Float64, (BENCH_CALC_N,)))))
+calculus["Compose"]["forward"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = linear_state(Compose(DiagOp(randn(BENCH_CALC_N)), Eye(Float64, (BENCH_CALC_N,)))))
+calculus["Compose"]["adjoint"] = @benchmarkable mul!(state.z, state.adj, state.y) setup = (state = linear_state(Compose(DiagOp(randn(BENCH_CALC_N)), Eye(Float64, (BENCH_CALC_N,)))))
 
 calculus["Reshape"] = BenchmarkGroup()
 calculus["Reshape"]["forward"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = linear_state(Reshape(Eye(Float64, (BENCH_CALC_N,)), BENCH_CALC_2D...)))
@@ -380,8 +381,8 @@ calculus["Scale"]["forward"] = @benchmarkable mul!(state.y, state.op, state.x) s
 calculus["Scale"]["adjoint"] = @benchmarkable mul!(state.z, state.adj, state.y) setup = (state = linear_state(Scale(2.0, Eye(Float64, (BENCH_CALC_N,)))))
 
 calculus["Sum"] = BenchmarkGroup()
-calculus["Sum"]["forward"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = linear_state(Sum(Eye(Float64, (BENCH_CALC_N,)), DiagOp(randn(make_rng(), BENCH_CALC_N)))))
-calculus["Sum"]["adjoint"] = @benchmarkable mul!(state.z, state.adj, state.y) setup = (state = linear_state(Sum(Eye(Float64, (BENCH_CALC_N,)), DiagOp(randn(make_rng(), BENCH_CALC_N)))))
+calculus["Sum"]["forward"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = linear_state(Sum(Eye(Float64, (BENCH_CALC_N,)), DiagOp(randn(BENCH_CALC_N)))))
+calculus["Sum"]["adjoint"] = @benchmarkable mul!(state.z, state.adj, state.y) setup = (state = linear_state(Sum(Eye(Float64, (BENCH_CALC_N,)), DiagOp(randn(BENCH_CALC_N)))))
 
 calculus["HCAT"] = BenchmarkGroup()
 calculus["HCAT"]["forward"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = hcat_state())
@@ -400,11 +401,11 @@ calculus["BroadCast"]["identity-single"] = @benchmarkable mul!(state.y, state.op
 if Threads.nthreads() > 2
     calculus["BroadCast"]["identity-threaded"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = linear_state(BroadCast(Eye(Float64, (BENCH_CALC_N,)), (BENCH_CALC_N, 8); threaded = true)))
 end
-calculus["BroadCast"]["operator-single-forward"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = linear_state(BroadCast(DiagOp(randn(make_rng(), 256)), (256, 8); threaded = false)))
-calculus["BroadCast"]["operator-single-adjoint"] = @benchmarkable mul!(state.z, state.adj, state.y) setup = (state = linear_state(BroadCast(DiagOp(randn(make_rng(), 256)), (256, 8); threaded = false)))
+calculus["BroadCast"]["operator-single-forward"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = linear_state(BroadCast(DiagOp(randn(256)), (256, 8); threaded = false)))
+calculus["BroadCast"]["operator-single-adjoint"] = @benchmarkable mul!(state.z, state.adj, state.y) setup = (state = linear_state(BroadCast(DiagOp(randn(256)), (256, 8); threaded = false)))
 if Threads.nthreads() > 2
-    calculus["BroadCast"]["operator-threaded-forward"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = linear_state(BroadCast(DiagOp(randn(make_rng(), 256)), (256, 8); threaded = true)))
-    calculus["BroadCast"]["operator-threaded-adjoint"] = @benchmarkable mul!(state.z, state.adj, state.y) setup = (state = linear_state(BroadCast(DiagOp(randn(make_rng(), 256)), (256, 8); threaded = true)))
+    calculus["BroadCast"]["operator-threaded-forward"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = linear_state(BroadCast(DiagOp(randn(256)), (256, 8); threaded = true)))
+    calculus["BroadCast"]["operator-threaded-adjoint"] = @benchmarkable mul!(state.z, state.adj, state.y) setup = (state = linear_state(BroadCast(DiagOp(randn(256)), (256, 8); threaded = true)))
 end
 
 calculus["AffineAdd"] = BenchmarkGroup()
@@ -443,8 +444,12 @@ for (name, builder, positive) in [
         ("SoftPlus", () -> SoftPlus(Float64, (BENCH_NONLIN_N["SoftPlus"],)), false),
     ]
     nonlinear[name] = BenchmarkGroup()
-    nonlinear[name]["forward"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = nonlinear_state($builder(); positive = $positive))
-    nonlinear[name]["jacobian-adjoint"] = @benchmarkable mul!(state.y, state.adj, state.b) setup = (state = jacobian_state($builder(); positive = $positive))
+    nonlinear[name]["forward"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (
+        state = nonlinear_state($builder(); positive = ($positive))
+    )
+    nonlinear[name]["jacobian-adjoint"] = @benchmarkable mul!(state.y, state.adj, state.b) setup = (
+        state = jacobian_state($builder(); positive = ($positive))
+    )
 end
 
 batching["SimpleBatchOp"] = BenchmarkGroup()
@@ -461,8 +466,12 @@ batching["SpreadingBatchOp"]["adjoint-single"] = @benchmarkable mul!(state.z, st
 if Threads.nthreads() > 2
     for strategy in (ThreadingStrategy.COPYING, ThreadingStrategy.LOCKING, ThreadingStrategy.FIXED_OPERATOR)
         strategy_name = String(Symbol(strategy))
-        batching["SpreadingBatchOp"]["forward-$(strategy_name)"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = spreading_batch_state(true; strategy = $strategy))
-        batching["SpreadingBatchOp"]["adjoint-$(strategy_name)"] = @benchmarkable mul!(state.z, state.adj, state.y) setup = (state = spreading_batch_state(true; strategy = $strategy))
+        batching["SpreadingBatchOp"]["forward-$(strategy_name)"] = @benchmarkable mul!(
+            state.y, state.op, state.x
+        ) setup = (state = spreading_batch_state(true; strategy = ($strategy)))
+        batching["SpreadingBatchOp"]["adjoint-$(strategy_name)"] = @benchmarkable mul!(
+            state.z, state.adj, state.y
+        ) setup = (state = spreading_batch_state(true; strategy = ($strategy)))
     end
 end
 
@@ -499,7 +508,7 @@ if HAS_WAVELET
 end
 
 normal["DiagOp"] = BenchmarkGroup()
-normal["DiagOp"]["mul"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = normal_state(DiagOp(randn(make_rng(), BENCH_LINEAR_DIAG_N); threaded = false)))
+normal["DiagOp"]["mul"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = normal_state(DiagOp(randn(BENCH_LINEAR_DIAG_N); threaded = false)))
 
 if HAS_FFTW
     normal["DFT"] = BenchmarkGroup()

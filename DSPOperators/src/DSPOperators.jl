@@ -1,7 +1,7 @@
 module DSPOperators
 
 using AbstractOperators, FFTW
-import AbstractFFTs
+using AbstractFFTs: AbstractFFTs
 import LinearAlgebra: mul!
 import Base: size, ndims
 
@@ -18,12 +18,6 @@ import AbstractOperators:
     is_full_column_rank,
     is_full_row_rank,
     is_thread_safe
-
-# Capture AbstractFFTs generic functions for use in package extensions.
-# Extensions cannot directly `import AbstractFFTs` (it's a dep of this package, not the extension),
-# but they can access these via `import DSPOperators: _rfft, _irfft`.
-const _rfft = rfft
-const _irfft = irfft
 
 include("Conv.jl")
 include("Filt.jl")

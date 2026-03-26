@@ -72,7 +72,7 @@ function NFFTOp(
         kwargs...,
     ) where {T, D}
     check_traj_and_dcf(trajectory, dcf, D)
-    arr_wrapper = AbstractOperators._array_wrapper_type(array_type)
+    arr_wrapper = _array_wrapper_type(array_type)
     plan = _nfft_plan(arr_wrapper, trajectory, image_size, threaded; kwargs...)
     ksp_shape = size(trajectory)[2:end]
     ksp_buffer = _nfft_adapt(arr_wrapper, zeros(complex(T), ksp_shape...))
@@ -91,7 +91,7 @@ function NFFTOp(
         kwargs...,
     ) where {T, D}
     check_traj(trajectory, D)
-    arr_wrapper = AbstractOperators._array_wrapper_type(array_type)
+    arr_wrapper = _array_wrapper_type(array_type)
     plan = _nfft_plan(arr_wrapper, trajectory, image_size, threaded; kwargs...)
     ksp_shape = size(trajectory)[2:end]
     ksp_buffer = _nfft_adapt(arr_wrapper, zeros(complex(T), ksp_shape...))
@@ -103,8 +103,9 @@ function NFFTOp(
 end
 
 # Default (CPU) implementations — overridden by NFFTOperatorsGPUArraysExt for GPU types
-_nfft_plan(::Type{Array}, trajectory, image_size, threaded; kwargs...) =
-    create_plan(trajectory, image_size, threaded; kwargs...)
+function _nfft_plan(::Type{Array}, trajectory, image_size, threaded; kwargs...)
+    return create_plan(trajectory, image_size, threaded; kwargs...)
+end
 _nfft_adapt(::Type{Array}, arr::AbstractArray) = collect(arr)
 
 function set_nfft_threading_expr(threading_state_expr, thread_count_expr, body_expr)

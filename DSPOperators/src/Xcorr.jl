@@ -97,7 +97,7 @@ Xcorr(x::H, h::H) where {H} = Xcorr(eltype(x), size(x), h)
 
 # Mappings
 
-function mul!(y, A::Xcorr{T}, b) where T
+function mul!(y, A::Xcorr{T}, b) where {T}
     check(y, A, b)
     n = length(b)
     # Forward: xcorr(b, h; padmode=:longest)
@@ -117,7 +117,7 @@ function mul!(y, A::Xcorr{T}, b) where T
     return y
 end
 
-function mul!(y, L::AdjointOperator{<:Xcorr{T}}, b) where T
+function mul!(y, L::AdjointOperator{<:Xcorr{T}}, b) where {T}
     check(y, L, b)
     A = L.A
     # Adjoint: y .= conv(b, A.h)[idx] where idx = (l+1):(l+length(y))

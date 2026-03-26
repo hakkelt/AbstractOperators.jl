@@ -1,5 +1,7 @@
 export MIMOFilt
 
+abstract type AbstractMIMOFilt{T, S <: AbstractArray} <: LinearOperator end
+
 """
 	MIMOFilt([domain_type=Float64::Type,] dim_in::Tuple, B::Vector{AbstractVector}, [A::Vector{AbstractVector},])
 
@@ -52,7 +54,7 @@ true
 	
 ```
 """
-struct MIMOFilt{T, A <: AbstractVector{T}} <: LinearOperator
+struct MIMOFilt{T, A <: AbstractVector{T}} <: AbstractMIMOFilt{T, Array{T}}
     dim_out::Tuple{Int, Int}
     dim_in::Tuple{Int, Int}
     B::Vector{A}
@@ -148,7 +150,7 @@ function mul!(y::AbstractArray, L::MIMOFilt, x::AbstractArray)
         end
         cx = 0
     end
-    return
+    return nothing
 end
 
 function mul!(y::AbstractArray, M::AdjointOperator{<:MIMOFilt}, x::AbstractArray)
@@ -177,23 +179,25 @@ function mul!(y::AbstractArray, M::AdjointOperator{<:MIMOFilt}, x::AbstractArray
         end
         cx = 0
     end
-    return
+    return nothing
 end
 
 # Properties
 
-domain_type(::MIMOFilt{T}) where {T} = T
-codomain_type(::MIMOFilt{T}) where {T} = T
-is_thread_safe(::MIMOFilt) = false
+domain_type(::AbstractMIMOFilt{T}) where {T} = T
+codomain_type(::AbstractMIMOFilt{T}) where {T} = T
+domain_storage_type(::AbstractMIMOFilt{T, S}) where {T, S} = S
+codomain_storage_type(::AbstractMIMOFilt{T, S}) where {T, S} = S
+is_thread_safe(::AbstractMIMOFilt) = false
 
-size(L::MIMOFilt) = L.dim_out, L.dim_in
+size(L::AbstractMIMOFilt) = L.dim_out, L.dim_in
 
 #TODO find out a way to verify this,
 # probably for IIR it means zeros inside unit circle
-is_full_row_rank(L::MIMOFilt) = true
-is_full_column_rank(L::MIMOFilt) = true
+is_full_row_rank(::AbstractMIMOFilt) = true
+is_full_column_rank(::AbstractMIMOFilt) = true
 
-fun_name(L::MIMOFilt) = "※"
+fun_name(::AbstractMIMOFilt) = "※"
 
 # Utilities
 
@@ -209,7 +213,7 @@ function add_iir!(y, b, a, x, si, coly, colx)
         y[i, coly] += val
     end
     si .= 0.0 #reset state
-    return
+    return nothing
 end
 
 function add_iir_rev!(y, b, a, x, si, coly, colx)
@@ -224,7 +228,7 @@ function add_iir_rev!(y, b, a, x, si, coly, colx)
         y[i, coly] += val
     end
     si .= 0.0
-    return
+    return nothing
 end
 
 function add_fir!(y, b, x, si, coly, colx)
@@ -239,7 +243,7 @@ function add_fir!(y, b, x, si, coly, colx)
         y[i, coly] += val
     end
     si .= 0.0
-    return
+    return nothing
 end
 
 function add_fir_rev!(y, b, x, si, coly, colx)
@@ -254,5 +258,5 @@ function add_fir_rev!(y, b, x, si, coly, colx)
         y[i, coly] += val
     end
     si .= 0.0
-    return
+    return nothing
 end
