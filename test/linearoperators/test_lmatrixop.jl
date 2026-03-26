@@ -135,7 +135,10 @@ end
     @test is_full_column_rank(op) == false
 
     # Show output symbol
-    io = IOBuffer(); show(io, op_vec); s = String(take!(io)); @test occursin("(⋅)b", s)
+    io = IOBuffer()
+    show(io, op_vec)
+    s = String(take!(io))
+    @test occursin("(⋅)b", s)
 end
 
 @testitem "LMatrixOp (JLArray)" tags = [:linearoperator, :LMatrixOp, :gpu, :jlarray] setup=[TestUtils] begin
@@ -145,4 +148,30 @@ end
     b = jl(randn(m))
     op = LMatrixOp(Float64, (n, m), b)
     test_op(op, jl(randn(n, m)), jl(randn(n)), false)
+end
+
+@testitem "LMatrixOp (CUDA)" tags = [:gpu, :cuda, :linearoperator, :LMatrixOp] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    using CUDA
+    if CUDA.functional()
+        Random.seed!(0)
+        n, m = 5, 6
+        b = CuArray(randn(m))
+        op = LMatrixOp(Float64, (n, m), b)
+        test_op(op, CuArray(randn(n, m)), CuArray(randn(n)), false)
+    end
+end
+
+@testitem "LMatrixOp (AMDGPU)" tags = [:gpu, :amdgpu, :linearoperator, :LMatrixOp] setup = [
+    TestUtils,
+] begin
+    using Random, AbstractOperators
+    using AMDGPU
+    if AMDGPU.functional()
+        Random.seed!(0)
+        n, m = 5, 6
+        b = AMDGPU.ROCArray(randn(m))
+        op = LMatrixOp(Float64, (n, m), b)
+        test_op(op, AMDGPU.ROCArray(randn(n, m)), AMDGPU.ROCArray(randn(n)), false)
+    end
 end

@@ -51,8 +51,9 @@ function FiniteDiff(
     return FiniteDiff(domain_type, dim_in, Val(dir); array_type)
 end
 
-FiniteDiff(dim_in::NTuple{N, Int}, dir::Int; array_type::Type = Array{Float64}) where {N} =
-    FiniteDiff(Float64, dim_in, Val(dir); array_type)
+function FiniteDiff(dim_in::NTuple{N, Int}, dir::Int; array_type::Type = Array{Float64}) where {N}
+    return FiniteDiff(Float64, dim_in, Val(dir); array_type)
+end
 
 function FiniteDiff(x::AbstractArray{T, N}, dir::Int = 1) where {T, N}
     S = _normalize_array_type(_array_wrapper(x), T)

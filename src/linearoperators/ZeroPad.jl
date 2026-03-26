@@ -34,13 +34,17 @@ function ZeroPad(
     return ZeroPad{N, T, S}(dim_in, zp)
 end
 
-ZeroPad(dim_in::Tuple, zp::NTuple{N, Int}; array_type::Type = Array{Float64}) where {N} =
-    ZeroPad(Float64, dim_in, zp; array_type)
-function ZeroPad(domain_type::Type{T}, dim_in::Tuple, zp::Vararg{Int, N}; array_type::Type = Array{T}) where {T, N}
+function ZeroPad(dim_in::Tuple, zp::NTuple{N, Int}; array_type::Type = Array{Float64}) where {N}
+    return ZeroPad(Float64, dim_in, zp; array_type)
+end
+function ZeroPad(
+        domain_type::Type{T}, dim_in::Tuple, zp::Vararg{Int, N}; array_type::Type = Array{T}
+    ) where {T, N}
     return ZeroPad(domain_type, dim_in, zp; array_type)
 end
-ZeroPad(dim_in::Tuple, zp::Vararg{Int, N}; array_type::Type = Array{Float64}) where {N} =
-    ZeroPad(Float64, dim_in, zp; array_type)
+function ZeroPad(dim_in::Tuple, zp::Vararg{Int, N}; array_type::Type = Array{Float64}) where {N}
+    return ZeroPad(Float64, dim_in, zp; array_type)
+end
 function ZeroPad(x::AbstractArray{T}, zp::NTuple{N, Int}) where {T, N}
     S = _normalize_array_type(_array_wrapper(x), T)
     return ZeroPad{N, T, S}(size(x), zp)
@@ -65,7 +69,11 @@ end
     # Wrap in nested for loops: outermost=dim N, innermost=dim 1 (column-major)
     body = assign
     for i in 1:N
-        body = :(for $(vars[i]) in 1:size(y, $i); $body; end)
+        body = :(
+            for $(vars[i]) in 1:size(y, $i)
+                ;$body
+            end
+        )
     end
     return quote
         check(y, L, b)

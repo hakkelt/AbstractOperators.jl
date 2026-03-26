@@ -95,7 +95,7 @@ end
         verb && println("  - threaded = $threaded")
         V = Variation(Float64, (n, m); threaded)
         Y = randn(n * m, 2)
-        lhs = dot(V * x_test |> vec, vec(Y))  # vec(Vx) ⋅ vec(Y)
+        lhs = dot(vec(V * x_test), vec(Y))  # vec(Vx) ⋅ vec(Y)
         z = zeros(n, m)
         mul!(z, V', Y)
         rhs = dot(vec(x_test), vec(z))
@@ -115,7 +115,10 @@ end
         @test_throws ErrorException Scale(1 + 2im, V)
 
         # Show output symbol
-        io = IOBuffer(); show(io, V); s = String(take!(io)); @test occursin("Ʋ", s)
+        io = IOBuffer()
+        show(io, V)
+        s = String(take!(io))
+        @test occursin("Ʋ", s)
 
         ###properties
         @test is_linear(op) == true
@@ -137,4 +140,29 @@ end
     n, m = 10, 5
     op = Variation(jl(zeros(Float64, n, m)); threaded = false)
     test_op(op, jl(randn(n, m)), jl(randn(n * m, 2)), false)
+end
+
+@testitem "Variation (CUDA)" tags = [:gpu, :cuda, :linearoperator, :Variation] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    using CUDA: CuArray
+    using CUDA
+    if CUDA.functional()
+        Random.seed!(0)
+        n, m = 10, 5
+        op = Variation(CUDA.zeros(Float64, n, m); threaded = false)
+        test_op(op, CuArray(randn(n, m)), CuArray(randn(n * m, 2)), false)
+    end
+end
+
+@testitem "Variation (AMDGPU)" tags = [:gpu, :amdgpu, :linearoperator, :Variation] setup = [
+    TestUtils,
+] begin
+    using Random, AbstractOperators
+    using AMDGPU
+    if AMDGPU.functional()
+        Random.seed!(0)
+        n, m = 10, 5
+        op = Variation(AMDGPU.zeros(Float64, n, m); threaded = false)
+        test_op(op, AMDGPU.ROCArray(randn(n, m)), AMDGPU.ROCArray(randn(n * m, 2)), false)
+    end
 end

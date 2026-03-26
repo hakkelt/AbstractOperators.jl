@@ -319,8 +319,23 @@ function guess_optimal_threading_strategy(operators, batch_size)
     copied_ops_size = Base.summarysize(operators) * min(nthreads(), prod(batch_size))
     domain_array_size = sizeof(domain_type(operators[1])) * prod(size(operators[1], 2))
     codomain_array_size = sizeof(codomain_type(operators[1])) * prod(size(operators[1], 1))
-    if copied_ops_size < 10.0e6 ||
-            copied_ops_size < max(domain_array_size, codomain_array_size) * 2 #= 10MB =#
+    if copied_ops_size < 10.0e6 || copied_ops_size < max(domain_array_size, codomain_array_size) * 2
+        # Public constructors
+
+        # Public constructors
+
+        # Public constructors
+
+        #= 10MB =#
+
+        # Public constructors
+
+        # Public constructors
+
+        # Public constructors
+
+        # Public constructors
+
         threading_strategy = ThreadingStrategy.COPYING
     else
         threading_strategy = ThreadingStrategy.LOCKING
@@ -587,12 +602,12 @@ codomain_storage_type(L::SpreadingBatchOpFixedOperator) = codomain_storage_type(
 codomain_storage_type(L::SpreadingBatchOpCopying) = codomain_storage_type(L.operators[1][1])
 AbstractOperators._check_domain_storage(domain_array, ::SpreadingBatchOp) = nothing
 AbstractOperators._check_codomain_storage(codomain_array, ::SpreadingBatchOp) = nothing
-AbstractOperators._check_domain_storage(
-    domain_array::ArrayPartition, ::SpreadingBatchOp
-) = nothing
-AbstractOperators._check_codomain_storage(
+AbstractOperators._check_domain_storage(domain_array::ArrayPartition, ::SpreadingBatchOp) = nothing
+function AbstractOperators._check_codomain_storage(
     codomain_array::ArrayPartition, ::SpreadingBatchOp
-) = nothing
+    )
+    return nothing
+end
 
 is_linear(L::SpreadingBatchOp) = is_linear(L.operators[1])
 is_linear(L::SpreadingBatchOpCopying) = is_linear(L.operators[1][1])

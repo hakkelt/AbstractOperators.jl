@@ -20,10 +20,10 @@ function Tanh(
     return Tanh{T, N, S}(DomainDim)
 end
 
-Tanh(DomainDim::NTuple{N, Int}; array_type::Type = Array{Float64}) where {N} =
-    Tanh(Float64, DomainDim; array_type)
-Tanh(DomainDim::Vararg{Int}; array_type::Type = Array{Float64}) =
-    Tanh(Float64, DomainDim; array_type)
+function Tanh(DomainDim::NTuple{N, Int}; array_type::Type = Array{Float64}) where {N}
+    return Tanh(Float64, DomainDim; array_type)
+end
+Tanh(DomainDim::Vararg{Int}; array_type::Type = Array{Float64}) = Tanh(Float64, DomainDim; array_type)
 
 function Tanh(x::AbstractArray{T}; array_type::Type = _array_wrapper(x)) where {T}
     S = _normalize_array_type(array_type, T)

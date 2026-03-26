@@ -62,9 +62,11 @@ function DiagOp(
     S = _normalize_array_type(array_type, T)
     return DiagOp{B, eltype(d), C, N, S, S, typeof(d)}(size(d), d)
 end
-DiagOp(domain_dim::NTuple{N, Int}, d::A; threaded::Bool = true, array_type::Type = Array{Float64}) where {N, A <: Number} =
-    DiagOp(Float64, domain_dim, d; threaded, array_type)
-
+function DiagOp(
+        domain_dim::NTuple{N, Int}, d::A; threaded::Bool = true, array_type::Type = Array{Float64}
+    ) where {N, A <: Number}
+    return DiagOp(Float64, domain_dim, d; threaded, array_type)
+end
 
 # scale of DiagOp
 function Scale(coeff::T, L::DiagOp{B, D, C, N, dS, cS}) where {T <: Number, B, D, C, N, dS, cS}

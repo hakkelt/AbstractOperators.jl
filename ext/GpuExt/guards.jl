@@ -5,15 +5,18 @@
 # GPU-GPU: delegate to the base check (handles ArrayPartition too)
 function check(y::AbstractGPUArray, A, b::AbstractGPUArray)
     invoke(AbstractOperators.check, Tuple{Any, Any, Any}, y, A, b)
+    return nothing
 end
 
 # ArrayPartition containers may hold GPU arrays — delegate to base check
 function check(y::AbstractGPUArray, A, b::ArrayPartition)
     invoke(AbstractOperators.check, Tuple{Any, Any, Any}, y, A, b)
+    return nothing
 end
 
 function check(y::ArrayPartition, A, b::AbstractGPUArray)
     invoke(AbstractOperators.check, Tuple{Any, Any, Any}, y, A, b)
+    return nothing
 end
 
 # GPU output + CPU input: error (plain arrays only, not ArrayPartition)

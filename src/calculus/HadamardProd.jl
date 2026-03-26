@@ -85,7 +85,9 @@ function mul!(y::AbstractArray, J::AdjointOperator{<:HadamardProdJac}, b::Abstra
 end
 
 # Properties
-Base.:(==)(P1::HadamardProd{L1, L2, C, D}, P2::HadamardProd{L1, L2, C, D}) where {L1, L2, C, D} = P1.A == P2.A && P1.B == P2.B
+function Base.:(==)(P1::HadamardProd{L1, L2, C, D}, P2::HadamardProd{L1, L2, C, D}) where {L1, L2, C, D}
+    return P1.A == P2.A && P1.B == P2.B
+end
 size(P::Union{HadamardProd, HadamardProdJac}) = (size(P.A, 1), size(P.A, 2))
 
 fun_name(L::Union{HadamardProd, HadamardProdJac}) = fun_name(L.A) * ".*" * fun_name(L.B)

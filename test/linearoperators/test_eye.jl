@@ -96,3 +96,24 @@ end
     test_eye_mul(jl, false, test_op, to_cpu, norm)
 end
 
+@testitem "Eye (CUDA)" tags = [:gpu, :cuda, :linearoperator, :Eye] setup = [
+    TestUtils, EyeTestHelper,
+] begin
+    using Random, AbstractOperators
+    using CUDA
+    if CUDA.functional()
+        Random.seed!(0)
+        test_eye_mul(CuArray, false, test_op, to_cpu, norm)
+    end
+end
+
+@testitem "Eye (AMDGPU)" tags = [:gpu, :amdgpu, :linearoperator, :Eye] setup = [
+    TestUtils, EyeTestHelper,
+] begin
+    using Random, AbstractOperators
+    using AMDGPU
+    if AMDGPU.functional()
+        Random.seed!(0)
+        test_eye_mul(AMDGPU.ROCArray, false, test_op, to_cpu, norm)
+    end
+end

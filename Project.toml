@@ -15,15 +15,17 @@ RecursiveArrayTools = "731186ca-8d62-57ce-b412-fbd966d074cd"
 
 [weakdeps]
 GPUArrays = "0c68f7d7-f131-5f86-a1c3-88cf8149b2d7"
+KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
 LinearMaps = "7a12625a-238d-50fd-b39a-03d52299707e"
 
 [extensions]
-GpuExt = "GPUArrays"
+GpuExt = ["GPUArrays", "KernelAbstractions"]
 LinearMapsExt = "LinearMaps"
 
 [compat]
 FastBroadcast = "0.3.5"
 GPUArrays = "10, 11"
+KernelAbstractions = "0.9"
 LinearAlgebra = "1"
 LinearMaps = "3.11.4"
 OperatorCore = "0.1"

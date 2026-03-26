@@ -20,7 +20,8 @@
 
     # complex matrix, real matrix input
     A = randn(n, m) + im * randn(n, m)
-    c = 3; op = MatrixOp(Float64, (m, c), A)
+    c = 3
+    op = MatrixOp(Float64, (m, c), A)
     x1 = randn(m, c)
     y1 = test_op(op, x1, randn(n, c) .+ im .* randn(n, c), verb)
     @test all(norm.(y1 .- A * x1) .<= 1.0e-12)
@@ -49,7 +50,9 @@ end
     using Random, LinearAlgebra, AbstractOperators
     Random.seed!(0)
 
-    n, m = 5, 4; A = randn(n, m) + im * randn(n, m); c = 3
+    n, m = 5, 4
+    A = randn(n, m) + im * randn(n, m)
+    c = 3
     op = MatrixOp(Float64, (m, c), A)
     @test is_sliced(op) == false
     @test is_linear(op) == true
@@ -63,13 +66,16 @@ end
     @test is_full_row_rank(MatrixOp(randn(Random.seed!(0), 3, 4))) == true
     @test is_full_column_rank(MatrixOp(randn(Random.seed!(0), 3, 4))) == false
 
-    B = randn(4, 4); invop = MatrixOp(Float64, (4,), B)
+    B = randn(4, 4)
+    invop = MatrixOp(Float64, (4,), B)
     @test is_invertible(invop) == (det(B) != 0)
 
-    Q, _ = qr(randn(5, 5)); Qmat = Matrix(Q)
+    Q, _ = qr(randn(5, 5))
+    Qmat = Matrix(Q)
     @test is_orthogonal(MatrixOp(Float64, (5,), Qmat)) == true
 
-    D = diagm(0 => randn(5)); Dop = MatrixOp(Float64, (5,), D)
+    D = diagm(0 => randn(5))
+    Dop = MatrixOp(Float64, (5,), D)
     @test is_diagonal(Dop) == true
     @test is_AcA_diagonal(Dop) == true
     @test is_AAc_diagonal(Dop) == true
@@ -79,12 +85,17 @@ end
     using Random, LinearAlgebra, AbstractOperators
     Random.seed!(0)
 
-    Q, _ = qr(randn(5, 5)); Qmat = Matrix(Q)
+    Q, _ = qr(randn(5, 5))
+    Qmat = Matrix(Q)
     Qop = MatrixOp(Float64, (5,), Qmat)
-    xvec = randn(5); yvec = zeros(5)
-    mul!(yvec, Qop, xvec); @test yvec ≈ Qmat * xvec
-    Xmat = randn(5, 3); Ymat = zeros(5, 3)
-    mul!(Ymat, Qop, Xmat); @test Ymat ≈ Qmat * Xmat
+    xvec = randn(5)
+    yvec = zeros(5)
+    mul!(yvec, Qop, xvec)
+    @test yvec ≈ Qmat * xvec
+    Xmat = randn(5, 3)
+    Ymat = zeros(5, 3)
+    mul!(Ymat, Qop, Xmat)
+    @test Ymat ≈ Qmat * Xmat
 
     Cmat = randn(3, 3) + im * randn(3, 3)
     Cop = MatrixOp(Float64, (3,), Cmat)
@@ -106,4 +117,45 @@ end
     test_op(MatrixOp(jl(A)), jl(randn(m)), jl(randn(n)), false)
     Ac = randn(n, m) + im * randn(n, m)
     test_op(MatrixOp(jl(Ac)), jl(randn(m) + im * randn(m)), jl(randn(n) + im * randn(n)), false)
+end
+
+@testitem "MatrixOp (CUDA)" tags = [:gpu, :cuda, :linearoperator, :MatrixOp] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    using CUDA
+    if CUDA.functional()
+        Random.seed!(0)
+        n, m = 5, 4
+        A = randn(n, m)
+        test_op(MatrixOp(CuArray(A)), CuArray(randn(m)), CuArray(randn(n)), false)
+        Ac = randn(n, m) + im * randn(n, m)
+        test_op(
+            MatrixOp(CuArray(Ac)),
+            CuArray(randn(m) + im * randn(m)),
+            CuArray(randn(n) + im * randn(n)),
+            false,
+        )
+    end
+end
+
+@testitem "MatrixOp (AMDGPU)" tags = [:gpu, :amdgpu, :linearoperator, :MatrixOp] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    using AMDGPU
+    if AMDGPU.functional()
+        Random.seed!(0)
+        n, m = 5, 4
+        A = randn(n, m)
+        test_op(
+            MatrixOp(AMDGPU.ROCArray(A)),
+            AMDGPU.ROCArray(randn(m)),
+            AMDGPU.ROCArray(randn(n)),
+            false,
+        )
+        Ac = randn(n, m) + im * randn(n, m)
+        test_op(
+            MatrixOp(AMDGPU.ROCArray(Ac)),
+            AMDGPU.ROCArray(randn(m) + im * randn(m)),
+            AMDGPU.ROCArray(randn(n) + im * randn(n)),
+            false,
+        )
+    end
 end

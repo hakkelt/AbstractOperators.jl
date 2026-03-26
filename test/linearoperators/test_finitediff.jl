@@ -67,14 +67,23 @@ end
     @test is_full_row_rank(op) == true
     @test is_full_column_rank(op) == false
 
-    n = 6; F = FiniteDiff(Float64, (n,)); g = randn(n - 1)
-    x = randn(n); lhs = dot(F * x, g)
-    tmp = zeros(n); mul!(tmp, F', g); rhs = dot(x, tmp)
+    n = 6
+    F = FiniteDiff(Float64, (n,))
+    g = randn(n - 1)
+    x = randn(n)
+    lhs = dot(F * x, g)
+    tmp = zeros(n)
+    mul!(tmp, F', g)
+    rhs = dot(x, tmp)
     @test lhs ≈ rhs atol = 1.0e-10
 
-    io = IOBuffer(); show(io, F); @test occursin("δx", String(take!(io)))
+    io = IOBuffer()
+    show(io, F)
+    @test occursin("δx", String(take!(io)))
     Fy = FiniteDiff(Float64, (3, 4), 2)
-    io = IOBuffer(); show(io, Fy); @test occursin("δy", String(take!(io)))
+    io = IOBuffer()
+    show(io, Fy)
+    @test occursin("δy", String(take!(io)))
     @test size(FiniteDiff(Float64, (3, 4, 5), 2)) == ((3, 3, 5), (3, 4, 5))
 end
 
@@ -82,4 +91,26 @@ end
     using Random, AbstractOperators, JLArrays
     Random.seed!(0)
     test_finitediff_mul(jl, false, test_op)
+end
+
+@testitem "FiniteDiff (CUDA)" tags = [:gpu, :cuda, :linearoperator, :FiniteDiff] setup = [
+    TestUtils, FiniteDiffTestHelper,
+] begin
+    using Random, AbstractOperators
+    using CUDA
+    if CUDA.functional()
+        Random.seed!(0)
+        test_finitediff_mul(CuArray, false, test_op)
+    end
+end
+
+@testitem "FiniteDiff (AMDGPU)" tags = [:gpu, :amdgpu, :linearoperator, :FiniteDiff] setup = [
+    TestUtils, FiniteDiffTestHelper,
+] begin
+    using Random, AbstractOperators
+    using AMDGPU
+    if AMDGPU.functional()
+        Random.seed!(0)
+        test_finitediff_mul(AMDGPU.ROCArray, false, test_op)
+    end
 end

@@ -57,7 +57,9 @@ has_optimized_normalop(R::Reshape) = true
 get_normal_op(R::Reshape) = get_normal_op(R.A)
 
 # Properties
-Base.:(==)(R1::Reshape{N, L}, R2::Reshape{N, L}) where {N, L} = R1.A == R2.A && R1.dim_out == R2.dim_out
+function Base.:(==)(R1::Reshape{N, L}, R2::Reshape{N, L}) where {N, L}
+    return R1.A == R2.A && R1.dim_out == R2.dim_out
+end
 size(R::Reshape) = (R.dim_out, size(R.A, 2))
 
 domain_type(R::Reshape) = domain_type(R.A)

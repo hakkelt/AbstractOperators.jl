@@ -20,10 +20,10 @@ function Exp(
     return Exp{T, N, S}(DomainDim)
 end
 
-Exp(DomainDim::NTuple{N, Int}; array_type::Type = Array{Float64}) where {N} =
-    Exp(Float64, DomainDim; array_type)
-Exp(DomainDim::Vararg{Int}; array_type::Type = Array{Float64}) =
-    Exp(Float64, DomainDim; array_type)
+function Exp(DomainDim::NTuple{N, Int}; array_type::Type = Array{Float64}) where {N}
+    return Exp(Float64, DomainDim; array_type)
+end
+Exp(DomainDim::Vararg{Int}; array_type::Type = Array{Float64}) = Exp(Float64, DomainDim; array_type)
 
 function Exp(x::AbstractArray{T}; array_type::Type = _array_wrapper(x)) where {T}
     S = _normalize_array_type(array_type, T)

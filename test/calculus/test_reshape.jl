@@ -48,7 +48,9 @@ end
     @test norm(y1 - y2) <= 1.0e-12
 
     # fun_name / storage / thread safety / idempotent remove
-    io = IOBuffer(); show(io, opR); s = String(take!(io))
+    io = IOBuffer()
+    show(io, opR)
+    s = String(take!(io))
     @test length(s) > 0
     _dst = domain_storage_type(opR)
     _cst = codomain_storage_type(opR)
@@ -170,11 +172,14 @@ end
     @test lhs ≈ rhs
 
     # fun_name via show should start with paragraph symbol
-    io = IOBuffer(); show(io, Rf); sR = String(take!(io))
+    io = IOBuffer()
+    show(io, Rf)
+    sR = String(take!(io))
     @test occursin("¶", sR)
 
     # has_optimized_normalop + get_normal_op passthrough (using GetIndex which has optimized normal)
-    nGI = 10; kGI = 7
+    nGI = 10
+    kGI = 7
     GI = GetIndex(Float64, (nGI,), (1:kGI,))  # sliced operator returning size kGI
     RG = Reshape(GI, (kGI, 1))
     normal_RG = AbstractOperators.get_normal_op(RG)
@@ -194,12 +199,15 @@ end
     verb && println(" --- Testing Reshape: permute and nonlinear --- ")
 
     # permute domain ordering (wrap HCAT to get multi-domain) and ensure same behavior when inputs permuted
-    mH = 6; n1 = 3; n2 = 5
+    mH = 6
+    n1 = 3
+    n2 = 5
     A1p = MatrixOp(randn(mH, n1))
     A2p = MatrixOp(randn(mH, n2))
     H = HCAT(A1p, A2p)
     RH = Reshape(H, (2, 3))  # 6 = 2*3
-    x1p = randn(n1); x2p = randn(n2)
+    x1p = randn(n1)
+    x2p = randn(n2)
     y_orig = RH * ArrayPartition(x1p, x2p)
     p = [2, 1]
     RHp = AbstractOperators.permute(RH, p)
@@ -247,4 +255,40 @@ end
     n2 = 6
     opR2 = Reshape(DiagOp(jl(randn(n2))), (2, 3))
     test_op(opR2, jl(randn(n2)), jl(randn(2, 3)), false)
+end
+
+@testitem "Reshape (CUDA)" tags = [:gpu, :cuda, :calculus, :Reshape] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    using CUDA
+    if CUDA.functional()
+        Random.seed!(0)
+
+        m, n = 8, 4
+        dim_out = (2, 2, 2)
+        A1 = CuArray(randn(m, n))
+        opR = Reshape(MatrixOp(A1), dim_out)
+        test_op(opR, CuArray(randn(n)), CuArray(randn(dim_out)), false)
+
+        n2 = 6
+        opR2 = Reshape(DiagOp(CuArray(randn(n2))), (2, 3))
+        test_op(opR2, CuArray(randn(n2)), CuArray(randn(2, 3)), false)
+    end
+end
+
+@testitem "Reshape (AMDGPU)" tags = [:gpu, :amdgpu, :calculus, :Reshape] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    using AMDGPU
+    if AMDGPU.functional()
+        Random.seed!(0)
+
+        m, n = 8, 4
+        dim_out = (2, 2, 2)
+        A1 = AMDGPU.ROCArray(randn(m, n))
+        opR = Reshape(MatrixOp(A1), dim_out)
+        test_op(opR, AMDGPU.ROCArray(randn(n)), AMDGPU.ROCArray(randn(dim_out)), false)
+
+        n2 = 6
+        opR2 = Reshape(DiagOp(AMDGPU.ROCArray(randn(n2))), (2, 3))
+        test_op(opR2, AMDGPU.ROCArray(randn(n2)), AMDGPU.ROCArray(randn(2, 3)), false)
+    end
 end

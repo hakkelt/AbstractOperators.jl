@@ -20,8 +20,9 @@ function SoftPlus(
     return SoftPlus{T, N, S}(DomainDim)
 end
 
-SoftPlus(DomainDim::NTuple{N, Int}; array_type::Type = Array{Float64}) where {N} =
-    SoftPlus(Float64, DomainDim; array_type)
+function SoftPlus(DomainDim::NTuple{N, Int}; array_type::Type = Array{Float64}) where {N}
+    return SoftPlus(Float64, DomainDim; array_type)
+end
 
 function SoftPlus(x::AbstractArray{T}; array_type::Type = _array_wrapper(x)) where {T}
     S = _normalize_array_type(array_type, T)

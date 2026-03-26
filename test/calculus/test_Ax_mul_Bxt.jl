@@ -123,3 +123,35 @@ end
     r = jl(randn(n, n))
     test_NLop_gpu(P, x, r, false)
 end
+
+@testitem "Ax_mul_Bxt (CUDA)" tags = [:gpu, :cuda, :calculus, :Ax_mul_Bxt] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    using CUDA
+    if CUDA.functional()
+        Random.seed!(0)
+
+        n = 10
+        P = Ax_mul_Bxt(
+            Eye(Float64, (n,); array_type = CUDA.CuArray{Float64, 1}), Sin(CUDA.zeros(Float64, n))
+        )
+        x = CuArray(randn(n))
+        r = CuArray(randn(n, n))
+        test_NLop_gpu(P, x, r, false)
+    end
+end
+
+@testitem "Ax_mul_Bxt (AMDGPU)" tags = [:gpu, :amdgpu, :calculus, :Ax_mul_Bxt] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    using AMDGPU
+    if AMDGPU.functional()
+        Random.seed!(0)
+
+        n = 10
+        P = Ax_mul_Bxt(
+            Eye(Float64, (n,); array_type = AMDGPU.ROCArray{Float64, 1}), Sin(AMDGPU.zeros(Float64, n))
+        )
+        x = AMDGPU.ROCArray(randn(n))
+        r = AMDGPU.ROCArray(randn(n, n))
+        test_NLop_gpu(P, x, r, false)
+    end
+end

@@ -48,8 +48,9 @@ end
 Create a GPU-transparent wrapper around the CPU operator `op`, preallocating
 CPU buffers for domain and codomain arrays.
 """
-CpuOperatorWrapper(op::AbstractOperator) =
-    CpuOperatorWrapper(op, allocate_in_domain(op), allocate_in_codomain(op))
+function CpuOperatorWrapper(op::AbstractOperator)
+    return CpuOperatorWrapper(op, allocate_in_domain(op), allocate_in_codomain(op))
+end
 
 # Delegate is_linear to the wrapped operator
 import OperatorCore: is_linear

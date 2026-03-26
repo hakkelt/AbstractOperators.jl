@@ -29,8 +29,9 @@ function SoftMax(
     return SoftMax{T, N, typeof(buf)}(DomainDim, buf)
 end
 
-SoftMax(DomainDim::NTuple{N, Int}; array_type::Type = Array{Float64}) where {N} =
-    SoftMax(Float64, DomainDim; array_type)
+function SoftMax(DomainDim::NTuple{N, Int}; array_type::Type = Array{Float64}) where {N}
+    return SoftMax(Float64, DomainDim; array_type)
+end
 
 function mul!(y::AbstractArray, L::SoftMax, x::AbstractArray)
     check(y, L, x)

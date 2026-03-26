@@ -71,7 +71,9 @@ end
     @test is_full_column_rank(DiagOp([ones(5); 0])) == false
 
     @test diag(op) == pi
-    d = pi; op = DiagOp((n,), d); x1 = randn(n)
+    d = pi
+    op = DiagOp((n,), d)
+    x1 = randn(n)
     @test norm(op' * (op * x1) .- diag_AcA(op) .* x1) <= 1.0e-12
     @test norm(op * (op' * x1) .- diag_AAc(op) .* x1) <= 1.0e-12
 
@@ -106,4 +108,34 @@ end
     using Random, AbstractOperators, JLArrays
     Random.seed!(0)
     test_diagop_mul(jl, false, test_op, to_cpu, norm)
+end
+
+@testitem "DiagOp (CUDA)" tags = [:gpu, :cuda, :linearoperator, :DiagOp] setup = [
+    TestUtils, DiagOpTestHelper,
+] begin
+    using Random, AbstractOperators
+    using CUDA
+    if CUDA.functional()
+        Random.seed!(0)
+        test_diagop_mul(CuArray, false, test_op, to_cpu, norm)
+        x = CuArray(randn(4))
+        op = DiagOp(x)
+        @test domain_storage_type(op) <: CUDA.CuArray
+        @test codomain_storage_type(op) <: CUDA.CuArray
+    end
+end
+
+@testitem "DiagOp (AMDGPU)" tags = [:gpu, :amdgpu, :linearoperator, :DiagOp] setup = [
+    TestUtils, DiagOpTestHelper,
+] begin
+    using Random, AbstractOperators
+    using AMDGPU
+    if AMDGPU.functional()
+        Random.seed!(0)
+        test_diagop_mul(AMDGPU.ROCArray, false, test_op, to_cpu, norm)
+        x = AMDGPU.ROCArray(randn(4))
+        op = DiagOp(x)
+        @test domain_storage_type(op) <: AMDGPU.ROCArray
+        @test codomain_storage_type(op) <: AMDGPU.ROCArray
+    end
 end

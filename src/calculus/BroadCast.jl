@@ -218,11 +218,11 @@ fun_name(R::OperatorBroadCast{T, N, M, true}) where {T, N, M} = "." * fun_name(R
 remove_displacement(R::NoOperatorBroadCast) = R
 function remove_displacement(R::OperatorBroadCast{T, N, M, false, Imask}) where {T, N, M, Imask}
     new_A = remove_displacement(R.A)
-    return OperatorBroadCast(new_A, R.dim_out, threaded = false)
+    return OperatorBroadCast(new_A, R.dim_out; threaded = false)
 end
 function remove_displacement(R::OperatorBroadCast{T, N, M, true, Imask}) where {T, N, M, Imask}
     new_A = remove_displacement(R.A[1])
-    return OperatorBroadCast(new_A, R.dim_out, threaded = true)
+    return OperatorBroadCast(new_A, R.dim_out; threaded = true)
 end
 
 has_fast_opnorm(::NoOperatorBroadCast) = true

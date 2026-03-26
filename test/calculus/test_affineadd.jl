@@ -4,7 +4,9 @@
     verb && println(" --- Testing AffineAdd --- ")
 
     n, m = 5, 6
-    A = randn(n, m); opA = MatrixOp(A); d = randn(n)
+    A = randn(n, m)
+    opA = MatrixOp(A)
+    d = randn(n)
     T = AffineAdd(opA, d)
     x1 = randn(m)
     @test norm(T * x1 - (A * x1 + d)) < 1.0e-9
@@ -29,7 +31,8 @@ end
     Random.seed!(0)
 
     n, m = 5, 6
-    A = randn(n, m); d = randn(n)
+    A = randn(n, m)
+    d = randn(n)
     opH = HCAT(Eye(n), MatrixOp(A))
     x = ArrayPartition(randn(n), randn(m))
     opHT = AffineAdd(opH, d)
@@ -37,9 +40,11 @@ end
     p = [2; 1]
     @test norm(AbstractOperators.permute(opHT, p) * ArrayPartition(x.x[p]...) - (x.x[1] + A * x.x[2] .+ d)) < 1.0e-12
 
-    n = 10; d = randn(n)
+    n = 10
+    d = randn(n)
     T = AffineAdd(Exp(n), d, false)
-    r = randn(n); x = randn(size(T, 2))
+    r = randn(n)
+    x = randn(size(T, 2))
     y, grad = test_NLop(T, x, r, verb)
     @test norm(y - (exp.(x) - d)) < 1.0e-8
 end
@@ -48,7 +53,9 @@ end
     using Random, AbstractOperators
     Random.seed!(0)
     n, m = 5, 6
-    A = MatrixOp(randn(n, m)); d1 = randn(n); d2 = randn(n)
+    A = MatrixOp(randn(n, m))
+    d1 = randn(n)
+    d2 = randn(n)
     @test AffineAdd(A, d1) == AffineAdd(A, d1)
     @test !(AffineAdd(A, d1) == AffineAdd(A, d2))
 end
@@ -57,15 +64,20 @@ end
     using Random, AbstractOperators
     Random.seed!(0)
     n = 5
-    E = Eye(n); TE = AffineAdd(E, randn(n)); @test is_invertible(TE) == is_invertible(E)
-    D = DiagOp(randn(n)); TD = AffineAdd(D, randn(n))
+    E = Eye(n)
+    TE = AffineAdd(E, randn(n))
+    @test is_invertible(TE) == is_invertible(E)
+    D = DiagOp(randn(n))
+    TD = AffineAdd(D, randn(n))
     @test is_AcA_diagonal(TD) == is_AcA_diagonal(D)
     @test is_AAc_diagonal(TD) == is_AAc_diagonal(D)
     m = 6
-    A = MatrixOp(randn(n, m)); TA = AffineAdd(A, randn(n))
+    A = MatrixOp(randn(n, m))
+    TA = AffineAdd(A, randn(n))
     @test is_full_row_rank(TA) == is_full_row_rank(A)
     @test is_full_column_rank(TA) == is_full_column_rank(A)
-    D2 = DiagOp(randn(n)); TD2 = AffineAdd(D2, zeros(n))
+    D2 = DiagOp(randn(n))
+    TD2 = AffineAdd(D2, zeros(n))
     @test diag_AcA(TD2) == diag_AcA(D2)
     @test diag_AAc(TD2) == diag_AAc(D2)
 end
@@ -73,7 +85,8 @@ end
 @testitem "AffineAdd slicing property delegation" tags = [:calculus, :AffineAdd] setup=[TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
-    G = GetIndex(Float64, (10,), 2:5); TG = AffineAdd(G, randn(4))
+    G = GetIndex(Float64, (10,), 2:5)
+    TG = AffineAdd(G, randn(4))
     @test is_sliced(TG) == is_sliced(G)
     @test AbstractOperators.get_slicing_expr(TG) == AbstractOperators.get_slicing_expr(G)
     @test AbstractOperators.get_slicing_mask(TG) == AbstractOperators.get_slicing_mask(G)
@@ -84,9 +97,13 @@ end
     using Random, AbstractOperators
     Random.seed!(0)
     n, m = 5, 6
-    G = GetIndex(Float64, (n, m), (1:3, :)); d = randn(3, m); TG = AffineAdd(G, d)
-    @test AbstractOperators.has_optimized_normalop(TG) == AbstractOperators.has_optimized_normalop(G)
-    N = AbstractOperators.get_normal_op(TG); x = randn(n, m)
+    G = GetIndex(Float64, (n, m), (1:3, :))
+    d = randn(3, m)
+    TG = AffineAdd(G, d)
+    @test AbstractOperators.has_optimized_normalop(TG) ==
+        AbstractOperators.has_optimized_normalop(G)
+    N = AbstractOperators.get_normal_op(TG)
+    x = randn(n, m)
     @test N * x ≈ TG.A' * (TG.A * x + TG.d)
 end
 
@@ -102,7 +119,8 @@ end
     using Random, AbstractOperators
     Random.seed!(0)
     n, m = 5, 6
-    opA = MatrixOp(randn(n, m)); d = randn(n)
+    opA = MatrixOp(randn(n, m))
+    d = randn(n)
     @test sign(AffineAdd(opA, d, true)) == 1
     @test sign(AffineAdd(opA, d, false)) == -1
 end
@@ -128,4 +146,52 @@ end
     r_adj2 = similar(r_adj)
     mul!(r_adj2, T', r)
     @test collect(r_adj) ≈ collect(r_adj2)
+end
+
+@testitem "AffineAdd (CUDA)" tags = [:gpu, :cuda, :calculus, :AffineAdd] setup = [TestUtils] begin
+    using Pkg, Random, AbstractOperators
+    using CUDA
+    if CUDA.functional()
+        Random.seed!(0)
+
+        n, m = 5, 6
+        A = randn(n, m)
+        d = randn(n)
+        T = AffineAdd(MatrixOp(CuArray(A)), CuArray(d))
+        x1 = CuArray(randn(m))
+        y1 = T * x1
+        y1_buf = similar(y1)
+        mul!(y1_buf, T, x1)
+        @test collect(y1) ≈ collect(y1_buf)
+
+        r = CuArray(randn(n))
+        r_adj = T' * r
+        r_adj2 = similar(r_adj)
+        mul!(r_adj2, T', r)
+        @test collect(r_adj) ≈ collect(r_adj2)
+    end
+end
+
+@testitem "AffineAdd (AMDGPU)" tags = [:gpu, :amdgpu, :calculus, :AffineAdd] setup = [TestUtils] begin
+    using Pkg, Random, AbstractOperators
+    using AMDGPU
+    if AMDGPU.functional()
+        Random.seed!(0)
+
+        n, m = 5, 6
+        A = randn(n, m)
+        d = randn(n)
+        T = AffineAdd(MatrixOp(AMDGPU.ROCArray(A)), AMDGPU.ROCArray(d))
+        x1 = AMDGPU.ROCArray(randn(m))
+        y1 = T * x1
+        y1_buf = similar(y1)
+        mul!(y1_buf, T, x1)
+        @test collect(y1) ≈ collect(y1_buf)
+
+        r = AMDGPU.ROCArray(randn(n))
+        r_adj = T' * r
+        r_adj2 = similar(r_adj)
+        mul!(r_adj2, T', r)
+        @test collect(r_adj) ≈ collect(r_adj2)
+    end
 end

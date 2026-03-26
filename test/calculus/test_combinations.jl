@@ -49,10 +49,12 @@ end
 
     # VCAT of HCATs
     m1, m2, n1 = 4, 7, 3
-    A1 = randn(n1, m1); A2 = randn(n1, m2)
+    A1 = randn(n1, m1)
+    A2 = randn(n1, m2)
     opH1 = HCAT(MatrixOp(A1), MatrixOp(A2))
     m1, m2, n2 = 4, 7, 5
-    A3 = randn(n2, m1); A4 = randn(n2, m2)
+    A3 = randn(n2, m1)
+    A4 = randn(n2, m2)
     opH2 = HCAT(MatrixOp(A3), MatrixOp(A4))
     opV = VCAT(opH1, opH2)
     x1, x2 = randn(m1), randn(m2)
@@ -70,16 +72,26 @@ end
     d2 = rand(ComplexF64, n2)
     opH2c = HCAT(MatrixOp(A3c), DiagOp(Float64, (n2,), d2))
     opVc = VCAT(opH1c, opH2c)
-    x1c = randn(m1) + im * randn(m1); x2c = randn(n2)
-    y1c = test_op(opVc, ArrayPartition(x1c, x2c), ArrayPartition(randn(n1)+im*randn(n1), randn(n2)+im*randn(n2)), verb)
+    x1c = randn(m1) + im * randn(m1)
+    x2c = randn(n2)
+    y1c = test_op(
+        opVc,
+        ArrayPartition(x1c, x2c),
+        ArrayPartition(randn(n1) + im * randn(n1), randn(n2) + im * randn(n2)),
+        verb,
+    )
     y2c = ArrayPartition(A1c * x1c + x2c .* d1, A3c * x1c + x2c .* d2)
     @test norm(y1c - y2c) <= 1.0e-12
 
     # HCAT of VCATs
     n1, n2, m1, m2 = 3, 5, 4, 7
-    A = randn(m1, n1); B = randn(m1, n2); C = randn(m2, n1); D = randn(m2, n2)
+    A = randn(m1, n1)
+    B = randn(m1, n2)
+    C = randn(m2, n1)
+    D = randn(m2, n2)
     opV2 = HCAT(VCAT(MatrixOp(A), MatrixOp(C)), VCAT(MatrixOp(B), MatrixOp(D)))
-    x1 = randn(n1); x2 = randn(n2)
+    x1 = randn(n1)
+    x2 = randn(n2)
     y1 = test_op(opV2, ArrayPartition(x1, x2), ArrayPartition(randn(m1), randn(m2)), verb)
     y2 = ArrayPartition(A * x1 + B * x2, C * x1 + D * x2)
     @test norm(y1 - y2) <= 1.0e-12
@@ -92,12 +104,18 @@ end
 
     # Sum of HCATs
     m, n1, n2, n3 = 4, 7, 5, 3
-    A1 = randn(m, n1); A2 = randn(m, n2); A3 = randn(m, n3)
-    B1 = randn(m, n1); B2 = randn(m, n2); B3 = randn(m, n3)
+    A1 = randn(m, n1)
+    A2 = randn(m, n2)
+    A3 = randn(m, n3)
+    B1 = randn(m, n1)
+    B2 = randn(m, n2)
+    B3 = randn(m, n3)
     opHA = HCAT(MatrixOp(A1), MatrixOp(A2), MatrixOp(A3))
     opHB = HCAT(MatrixOp(B1), MatrixOp(B2), MatrixOp(B3))
     opS = Sum(opHA, opHB)
-    x1 = randn(n1); x2 = randn(n2); x3 = randn(n3)
+    x1 = randn(n1)
+    x2 = randn(n2)
+    x3 = randn(n3)
     y1 = test_op(opS, ArrayPartition(x1, x2, x3), randn(m), verb)
     y2 = A1 * x1 + B1 * x1 + A2 * x2 + B2 * x2 + A3 * x3 + B3 * x3
     @test norm(y1 - y2) <= 1.0e-12
@@ -108,9 +126,12 @@ end
 
     # Sum of VCATs
     m1, m2, n = 4, 7, 5
-    A1 = randn(m1, n); A2 = randn(m2, n)
-    B1 = randn(m1, n); B2 = randn(m2, n)
-    C1 = randn(m1, n); C2 = randn(m2, n)
+    A1 = randn(m1, n)
+    A2 = randn(m2, n)
+    B1 = randn(m1, n)
+    B2 = randn(m2, n)
+    C1 = randn(m1, n)
+    C2 = randn(m2, n)
     opVA = VCAT(MatrixOp(A1), MatrixOp(A2))
     opVB = VCAT(MatrixOp(B1), MatrixOp(B2))
     opVC = VCAT(MatrixOp(C1), MatrixOp(C2))
@@ -127,19 +148,23 @@ end
     verb && println(" --- Testing Combinations: Scale --- ")
 
     # Scale of DCAT
-    m1, n1 = 4, 7; m2, n2 = 3, 5
-    A1 = randn(m1, n1); A2 = randn(m2, n2)
+    m1, n1 = 4, 7
+    m2, n2 = 3, 5
+    A1 = randn(m1, n1)
+    A2 = randn(m2, n2)
     opD = DCAT(MatrixOp(A1), MatrixOp(A2))
     coeff = randn()
     opS = Scale(coeff, opD)
-    x1 = randn(n1); x2 = randn(n2)
+    x1 = randn(n1)
+    x2 = randn(n2)
     y = test_op(opS, ArrayPartition(x1, x2), ArrayPartition(randn(m1), randn(m2)), verb)
     z = ArrayPartition(coeff * A1 * x1, coeff * A2 * x2)
     @test norm(y - z) <= 1.0e-12
 
     # Scale of VCAT
     m1, m2, n = 4, 3, 7
-    A1 = randn(m1, n); A2 = randn(m2, n)
+    A1 = randn(m1, n)
+    A2 = randn(m2, n)
     opV = VCAT(MatrixOp(A1), MatrixOp(A2))
     coeff = randn()
     opS = Scale(coeff, opV)
@@ -150,19 +175,24 @@ end
 
     # Scale of HCAT
     m, n1, n2 = 4, 3, 7
-    A1 = randn(m, n1); A2 = randn(m, n2)
+    A1 = randn(m, n1)
+    A2 = randn(m, n2)
     opH = HCAT(MatrixOp(A1), MatrixOp(A2))
     coeff = randn()
     opS = Scale(coeff, opH)
-    x1 = randn(n1); x2 = randn(n2)
+    x1 = randn(n1)
+    x2 = randn(n2)
     y = test_op(opS, ArrayPartition(x1, x2), randn(m), verb)
     z = coeff * (A1 * x1 + A2 * x2)
     @test norm(y - z) <= 1.0e-12
 
     # DCAT of HCATs
     m1, m2, n1, n2 = 2, 3, 4, 5
-    A1 = randn(m1, n1); A2 = randn(m1, n2)
-    B1 = randn(m2, n1); B2 = randn(m2, n2); B3 = randn(m2, n2)
+    A1 = randn(m1, n1)
+    A2 = randn(m1, n2)
+    B1 = randn(m2, n1)
+    B2 = randn(m2, n2)
+    B3 = randn(m2, n2)
     opH1 = HCAT(MatrixOp(A1), MatrixOp(A2))
     opH2 = HCAT(MatrixOp(B1), MatrixOp(B2), MatrixOp(B3))
     op = DCAT(MatrixOp(A1), opH2)
@@ -179,7 +209,8 @@ end
 
     # Scale of Sum and Compose
     m, n = 5, 7
-    A1 = randn(m, n); A2 = randn(m, n)
+    A1 = randn(m, n)
+    A2 = randn(m, n)
     opSum = Sum(MatrixOp(A1), MatrixOp(A2))
     coeff = pi
     opSS = Scale(coeff, opSum)
@@ -189,7 +220,8 @@ end
     @test norm(y1 - y2) <= 1.0e-12
 
     m1, m2, m3 = 4, 7, 3
-    Ac1 = randn(m2, m1); Ac2 = randn(m3, m2)
+    Ac1 = randn(m2, m1)
+    Ac2 = randn(m3, m2)
     opC = Compose(MatrixOp(Ac2), MatrixOp(Ac1))
     opSC = Scale(coeff, opC)
     x = randn(m1)
@@ -205,12 +237,17 @@ end
 
     # Nonlinear HCAT of VCAT
     n, m1, m2, m3 = 4, 3, 2, 7
-    x1 = randn(m1); x2 = randn(m2); x3 = randn(m3)
+    x1 = randn(m1)
+    x2 = randn(m2)
+    x3 = randn(m3)
     x = ArrayPartition(x1, x2, x3)
     r = ArrayPartition(randn(n), randn(m1))
-    A1 = randn(n, m1); A2 = randn(n, m2); A3 = randn(n, m3)
+    A1 = randn(n, m1)
+    A2 = randn(n, m2)
+    A3 = randn(n, m3)
     B1 = Sigmoid(Float64, (m1,), 2)
-    B2 = randn(m1, m2); B3 = randn(m1, m3)
+    B2 = randn(m1, m2)
+    B3 = randn(m1, m3)
     op1 = VCAT(MatrixOp(A1), B1)
     op2 = VCAT(MatrixOp(A2), MatrixOp(B2))
     op3 = VCAT(MatrixOp(A3), MatrixOp(B3))
@@ -221,11 +258,17 @@ end
 
     # Nonlinear VCAT of HCAT
     m1, m2, m3, n1, n2 = 3, 4, 5, 6, 7
-    x1 = randn(m1); x2 = randn(n1); x3 = randn(m3)
+    x1 = randn(m1)
+    x2 = randn(n1)
+    x3 = randn(m3)
     x = ArrayPartition(x1, x2, x3)
     r = ArrayPartition(randn(n1), randn(n2))
-    A1 = randn(n1, m1); B1 = Sigmoid(Float64, (n1,), 2); C1 = randn(n1, m3)
-    A2 = randn(n2, m1); B2 = randn(n2, n1); C2 = randn(n2, m3)
+    A1 = randn(n1, m1)
+    B1 = Sigmoid(Float64, (n1,), 2)
+    C1 = randn(n1, m3)
+    A2 = randn(n2, m1)
+    B2 = randn(n2, n1)
+    C2 = randn(n2, m3)
     op = VCAT(HCAT(MatrixOp(A1), B1, MatrixOp(C1)), HCAT(MatrixOp(A2), MatrixOp(B2), MatrixOp(C2)))
     y, grad = test_NLop(op, x, r, verb)
     Y = ArrayPartition(A1 * x1 + B1 * x2 + C1 * x3, A2 * x1 + B2 * x2 + C2 * x3)
@@ -233,15 +276,20 @@ end
 
     # Nonlinear AffineAdd and Compose
     n = 10
-    d1 = randn(n); d2 = randn(n)
+    d1 = randn(n)
+    d2 = randn(n)
     T = Compose(AffineAdd(Sin(n), d2), AffineAdd(Eye(n), d1))
-    r = randn(n); x = randn(size(T, 2))
+    r = randn(n)
+    x = randn(size(T, 2))
     y, grad = test_NLop(T, x, r, verb)
     @test norm(y - (sin.(x + d1) + d2)) < 1.0e-8
 
     d3 = pi
-    T2 = Compose(AffineAdd(Sin(n), d3), Compose(AffineAdd(Exp(n), d2, false), AffineAdd(Eye(n), d1)))
-    r = randn(n); x = randn(size(T2, 2))
+    T2 = Compose(
+        AffineAdd(Sin(n), d3), Compose(AffineAdd(Exp(n), d2, false), AffineAdd(Eye(n), d1))
+    )
+    r = randn(n)
+    x = randn(size(T2, 2))
     y, grad = test_NLop(T2, x, r, verb)
     @test norm(y - (sin.(exp.(x + d1) - d2) .+ d3)) < 1.0e-8
 end
@@ -259,4 +307,40 @@ end
     opC = Compose(MatrixOp(A3), opH)
     x1, x2 = jl(randn(m1)), jl(randn(m2))
     test_op(opC, ArrayPartition(x1, x2), jl(randn(m4)), false)
+end
+
+@testitem "Combinations (CUDA)" tags = [:gpu, :cuda, :calculus, :Combinations] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    using CUDA
+    if CUDA.functional()
+        Random.seed!(0)
+
+        m1, m2, m3, m4 = 4, 7, 3, 2
+        A1 = CuArray(randn(m3, m1))
+        A2 = CuArray(randn(m3, m2))
+        A3 = CuArray(randn(m4, m3))
+        opH = HCAT(MatrixOp(A1), MatrixOp(A2))
+        opC = Compose(MatrixOp(A3), opH)
+        x1, x2 = CuArray(randn(m1)), CuArray(randn(m2))
+        test_op(opC, ArrayPartition(x1, x2), CuArray(randn(m4)), false)
+    end
+end
+
+@testitem "Combinations (AMDGPU)" tags = [:gpu, :amdgpu, :calculus, :Combinations] setup = [
+    TestUtils,
+] begin
+    using Random, AbstractOperators
+    using AMDGPU
+    if AMDGPU.functional()
+        Random.seed!(0)
+
+        m1, m2, m3, m4 = 4, 7, 3, 2
+        A1 = AMDGPU.ROCArray(randn(m3, m1))
+        A2 = AMDGPU.ROCArray(randn(m3, m2))
+        A3 = AMDGPU.ROCArray(randn(m4, m3))
+        opH = HCAT(MatrixOp(A1), MatrixOp(A2))
+        opC = Compose(MatrixOp(A3), opH)
+        x1, x2 = AMDGPU.ROCArray(randn(m1)), AMDGPU.ROCArray(randn(m2))
+        test_op(opC, ArrayPartition(x1, x2), AMDGPU.ROCArray(randn(m4)), false)
+    end
 end

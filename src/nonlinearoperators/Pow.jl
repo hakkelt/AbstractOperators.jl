@@ -18,8 +18,9 @@ function Pow(
     return Pow{T, N, I, S}(DomainDim, p)
 end
 
-Pow(DomainDim::NTuple{N, Int}, p::I; array_type::Type = Array{Float64}) where {N, I <: Real} =
-    Pow(Float64, DomainDim, p; array_type)
+function Pow(DomainDim::NTuple{N, Int}, p::I; array_type::Type = Array{Float64}) where {N, I <: Real}
+    return Pow(Float64, DomainDim, p; array_type)
+end
 
 function Pow(x::AbstractArray{T}, p::I; array_type::Type = _array_wrapper(x)) where {T, I <: Real}
     S = _normalize_array_type(array_type, T)

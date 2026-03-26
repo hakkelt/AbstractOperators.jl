@@ -119,8 +119,14 @@ end
 
 # Properties
 
-Base.:(==)(P1::Axt_mul_Bx{1, L1, L2, C, D}, P2::Axt_mul_Bx{1, L1, L2, C, D}) where {L1, L2, C, D} = P1.A == P2.A && P1.B == P2.B
-Base.:(==)(P1::Axt_mul_BxJac{1, L1, L2, C, D}, P2::Axt_mul_BxJac{1, L1, L2, C, D}) where {L1, L2, C, D} = P1.A == P2.A && P1.B == P2.B
+function Base.:(==)(P1::Axt_mul_Bx{1, L1, L2, C, D}, P2::Axt_mul_Bx{1, L1, L2, C, D}) where {L1, L2, C, D}
+    return P1.A == P2.A && P1.B == P2.B
+end
+function Base.:(==)(
+        P1::Axt_mul_BxJac{1, L1, L2, C, D}, P2::Axt_mul_BxJac{1, L1, L2, C, D}
+    ) where {L1, L2, C, D}
+    return P1.A == P2.A && P1.B == P2.B
+end
 
 size(P::Union{Axt_mul_Bx{1}, Axt_mul_BxJac{1}}) = ((1,), size(P.A, 2))
 function size(P::Union{Axt_mul_Bx{2}, Axt_mul_BxJac{2}})

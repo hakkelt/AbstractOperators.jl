@@ -20,10 +20,10 @@ function Atan(
     return Atan{T, N, S}(DomainDim)
 end
 
-Atan(DomainDim::NTuple{N, Int}; array_type::Type = Array{Float64}) where {N} =
-    Atan(Float64, DomainDim; array_type)
-Atan(DomainDim::Vararg{Int}; array_type::Type = Array{Float64}) =
-    Atan(Float64, DomainDim; array_type)
+function Atan(DomainDim::NTuple{N, Int}; array_type::Type = Array{Float64}) where {N}
+    return Atan(Float64, DomainDim; array_type)
+end
+Atan(DomainDim::Vararg{Int}; array_type::Type = Array{Float64}) = Atan(Float64, DomainDim; array_type)
 
 function Atan(x::AbstractArray{T}; array_type::Type = _array_wrapper(x)) where {T}
     S = _normalize_array_type(array_type, T)

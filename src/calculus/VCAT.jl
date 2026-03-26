@@ -159,7 +159,9 @@ end
 
 # Properties
 
-Base.:(==)(H1::VCAT{N, L1, P1, C}, H2::VCAT{N, L2, P2, C}) where {N, L1, L2, P1, P2, C} = H1.A == H2.A && H1.idxs == H2.idxs
+function Base.:(==)(H1::VCAT{N, L1, P1, C}, H2::VCAT{N, L2, P2, C}) where {N, L1, L2, P1, P2, C}
+    return H1.A == H2.A && H1.idxs == H2.idxs
+end
 
 @generated function size(H::VCAT{N, L, P}) where {N, L, P}
     exprs = []

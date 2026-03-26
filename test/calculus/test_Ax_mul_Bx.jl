@@ -119,3 +119,49 @@ end
     r2 = jl(randn(n2, n2))
     test_NLop_gpu(P2, x2, r2, false)
 end
+
+@testitem "Ax_mul_Bx (CUDA)" tags = [:gpu, :cuda, :calculus, :Ax_mul_Bx] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    using CUDA
+    if CUDA.functional()
+        Random.seed!(0)
+
+        n = 3
+        P = Ax_mul_Bx(
+            Eye(Float64, (n, n); array_type = CUDA.CuArray{Float64, 2}),
+            Eye(Float64, (n, n); array_type = CUDA.CuArray{Float64, 2}),
+        )
+        x = CuArray(randn(n, n))
+        r = CuArray(randn(n, n))
+        test_NLop_gpu(P, x, r, false)
+
+        n2 = 3
+        P2 = Ax_mul_Bx(Sin(CUDA.zeros(Float64, n2, n2)), Cos(CUDA.zeros(Float64, n2, n2)))
+        x2 = CuArray(randn(n2, n2))
+        r2 = CuArray(randn(n2, n2))
+        test_NLop_gpu(P2, x2, r2, false)
+    end
+end
+
+@testitem "Ax_mul_Bx (AMDGPU)" tags = [:gpu, :amdgpu, :calculus, :Ax_mul_Bx] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    using AMDGPU
+    if AMDGPU.functional()
+        Random.seed!(0)
+
+        n = 3
+        P = Ax_mul_Bx(
+            Eye(Float64, (n, n); array_type = AMDGPU.ROCArray{Float64, 2}),
+            Eye(Float64, (n, n); array_type = AMDGPU.ROCArray{Float64, 2}),
+        )
+        x = AMDGPU.ROCArray(randn(n, n))
+        r = AMDGPU.ROCArray(randn(n, n))
+        test_NLop_gpu(P, x, r, false)
+
+        n2 = 3
+        P2 = Ax_mul_Bx(Sin(AMDGPU.zeros(Float64, n2, n2)), Cos(AMDGPU.zeros(Float64, n2, n2)))
+        x2 = AMDGPU.ROCArray(randn(n2, n2))
+        r2 = AMDGPU.ROCArray(randn(n2, n2))
+        test_NLop_gpu(P2, x2, r2, false)
+    end
+end

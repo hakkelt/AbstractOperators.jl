@@ -17,7 +17,8 @@ function test_zeropad_mul(conv, verb, test_op, to_cpu, norm)
     op = ZeroPad(conv(zeros(Float64, n)), z)
     x1 = conv(randn(n))
     y1 = test_op(op, x1, conv(randn(n .+ z)), verb)
-    y2c = zeros(n .+ z); y2c[1:n[1], 1:n[2]] = collect(x1)
+        y2c = zeros(n .+ z)
+        y2c[1:n[1], 1:n[2]] = collect(x1)
     @test norm(to_cpu(y1) .- y2c) <= 1.0e-12
 
     n = (3, 2, 2)
@@ -58,8 +59,10 @@ end  # @testmodule ZeroPadTestHelper
     @test Nop * x1 ≈ x1
 
     # Adjoint crop
-    ybig = zeros(n .+ z); ybig[1:n[1], 1:n[2], 1:n[3]] .= x1
-    xcropped = zeros(n); mul!(xcropped, op', ybig)
+    ybig = zeros(n .+ z)
+    ybig[1:n[1], 1:n[2], 1:n[3]] .= x1
+    xcropped = zeros(n)
+    mul!(xcropped, op', ybig)
     @test xcropped ≈ x1
 
     # Scaling
@@ -68,8 +71,10 @@ end  # @testmodule ZeroPadTestHelper
     @test_throws ErrorException Scale(1 + 2im, op)
 
     # other constructors
-    ZeroPad(n, z...); ZeroPad(Float64, n, z...)
-    ZeroPad(x1, z); ZeroPad(x1, z...)
+    ZeroPad(n, z...)
+    ZeroPad(Float64, n, z...)
+    ZeroPad(x1, z)
+    ZeroPad(x1, z...)
 
     # errors
     @test_throws ErrorException ZeroPad(Float64, n, (1, 2))
@@ -88,11 +93,36 @@ end  # @testmodule ZeroPadTestHelper
     @test is_full_column_rank(op) == true
     @test diag_AcA(op) == 1
 
-    io = IOBuffer(); show(io, op); s = String(take!(io)); @test occursin("[I;0]", s)
+    io = IOBuffer()
+    show(io, op)
+    s = String(take!(io))
+    @test occursin("[I;0]", s)
 end
 
 @testitem "ZeroPad (GPU)" tags = [:gpu, :linearoperator, :ZeroPad] setup=[TestUtils, ZeroPadTestHelper] begin
     using Random, AbstractOperators, JLArrays
     Random.seed!(0)
     test_zeropad_mul(jl, false, test_op, to_cpu, norm)
+end
+
+@testitem "ZeroPad (CUDA)" tags = [:gpu, :cuda, :linearoperator, :ZeroPad] setup = [
+    TestUtils, ZeroPadTestHelper,
+] begin
+    using Random, AbstractOperators
+    using CUDA
+    if CUDA.functional()
+        Random.seed!(0)
+        test_zeropad_mul(CuArray, false, test_op, to_cpu, norm)
+    end
+end
+
+@testitem "ZeroPad (AMDGPU)" tags = [:gpu, :amdgpu, :linearoperator, :ZeroPad] setup = [
+    TestUtils, ZeroPadTestHelper,
+] begin
+    using Random, AbstractOperators
+    using AMDGPU
+    if AMDGPU.functional()
+        Random.seed!(0)
+        test_zeropad_mul(AMDGPU.ROCArray, false, test_op, to_cpu, norm)
+    end
 end

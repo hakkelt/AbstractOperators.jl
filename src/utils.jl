@@ -58,14 +58,14 @@ end
 
 _check_domain_storage(::ArrayPartition, op) = nothing
 function _check_domain_storage(domain_array, op)
-    if !_is_storage_compatible(domain_array, domain_storage_type(op))
+    return if !_is_storage_compatible(domain_array, domain_storage_type(op))
         throw(ArgumentError("Input must be an AbstractArray"))
     end
 end
 
 _check_codomain_storage(::ArrayPartition, op) = nothing
 function _check_codomain_storage(codomain_array, op)
-    if !_is_storage_compatible(codomain_array, codomain_storage_type(op))
+    return if !_is_storage_compatible(codomain_array, codomain_storage_type(op))
         throw(ArgumentError("Output must be an AbstractArray"))
     end
 end
@@ -98,7 +98,11 @@ function check(codomain_array, op, domain_array)
         )
     end
     if (ndoms(op, 1) > 1) != (codomain_array isa ArrayPartition)
-        throw(ArgumentError("Output must be an ArrayPartition if and only if operator has multiple output domains"))
+        throw(
+            ArgumentError(
+                "Output must be an ArrayPartition if and only if operator has multiple output domains",
+            ),
+        )
     end
     if codomain_array isa ArrayPartition
         dtype = eltype.(codomain_array.x)

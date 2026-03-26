@@ -630,3 +630,100 @@ end
     @test is_null(combine(z, M))
     @test is_null(combine(M, z))
 end
+
+@testitem "CR: DiagOp adjoint-left combinations" tags = [:calculus, :CombinationRules] begin
+    using LinearAlgebra
+    using AbstractOperators
+    using AbstractOperators: can_be_combined, combine
+
+    n = 5
+    d1 = randn(n)
+    d2 = randn(n)
+    diag1 = DiagOp(d1)
+    diag2 = DiagOp(d2)
+
+    # DiagOp' * DiagOp
+    adj1 = diag1'
+    @test can_be_combined(adj1, diag2)
+    c1 = combine(adj1, diag2)
+    @test c1 isa DiagOp
+    @test c1.d ≈ conj.(d1) .* d2
+
+    # DiagOp' * DiagOp'
+    adj2 = diag2'
+    @test can_be_combined(adj1, adj2)
+    c2 = combine(adj1, adj2)
+    @test c2 isa DiagOp
+    @test c2.d ≈ conj.(d1) .* conj.(d2)
+end
+
+@testitem "CR: can_be_combined with Eye" tags = [:calculus, :CombinationRules] begin
+    using AbstractOperators
+    using AbstractOperators: can_be_combined, combine
+
+    n = 4
+    eye = Eye(n)
+    fd = FiniteDiff(Float64, (n + 1,), 1)
+
+    @test can_be_combined(fd, eye)
+    c = combine(fd, eye)
+    @test c isa typeof(fd)
+    x = randn(n + 1)
+    @test c * x ≈ fd * x
+end
+
+@testitem "CR: MatrixOp and Scale combinations (adjoint variants)" tags = [
+    :calculus, :CombinationRules,
+] begin
+    using LinearAlgebra
+    using AbstractOperators
+    using AbstractOperators: can_be_combined, combine
+
+    n = 4
+    A = randn(n, n)
+    B = randn(n, n)
+    α = 1.5
+    mat = MatrixOp(A)
+    mat_adj = mat'
+    scl = Scale(α, Eye(n))
+
+    # MatrixOp' * MatrixOp
+    @test can_be_combined(mat_adj, mat)
+    c1 = combine(mat_adj, mat)
+    @test c1 isa MatrixOp
+    @test c1.A ≈ A' * A
+
+    # MatrixOp * MatrixOp'
+    @test can_be_combined(mat, mat_adj)
+    c2 = combine(mat, mat_adj)
+    @test c2.A ≈ A * A'
+
+    # MatrixOp' * MatrixOp'
+    @test can_be_combined(mat_adj, mat_adj)
+    c3 = combine(mat_adj, mat_adj)
+    @test c3.A ≈ A' * A'
+
+    # AdjointMatrixOp * Scale
+    @test can_be_combined(mat_adj, scl)
+    c4 = combine(mat_adj, scl)
+    x = randn(n)
+    @test c4 * x ≈ mat_adj * (scl * x)
+
+    # Scale * AdjointMatrixOp
+    @test can_be_combined(scl, mat_adj)
+    c5 = combine(scl, mat_adj)
+    @test c5 * x ≈ scl * (mat_adj * x)
+
+    # AdjointScale * MatrixOp
+    scl_op = Scale(α, FiniteDiff(Float64, (n + 1,), 1))
+    scl_adj = scl_op'
+    @test can_be_combined(scl_adj, mat)
+    c6 = combine(scl_adj, mat)
+    x2 = randn(n)
+    @test c6 * x2 ≈ scl_adj * (mat * x2)
+
+    # AdjointScale * AdjointMatrixOp
+    @test can_be_combined(scl_adj, mat_adj)
+    c7 = combine(scl_adj, mat_adj)
+    @test c7 * x ≈ scl_adj * (mat_adj * x)
+end

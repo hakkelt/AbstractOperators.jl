@@ -6,6 +6,8 @@ using RecursiveArrayTools: ArrayPartition
 using LinearAlgebra
 using Random
 using JLArrays
+using GPUArrays
+using KernelAbstractions  # triggers GpuExt together with GPUArrays (via JLArrays)
 
 export verb, test_op, test_NLop, gradient_fd, ArrayPartition, norm, dot, diag, opnorm
 export jl, to_cpu, test_NLop_gpu
@@ -26,10 +28,19 @@ function assert_adjoint_invariant(x, Ax, y, Acy; atol = 1.0e-8)
     @test abs(s1 - s2) < atol
 end
 
+function assert_backend_output_type(op::AbstractOperator, x::AbstractArray, y)
+    expected = typeof(similar(x, codomain_type(op), size(op, 1)...))
+    @test y isa expected
+end
+
+assert_backend_output_type(::AbstractOperator, ::ArrayPartition, ::Any) = nothing
+assert_backend_output_type(::AbstractOperator, ::AbstractArray, ::ArrayPartition) = nothing
+
 function test_NLop_gpu(A::AbstractOperator, x, y, verb::Bool = false)
     verb && (println(), println(A))
 
     Ax = A * x
+    assert_backend_output_type(A, x, Ax)
     Ax2 = similar(Ax)
     mul!(Ax2, A, x)
     assert_cpu_approx(Ax, Ax2)
@@ -51,6 +62,9 @@ function test_op(A::AbstractOperator, x, y, verb::Bool = false)
     verb && (println(); show(A); println())
 
     Ax = A * x
+    if x isa AbstractGPUArray
+        assert_backend_output_type(A, x, Ax)
+    end
     Ax2 = similar(Ax)
     verb && println("forward preallocated")
     mul!(Ax2, A, x) #verify in-place linear operator works

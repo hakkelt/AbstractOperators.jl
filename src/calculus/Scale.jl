@@ -73,7 +73,7 @@ function mul!(y::Tuple, L::Scale{Th}, x::AbstractArray) where {Th}
     for k in eachindex(y)
         @.. thread = Th y[k] *= L.coeff
     end
-    return
+    return nothing
 end
 
 function mul!(
@@ -92,7 +92,7 @@ function mul!(y::Tuple, S::AdjointOperator{<:Scale{Th}}, x::AbstractArray) where
     for k in eachindex(y)
         @.. thread = Th y[k] .*= L.coeff_conj
     end
-    return
+    return nothing
 end
 
 has_optimized_normalop(L::Scale) = is_linear(L.A) && has_optimized_normalop(L.A)

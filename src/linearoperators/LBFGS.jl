@@ -40,10 +40,8 @@ function LBFGS(x::T, M::I; array_type::Type = _array_wrapper(x)) where {T <: Abs
     s = zero(x)
     y = zero(x)
     R = real(eltype(x))
-    ys_M = similar(x, R, M)
-    fill!(ys_M, one(R))
-    alphas = similar(x, R, M)
-    fill!(alphas, one(R))
+    ys_M = fill(one(R), M)   # always CPU: only used with scalar indexing
+    alphas = fill(one(R), M) # always CPU: only used with scalar indexing
     return LBFGS{R, T, M, I}(0, 0, s, y, s_M, y_M, ys_M, alphas, one(R))
 end
 
@@ -131,6 +129,8 @@ domain_type(L::LBFGS) = eltype(L.y_M[1])
 domain_type(L::LBFGS{R, T}) where {R, T <: ArrayPartition} = eltype.(L.y_M[1].x)
 codomain_type(L::LBFGS) = eltype(L.y_M[1])
 codomain_type(L::LBFGS{R, T}) where {R, T <: ArrayPartition} = eltype.(L.y_M[1].x)
+domain_storage_type(L::LBFGS) = typeof(L.s)
+codomain_storage_type(L::LBFGS) = typeof(L.s)
 is_thread_safe(L::LBFGS) = false
 
 size(A::LBFGS{R, T}) where {R, T <: ArrayPartition} = (size.(A.s.x), size.(A.s.x))

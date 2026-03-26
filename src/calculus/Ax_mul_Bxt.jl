@@ -95,8 +95,12 @@ function mul!(y::AbstractArray, J::AdjointOperator{<:Ax_mul_BxtJac}, b::Abstract
 end
 
 # Properties
-Base.:(==)(P1::Ax_mul_Bxt{L1, L2, C, D}, P2::Ax_mul_Bxt{L1, L2, C, D}) where {L1, L2, C, D} = P1.A == P2.A && P1.B == P2.B
-Base.:(==)(P1::Ax_mul_BxtJac{L1, L2, C, D}, P2::Ax_mul_BxtJac{L1, L2, C, D}) where {L1, L2, C, D} = P1.A == P2.A && P1.B == P2.B
+function Base.:(==)(P1::Ax_mul_Bxt{L1, L2, C, D}, P2::Ax_mul_Bxt{L1, L2, C, D}) where {L1, L2, C, D}
+    return P1.A == P2.A && P1.B == P2.B
+end
+function Base.:(==)(P1::Ax_mul_BxtJac{L1, L2, C, D}, P2::Ax_mul_BxtJac{L1, L2, C, D}) where {L1, L2, C, D}
+    return P1.A == P2.A && P1.B == P2.B
+end
 
 function size(P::Union{Ax_mul_Bxt, Ax_mul_BxtJac})
     return ((size(P.A, 1)[1], size(P.B, 1)[1]), size(P.A, 2))

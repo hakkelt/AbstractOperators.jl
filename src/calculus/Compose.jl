@@ -34,12 +34,10 @@ struct Compose{N, M, L <: Tuple, T <: Tuple} <: AbstractOperator
         while i < length(A)
             should_be_combined = false
             triple_combination = false
-            if (
-                    A[i + 1] isa AdjointOperator &&
-                        A[i + 1].A == A[i] &&
-                        has_optimized_normalop(A[i])
+            if (A[i + 1] isa AdjointOperator && A[i + 1].A == A[i] && has_optimized_normalop(A[i]))
+                DEBUG_COMPOSE[] && print(
+                    "Replacing $(typeof((A[i])).name.wrapper) and $(typeof((A[i + 1])).name.wrapper) with normal operator",
                 )
-                DEBUG_COMPOSE[] && print("Replacing $(typeof((A[i])).name.wrapper) and $(typeof((A[i + 1])).name.wrapper) with normal operator")
                 new_op = get_normal_op(A[i])
                 should_be_combined = true
             elseif can_be_combined(A[i + 1], A[i])

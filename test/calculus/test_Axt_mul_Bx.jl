@@ -140,3 +140,62 @@ end
     Bx = Array(B2.A) * Array(x2)
     @test Array(y2) ≈ Ax' * Bx
 end
+
+@testitem "Axt_mul_Bx (CUDA)" tags = [:gpu, :cuda, :calculus, :Axt_mul_Bx] setup = [TestUtils] begin
+    using Random, AbstractOperators, LinearAlgebra
+    using CUDA
+    if CUDA.functional()
+        Random.seed!(0)
+
+        n, m = 3, 4
+        AL = CuArray(randn(n, m))
+        BL = CuArray(randn(n, m))
+        A, B = MatrixOp(AL), MatrixOp(BL)
+        P = Axt_mul_Bx(A, B)
+        x = CuArray(randn(m))
+        y = CUDA.zeros(Float64, 1)
+        mul!(y, P, x)
+        Acpu, Bcpu, xcpu = Array(AL), Array(BL), Array(x)
+        @test Array(y)[1] ≈ dot(Acpu * xcpu, Bcpu * xcpu)
+
+        n, m, l = 3, 5, 4
+        A2, B2 = MatrixOp(CuArray(randn(n, m)), l), MatrixOp(CuArray(randn(n, m)), l)
+        P2 = Axt_mul_Bx(A2, B2)
+        x2 = CuArray(randn(m, l))
+        y2 = CUDA.zeros(Float64, l, l)
+        mul!(y2, P2, x2)
+        Ax = Array(A2.A) * Array(x2)
+        Bx = Array(B2.A) * Array(x2)
+        @test Array(y2) ≈ Ax' * Bx
+    end
+end
+
+@testitem "Axt_mul_Bx (AMDGPU)" tags = [:gpu, :amdgpu, :calculus, :Axt_mul_Bx] setup = [TestUtils] begin
+    using Random, AbstractOperators, LinearAlgebra
+    using AMDGPU
+    if AMDGPU.functional()
+        Random.seed!(0)
+
+        n, m = 3, 4
+        AL = AMDGPU.ROCArray(randn(n, m))
+        BL = AMDGPU.ROCArray(randn(n, m))
+        A, B = MatrixOp(AL), MatrixOp(BL)
+        P = Axt_mul_Bx(A, B)
+        x = AMDGPU.ROCArray(randn(m))
+        y = AMDGPU.zeros(1)
+        mul!(y, P, x)
+        Acpu, Bcpu, xcpu = Array(AL), Array(BL), Array(x)
+        @test Array(y)[1] ≈ dot(Acpu * xcpu, Bcpu * xcpu)
+
+        n, m, l = 3, 5, 4
+        A2, B2 = MatrixOp(AMDGPU.ROCArray(randn(n, m)), l),
+            MatrixOp(AMDGPU.ROCArray(randn(n, m)), l)
+        P2 = Axt_mul_Bx(A2, B2)
+        x2 = AMDGPU.ROCArray(randn(m, l))
+        y2 = AMDGPU.zeros(l, l)
+        mul!(y2, P2, x2)
+        Ax = Array(A2.A) * Array(x2)
+        Bx = Array(B2.A) * Array(x2)
+        @test Array(y2) ≈ Ax' * Bx
+    end
+end

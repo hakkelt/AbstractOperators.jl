@@ -102,9 +102,12 @@ end
 
 # Get the array container type (Array, CuArray, etc.) from an array instance
 _array_wrapper_type(::Type{A}) where {A <: AbstractArray} = Base.typename(A).wrapper
-_array_wrapper(x::A) where {T, A <: AbstractArray{T}} = _array_wrapper_type(typeof(x isa SubArray ? parent(x) : x))
-_normalize_array_type(array_type::Type{A}, elem_type::Type{T}) where {A <: AbstractArray, T} =
-    _array_wrapper_type(A){T}
+function _array_wrapper(x::A) where {T, A <: AbstractArray{T}}
+    return _array_wrapper_type(typeof(x isa SubArray ? parent(x) : x))
+end
+function _normalize_array_type(array_type::Type{A}, elem_type::Type{T}) where {A <: AbstractArray, T}
+    return _array_wrapper_type(A){T}
+end
 
 function allocate_in_domain(L::AbstractOperator, dims... = size(L, 2)...)
     dS = domain_storage_type(L)
@@ -295,12 +298,10 @@ remove_displacement(A::AbstractOperator) = A
 
 import Base: convert
 function convert(::Type{T}, dom::Type, dim_in::Tuple, L::T) where {T <: AbstractOperator}
-    domain_type(L) != dom && error(
-        "cannot convert operator with domain $(domain_type(L)) to operator with domain $dom ",
-    )
-    size(L, 1) != dim_in && error(
-        "cannot convert operator with size $(size(L, 1)) to operator with domain $dim_in ",
-    )
+    domain_type(L) != dom &&
+        error("cannot convert operator with domain $(domain_type(L)) to operator with domain $dom ")
+    size(L, 1) != dim_in &&
+        error("cannot convert operator with size $(size(L, 1)) to operator with domain $dim_in ")
     return L
 end
 
@@ -319,7 +320,12 @@ julia> AbstractOperators.can_be_combined(Eye(10), FiniteDiff((11,)))
 true
 ```
 """
-can_be_combined(L, R) = is_eye(L) || is_eye(R) || is_null(L) || (is_null(R) && is_linear(L) && all(displacement(L) .== 0))
+function can_be_combined(L, R)
+    return is_eye(L) ||
+        is_eye(R) ||
+        is_null(L) ||
+        (is_null(R) && is_linear(L) && all(displacement(L) .== 0))
+end
 can_be_combined(L, M, R) = false
 
 """

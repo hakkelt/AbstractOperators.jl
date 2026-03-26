@@ -22,10 +22,16 @@
     @test norm(y1 - y2) <= 1.0e-12
 
     m, n1, n2, n3 = 4, 7, 5, 6
-    A1 = randn(m, n1); A2 = randn(m, n2); A3 = randn(m, n3)
-    opA1 = MatrixOp(A1); opA2 = MatrixOp(A2); opA3 = MatrixOp(A3)
+    A1 = randn(m, n1)
+    A2 = randn(m, n2)
+    A3 = randn(m, n3)
+    opA1 = MatrixOp(A1)
+    opA2 = MatrixOp(A2)
+    opA3 = MatrixOp(A3)
     opH = HCAT(opA1, opA2, opA3)
-    x1 = randn(n1); x2 = randn(n2); x3 = randn(n3)
+    x1 = randn(n1)
+    x2 = randn(n2)
+    x3 = randn(n3)
     y1 = test_op(opH, ArrayPartition(x1, x2, x3), randn(m), verb)
     @test norm(y1 - (A1 * x1 + A2 * x2 + A3 * x3)) <= 1.0e-12
 
@@ -40,7 +46,9 @@ end
     Random.seed!(0)
 
     m, n1, n2, n3 = 4, 7, 5, 6
-    opA1 = MatrixOp(randn(m, n1)); opA2 = MatrixOp(randn(m, n2)); opA3 = MatrixOp(randn(m, n3))
+    opA1 = MatrixOp(randn(m, n1))
+    opA2 = MatrixOp(randn(m, n2))
+    opA3 = MatrixOp(randn(m, n3))
     op = HCAT(opA1, opA2, opA3)
     @test is_linear(op) == true
     @test is_null(op) == false
@@ -62,7 +70,8 @@ end
     @test norm(op2 * (op2' * y1) .- diag_AAc(op2) .* y1) < 1.0e-12
 
     # storage type and thread safety
-    A1 = MatrixOp(randn(m, n1)); A2 = MatrixOp(randn(m, n2))
+    A1 = MatrixOp(randn(m, n1))
+    A2 = MatrixOp(randn(m, n2))
     op3 = HCAT(A1, A2)
     @test domain_storage_type(op3) !== nothing
     @test codomain_storage_type(op3) !== nothing
@@ -74,19 +83,23 @@ end
     Random.seed!(0)
 
     m, n1, n2 = 4, 7, 5
-    A1 = randn(m, n1); A2 = randn(m, n2)
-    d1 = randn(m); d2 = randn(m)
+    A1 = randn(m, n1)
+    A2 = randn(m, n2)
+    d1 = randn(m)
+    d2 = randn(m)
     opA1 = AffineAdd(MatrixOp(A1), d1)
     opA2 = AffineAdd(MatrixOp(A2), d2)
     opH = HCAT(opA1, opA2)
-    x1 = randn(n1); x2 = randn(n2)
+    x1 = randn(n1)
+    x2 = randn(n2)
     y1 = opH * ArrayPartition(x1, x2)
     @test norm(y1 - (A1 * x1 + d1 + A2 * x2 + d2)) <= 1.0e-12
     y2 = remove_displacement(opH) * ArrayPartition(x1, x2)
     @test norm(y2 - (A1 * x1 + A2 * x2)) <= 1.0e-12
 
     # remove_displacement idempotence
-    A1b = MatrixOp(randn(m, n1)); A2b = MatrixOp(randn(m, n2))
+    A1b = MatrixOp(randn(m, n1))
+    A2b = MatrixOp(randn(m, n2))
     op = HCAT(A1b, A2b)
     @test remove_displacement(op) == op
     opd = HCAT(AffineAdd(A1b, d1), AffineAdd(A2b, d2))
@@ -120,12 +133,14 @@ end
     @test !is_sliced(AbstractOperators.remove_slicing(Hs_comp))
 
     m, n1, n2 = 4, 3, 2
-    Aeq = MatrixOp(randn(m, n1)); Beq = MatrixOp(randn(m, n2))
+    Aeq = MatrixOp(randn(m, n1))
+    Beq = MatrixOp(randn(m, n2))
     H1a = HCAT(Aeq, Beq)
     p2 = collect(Iterators.reverse(1:ndoms(H1a, 2)))
     Hp = AbstractOperators.permute(H1a, p2)
     @test typeof(Hp) <: HCAT
-    xA = randn(size(Aeq, 2)); xB = randn(size(Beq, 2))
+    xA = randn(size(Aeq, 2))
+    xB = randn(size(Beq, 2))
     y_orig = H1a * ArrayPartition(xA, xB)
     xin = p2 == [2, 1] ? ArrayPartition(xB, xA) : ArrayPartition(xA, xB)
     @test y_orig ≈ Hp * xin
@@ -218,4 +233,50 @@ end
     A2 = jl(randn(m, n2))
     opH2 = HCAT(MatrixOp(A1), MatrixOp(A2))
     test_op(opH2, ArrayPartition(jl(randn(n1)), jl(randn(n2))), jl(randn(m)), false)
+end
+
+@testitem "HCAT (CUDA)" tags = [:gpu, :cuda, :calculus, :HCAT] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    using CUDA
+    if CUDA.functional()
+        Random.seed!(0)
+
+        n = 4
+        opH = HCAT(DiagOp(CuArray(ones(n))), DiagOp(CuArray(2 * ones(n))))
+        test_op(opH, ArrayPartition(CuArray(randn(n)), CuArray(randn(n))), CuArray(randn(n)), false)
+
+        m, n1, n2 = 4, 7, 5
+        A1 = CuArray(randn(m, n1))
+        A2 = CuArray(randn(m, n2))
+        opH2 = HCAT(MatrixOp(A1), MatrixOp(A2))
+        test_op(opH2, ArrayPartition(CuArray(randn(n1)), CuArray(randn(n2))), CuArray(randn(m)), false)
+    end
+end
+
+@testitem "HCAT (AMDGPU)" tags = [:gpu, :amdgpu, :calculus, :HCAT] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    using AMDGPU
+    if AMDGPU.functional()
+        Random.seed!(0)
+
+        n = 4
+        opH = HCAT(DiagOp(AMDGPU.ROCArray(ones(n))), DiagOp(AMDGPU.ROCArray(2 * ones(n))))
+        test_op(
+            opH,
+            ArrayPartition(AMDGPU.ROCArray(randn(n)), AMDGPU.ROCArray(randn(n))),
+            AMDGPU.ROCArray(randn(n)),
+            false,
+        )
+
+        m, n1, n2 = 4, 7, 5
+        A1 = AMDGPU.ROCArray(randn(m, n1))
+        A2 = AMDGPU.ROCArray(randn(m, n2))
+        opH2 = HCAT(MatrixOp(A1), MatrixOp(A2))
+        test_op(
+            opH2,
+            ArrayPartition(AMDGPU.ROCArray(randn(n1)), AMDGPU.ROCArray(randn(n2))),
+            AMDGPU.ROCArray(randn(m)),
+            false,
+        )
+    end
 end

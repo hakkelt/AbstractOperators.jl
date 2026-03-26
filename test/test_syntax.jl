@@ -371,3 +371,70 @@ end
     L = Eye(10)
     @test displacement(L) == 0.0
 end
+
+@testitem "Syntax: VCAT and HCAT with Tuple input" tags = [:misc, :Syntax] setup = [TestUtils] begin
+    using AbstractOperators, RecursiveArrayTools
+    n1, n2, m = 3, 4, 5
+    x1 = randn(n1)
+    x2 = randn(n2)
+
+    # HCAT * Tuple  (returns codomain array, not ArrayPartition)
+    opH = HCAT(MatrixOp(randn(m, n1)), MatrixOp(randn(m, n2)))
+    yH = opH * (x1, x2)
+    @test yH ≈ opH * ArrayPartition(x1, x2)
+
+    # VCAT * Tuple (multi-domain VCAT — each sub-op is an HCAT, so domain is a tuple)
+    # opV has domain (n1,)×(n2,) and codomain (m,)×(m,); input must be a Tuple
+    opH1 = HCAT(MatrixOp(randn(m, n1)), MatrixOp(randn(m, n2)))
+    opH2 = HCAT(MatrixOp(randn(m, n1)), MatrixOp(randn(m, n2)))
+    opV = VCAT(opH1, opH2)
+    yV = opV * (x1, x2)          # calls *(L::VCAT, b::Tuple) → returns y.x as Tuple
+    @test yV isa Tuple
+    ref = opV * ArrayPartition(x1, x2)
+    @test all(collect(yV[i]) ≈ ref.x[i] for i in eachindex(yV))
+end
+
+@testitem "Syntax: L * coeff (operator-right scalar mul)" tags = [:misc, :Syntax] setup = [
+    TestUtils,
+] begin
+    using AbstractOperators
+    n = 4
+    op = FiniteDiff(Float64, (n,), 1)
+    alpha = 3.0
+    s1 = op * alpha
+    s2 = alpha * op
+    x = randn(n)
+    @test s1 * x ≈ s2 * x
+end
+
+@testitem "Syntax: mul! fallback throws MethodError" tags = [:misc, :Syntax] setup = [TestUtils] begin
+    using AbstractOperators
+    # Custom operator with no mul! defined so the fallback in syntax.jl fires
+    struct _NoMulOp <: AbstractOperators.LinearOperator end
+    AbstractOperators.size(::_NoMulOp) = ((3,), (3,))
+    AbstractOperators.domain_type(::_NoMulOp) = Float64
+    AbstractOperators.codomain_type(::_NoMulOp) = Float64
+    op = _NoMulOp()
+    @test_throws MethodError mul!(zeros(3), op, zeros(3))
+end
+
+@testitem "Syntax: Sum getindex (multi-domain)" tags = [:misc, :Syntax] setup = [TestUtils] begin
+    using AbstractOperators
+    n = 5
+    A = MatrixOp(randn(n, n))
+    B = DiagOp(randn(n))
+    S = Sum(A, B)
+    sliced = S[2:(n - 1)]
+    x = randn(n)
+    @test sliced * x ≈ (S * x)[2:(n - 1)]
+end
+
+@testitem "Syntax: Scale getindex (ndoms == 1 branch)" tags = [:misc, :Syntax] setup = [TestUtils] begin
+    using AbstractOperators
+    n = 5
+    op = FiniteDiff(Float64, (n,), 1)   # ndoms(Scale(coeff, op), 2) == 1
+    s = Scale(2.0, op)
+    sliced = s[1:2]
+    x = randn(n)
+    @test sliced * x ≈ (s * x)[1:2]
+end

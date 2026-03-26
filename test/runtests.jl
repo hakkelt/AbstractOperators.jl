@@ -1,26 +1,27 @@
-using TestItemRunner
+using TestItemRunner, CUDA, AMDGPU
 
-if Base.find_package("CUDA") !== nothing
-    @eval import CUDA
-    const HAS_CUDA = CUDA.functional()
-else
-    const HAS_CUDA = false
-end
-
-if Base.find_package("AMDGPU") !== nothing
-    @eval import AMDGPU
-    const HAS_AMDGPU = AMDGPU.functional()
-else
-    const HAS_AMDGPU = false
-end
 const VERB = get(ENV, "ABSTRACTOPERATORS_TEST_VERBOSE", "false") == "true"
-const FILTER = ti -> begin
-    run_item = (!(:cuda in ti.tags) || HAS_CUDA) &&
-               (!(:amdgpu in ti.tags) || HAS_AMDGPU)
-    if VERB && run_item
-        println("Running @testitem: ", ti.name)
+const FILTER = if length(ARGS) > 0
+    @assert length(ARGS) == 1
+    parts = split(ARGS[1], ",")
+    tags = map(p -> Symbol(p[2:end]), filter(x -> startswith(x, ":"), parts))
+    names = filter(x -> !startswith(x, ":"), parts)
+    ti -> begin
+        run_item = any(t -> t in ti.tags, tags) || any(n -> n == ti.name, names)
+        if VERB && run_item
+            println("Running @testitem: ", ti.name)
+        end
+        run_item
     end
-    run_item
+else
+    ti -> begin
+        run_item = (!(:cuda in ti.tags) || CUDA.functional()) &&
+                (!(:amdgpu in ti.tags) || AMDGPU.functional())
+        if VERB && run_item
+            println("Running @testitem: ", ti.name)
+        end
+        run_item
+    end
 end
 
 @run_package_tests filter = FILTER

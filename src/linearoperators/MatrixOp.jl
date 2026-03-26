@@ -48,10 +48,12 @@ function MatrixOp(
 end
 ###
 
-MatrixOp(A::M; array_type::Type = _array_wrapper_type(M)) where {M <: AbstractMatrix} =
-    MatrixOp(eltype(A), (size(A, 2),), A; array_type)
-MatrixOp(D::Type, A::M; array_type::Type = _array_wrapper_type(M)) where {M <: AbstractMatrix} =
-    MatrixOp(D, (size(A, 2),), A; array_type)
+function MatrixOp(A::M; array_type::Type = _array_wrapper_type(M)) where {M <: AbstractMatrix}
+    return MatrixOp(eltype(A), (size(A, 2),), A; array_type)
+end
+function MatrixOp(D::Type, A::M; array_type::Type = _array_wrapper_type(M)) where {M <: AbstractMatrix}
+    return MatrixOp(D, (size(A, 2),), A; array_type)
+end
 function MatrixOp(A::M, n::Integer) where {M <: AbstractMatrix}
     return MatrixOp(eltype(A), (size(A, 2), n), A; array_type = _array_wrapper_type(M))
 end
@@ -102,7 +104,7 @@ function mul!(y::AbstractArray, L::MatrixOp, b::AbstractArray)
     return mul!(y, L.A, b)
 end
 # NC=1 implicit batching: matrix input accepted (domain declared as 1D but each column is processed)
-function mul!(y::AbstractArray, L::MatrixOp{<:Any, <:Any, <:Any, 1, <:Any, <:Any}, b::AbstractArray)
+function mul!(y::AbstractArray, L::MatrixOp{<:Any, <:Any, <:Any, 1}, b::AbstractArray)
     return mul!(y, L.A, b)
 end
 function mul!(y::AbstractArray, L::AdjointOperator{<:MatrixOp}, b::AbstractArray)
@@ -110,7 +112,9 @@ function mul!(y::AbstractArray, L::AdjointOperator{<:MatrixOp}, b::AbstractArray
     return mul!(y, L.A.A', b)
 end
 # NC=1 adjoint implicit batching: matrix input accepted
-function mul!(y::AbstractArray, L::AdjointOperator{<:MatrixOp{<:Any, <:Any, <:Any, 1, <:Any, <:Any}}, b::AbstractArray)
+function mul!(
+        y::AbstractArray, L::AdjointOperator{<:MatrixOp{<:Any, <:Any, <:Any, 1}}, b::AbstractArray
+    )
     return mul!(y, L.A.A', b)
 end
 
@@ -147,10 +151,13 @@ is_AAc_diagonal(L::MatrixOp) = isdiag(L.A * L.A')
 is_AcA_diagonal(L::MatrixOp) = isdiag(L.A' * L.A)
 is_null(L::MatrixOp) = L.A == 0 * I
 is_eye(L::MatrixOp) = L.A == I
-is_invertible(L::MatrixOp) =
-    size(L.A, 1) == size(L.A, 2) &&
-    !isapprox(det(BigFloat.(L.A)), 0, atol = eps(eltype(L.A)) * 10)
-is_orthogonal(L::MatrixOp) = size(L.A, 1) == size(L.A, 2) && all(<(eps(eltype(L.A)) * 10), L.A' * L.A - I)
+function is_invertible(L::MatrixOp)
+    return size(L.A, 1) == size(L.A, 2) &&
+        !isapprox(det(BigFloat.(L.A)), 0; atol = eps(eltype(L.A)) * 10)
+end
+function is_orthogonal(L::MatrixOp)
+    return size(L.A, 1) == size(L.A, 2) && all(<(eps(eltype(L.A)) * 10), L.A' * L.A - I)
+end
 is_full_row_rank(L::MatrixOp) = rank(L.A) == size(L.A, 1)
 is_full_column_rank(L::MatrixOp) = rank(L.A) == size(L.A, 2)
 is_positive_definite(L::MatrixOp) = isposdef(L.A)

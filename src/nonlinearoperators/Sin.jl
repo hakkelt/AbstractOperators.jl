@@ -20,10 +20,10 @@ function Sin(
     return Sin{T, N, S}(DomainDim)
 end
 
-Sin(DomainDim::NTuple{N, Int}; array_type::Type = Array{Float64}) where {N} =
-    Sin(Float64, DomainDim; array_type)
-Sin(DomainDim::Vararg{Int}; array_type::Type = Array{Float64}) =
-    Sin(Float64, DomainDim; array_type)
+function Sin(DomainDim::NTuple{N, Int}; array_type::Type = Array{Float64}) where {N}
+    return Sin(Float64, DomainDim; array_type)
+end
+Sin(DomainDim::Vararg{Int}; array_type::Type = Array{Float64}) = Sin(Float64, DomainDim; array_type)
 
 function Sin(x::AbstractArray{T}; array_type::Type = _array_wrapper(x)) where {T}
     S = _normalize_array_type(array_type, T)

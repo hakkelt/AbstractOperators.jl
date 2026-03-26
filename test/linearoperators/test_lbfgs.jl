@@ -197,7 +197,10 @@ end
     @test H.currmem == prev_mem
 
     # Show output symbol
-    io = IOBuffer(); show(io, H); s = String(take!(io)); @test occursin("LBFGS", s)
+    io = IOBuffer()
+    show(io, H)
+    s = String(take!(io))
+    @test occursin("LBFGS", s)
 
     # Testing reset
 
@@ -209,4 +212,84 @@ end
 
     @test ones(size(H, 1)) == H * ones(size(H, 1))
     @test ArrayPartition(ones.(size(HH, 1))) == HH * ArrayPartition(ones.(size(HH, 1))...)
+end
+
+@testitem "L-BFGS (CUDA)" tags = [:gpu, :cuda, :linearoperator, :LBFGS] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    using CUDA
+    if CUDA.functional()
+        Random.seed!(42)
+
+        n = 64
+        mem = 5
+        x_prev = CUDA.randn(Float32, n)
+        grad_prev = CUDA.randn(Float32, n)
+        H = LBFGS(x_prev, mem)
+        @test domain_storage_type(H) <: CUDA.CuArray
+        @test codomain_storage_type(H) <: CUDA.CuArray
+
+        x = CUDA.randn(Float32, n)
+        grad = CUDA.randn(Float32, n)
+        update!(H, x, x_prev, grad, grad_prev)
+
+        y = H * grad
+        @test y isa CUDA.CuArray
+        y2 = similar(grad)
+        mul!(y2, H, grad)
+        @test collect(y) ≈ collect(y2)
+
+        g = CUDA.randn(Float32, n)
+        lhs = collect(H' * g)
+        rhs = similar(g)
+        mul!(rhs, H', g)
+        @test lhs ≈ collect(rhs)
+
+        xp = ArrayPartition(CUDA.randn(Float32, n), CUDA.randn(Float32, n))
+        gp = ArrayPartition(CUDA.randn(Float32, n), CUDA.randn(Float32, n))
+        Hp = LBFGS(xp, mem)
+        @test domain_storage_type(Hp) == typeof(xp)
+        @test codomain_storage_type(Hp) == typeof(xp)
+        yp = Hp * gp
+        @test yp isa typeof(xp)
+    end
+end
+
+@testitem "L-BFGS (AMDGPU)" tags = [:gpu, :amdgpu, :linearoperator, :LBFGS] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    using AMDGPU
+    if AMDGPU.functional()
+        Random.seed!(42)
+
+        n = 64
+        mem = 5
+        x_prev = AMDGPU.ROCArray(randn(Float32, n))
+        grad_prev = AMDGPU.ROCArray(randn(Float32, n))
+        H = LBFGS(x_prev, mem)
+        @test domain_storage_type(H) <: AMDGPU.ROCArray
+        @test codomain_storage_type(H) <: AMDGPU.ROCArray
+
+        x = AMDGPU.ROCArray(randn(Float32, n))
+        grad = AMDGPU.ROCArray(randn(Float32, n))
+        update!(H, x, x_prev, grad, grad_prev)
+
+        y = H * grad
+        @test y isa AMDGPU.ROCArray
+        y2 = similar(grad)
+        mul!(y2, H, grad)
+        @test collect(y) ≈ collect(y2)
+
+        g = AMDGPU.ROCArray(randn(Float32, n))
+        lhs = collect(H' * g)
+        rhs = similar(g)
+        mul!(rhs, H', g)
+        @test lhs ≈ collect(rhs)
+
+        xp = ArrayPartition(AMDGPU.ROCArray(randn(Float32, n)), AMDGPU.ROCArray(randn(Float32, n)))
+        gp = ArrayPartition(AMDGPU.ROCArray(randn(Float32, n)), AMDGPU.ROCArray(randn(Float32, n)))
+        Hp = LBFGS(xp, mem)
+        @test domain_storage_type(Hp) == typeof(xp)
+        @test codomain_storage_type(Hp) == typeof(xp)
+        yp = Hp * gp
+        @test yp isa typeof(xp)
+    end
 end

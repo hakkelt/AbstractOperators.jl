@@ -52,7 +52,10 @@ end
     op = MyLinOp(Float64, (m,), (n,), (y, x) -> mul!(y, A, x), (y, x) -> mul!(y, A', x))
     x1 = randn(m)
     @test_throws DimensionMismatch op * randn(m + 1)
-    io = IOBuffer(); show(io, op); s = String(take!(io)); @test occursin("A", s)
+    io = IOBuffer()
+    show(io, op)
+    s = String(take!(io))
+    @test occursin("A", s)
     op2 = MyLinOp(Float64, (m,), Float64, (n,), (y, x) -> mul!(y, A, x), (y, x) -> mul!(y, A', x))
     @test size(op2) == ((n,), (m,))
     @test op2 * x1 ≈ A * x1
@@ -69,4 +72,40 @@ end
     y = jl(randn(n))
     test_op(op, x, y, false)
     @test domain_storage_type(op) <: AT
+end
+
+@testitem "MyLinOp (CUDA)" tags = [:gpu, :cuda, :linearoperator, :MyLinOp] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    using CUDA
+    if CUDA.functional()
+        Random.seed!(0)
+        n, m = 5, 4
+        A = CuArray(randn(n, m))
+        AT = Base.typename(typeof(CUDA.zeros(Float64, 1))).wrapper
+        op = MyLinOp(
+            Float64, (m,), (n,), (y, x) -> mul!(y, A, x), (y, x) -> mul!(y, A', x); array_type = AT
+        )
+        x = CuArray(randn(m))
+        y = CuArray(randn(n))
+        test_op(op, x, y, false)
+        @test domain_storage_type(op) <: AT
+    end
+end
+
+@testitem "MyLinOp (AMDGPU)" tags = [:gpu, :amdgpu, :linearoperator, :MyLinOp] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    using AMDGPU
+    if AMDGPU.functional()
+        Random.seed!(0)
+        n, m = 5, 4
+        A = AMDGPU.ROCArray(randn(n, m))
+        AT = Base.typename(typeof(AMDGPU.zeros(Float64, 1))).wrapper
+        op = MyLinOp(
+            Float64, (m,), (n,), (y, x) -> mul!(y, A, x), (y, x) -> mul!(y, A', x); array_type = AT
+        )
+        x = AMDGPU.ROCArray(randn(m))
+        y = AMDGPU.ROCArray(randn(n))
+        test_op(op, x, y, false)
+        @test domain_storage_type(op) <: AT
+    end
 end

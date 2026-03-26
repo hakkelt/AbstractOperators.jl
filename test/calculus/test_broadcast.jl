@@ -10,7 +10,8 @@
     opR = BroadCast(opA1, dim_out)
     x1 = randn(n)
     y1 = test_op(opR, x1, randn(dim_out), verb)
-    y2 = zeros(dim_out); y2 .= A1 * x1
+    y2 = zeros(dim_out)
+    y2 .= A1 * x1
     @test norm(y1 - y2) <= 1.0e-12
 
     m, n, l, k = 8, 4, 5, 7
@@ -19,20 +20,24 @@
     opR = BroadCast(opA1, dim_out)
     x1 = randn(m, n)
     y1 = test_op(opR, x1, randn(dim_out), verb)
-    y2 = zeros(dim_out); y2 .= x1
+    y2 = zeros(dim_out)
+    y2 .= x1
     @test norm(y1 - y2) <= 1.0e-12
     @test_throws Exception BroadCast(opA1, (m, m))
 
-    m, n = 8, 4; dim_out = (m, 10)
+    m, n = 8, 4
+    dim_out = (m, 10)
     d1 = randn(m)
     opA1 = AffineAdd(MatrixOp(randn(m, n)), d1)
     opR = BroadCast(opA1, dim_out)
     x1 = randn(n)
     y1 = opR * x1
-    y2 = zeros(dim_out); y2 .= opA1.A.A * x1 + d1
+    y2 = zeros(dim_out)
+    y2 .= opA1.A.A * x1 + d1
     @test norm(y1 - y2) <= 1.0e-12
     y3 = remove_displacement(opR) * x1
-    y4 = zeros(dim_out); y4 .= opA1.A.A * x1
+    y4 = zeros(dim_out)
+    y4 .= opA1.A.A * x1
     @test norm(y3 - y4) <= 1.0e-12
 end
 
@@ -40,7 +45,8 @@ end
     using Random, AbstractOperators
     Random.seed!(0)
 
-    m, n = 8, 4; dim_out = (m, 10)
+    m, n = 8, 4
+    dim_out = (m, 10)
     opA1 = MatrixOp(randn(m, n))
     opR = BroadCast(opA1, dim_out)
     @test is_null(opR) == is_null(opA1)
@@ -57,7 +63,8 @@ end
     @test codomain_storage_type(opR) !== nothing
     @test AbstractOperators.has_fast_opnorm(opR) == AbstractOperators.has_fast_opnorm(opA1)
 
-    m = 3; E = Eye(m)
+    m = 3
+    E = Eye(m)
     SB = BroadCast(E, (m, 2))
     @test SB isa AbstractOperators.NoOperatorBroadCast
     x = randn(m)
@@ -72,7 +79,8 @@ end
     Random.seed!(0)
 
     n, l = 4, 7
-    x = randn(n); r = randn(n, l)
+    x = randn(n)
+    r = randn(n, l)
     opS = Sigmoid(Float64, (n,), 2)
     op = BroadCast(opS, (n, l))
     y, grad = test_NLop(op, x, r, verb)
@@ -167,4 +175,46 @@ end
     dim_out2 = (m2, n2, 5)
     opR2 = BroadCast(Eye(Float64, (m2, n2); array_type=JLArray{Float64}), dim_out2; threaded=false)
     test_op(opR2, jl(randn(m2, n2)), jl(randn(dim_out2)), false)
+end
+
+@testitem "BroadCast (CUDA)" tags = [:gpu, :cuda, :calculus, :BroadCast] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    using CUDA
+    if CUDA.functional()
+        Random.seed!(0)
+
+        m, n = 8, 4
+        dim_out = (m, 10)
+        A1 = CuArray(randn(m, n))
+        opR = BroadCast(MatrixOp(A1), dim_out; threaded = false)
+        test_op(opR, CuArray(randn(n)), CuArray(randn(dim_out)), false)
+
+        m2, n2 = 3, 3
+        dim_out2 = (m2, n2, 5)
+        opR2 = BroadCast(
+            Eye(Float64, (m2, n2); array_type = CUDA.CuArray{Float64, 2}), dim_out2; threaded = false
+        )
+        test_op(opR2, CuArray(randn(m2, n2)), CuArray(randn(dim_out2)), false)
+    end
+end
+
+@testitem "BroadCast (AMDGPU)" tags = [:gpu, :amdgpu, :calculus, :BroadCast] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    using AMDGPU
+    if AMDGPU.functional()
+        Random.seed!(0)
+
+        m, n = 8, 4
+        dim_out = (m, 10)
+        A1 = AMDGPU.ROCArray(randn(m, n))
+        opR = BroadCast(MatrixOp(A1), dim_out; threaded = false)
+        test_op(opR, AMDGPU.ROCArray(randn(n)), AMDGPU.ROCArray(randn(dim_out)), false)
+
+        m2, n2 = 3, 3
+        dim_out2 = (m2, n2, 5)
+        opR2 = BroadCast(
+            Eye(Float64, (m2, n2); array_type = AMDGPU.ROCArray{Float64, 2}), dim_out2; threaded = false
+        )
+        test_op(opR2, AMDGPU.ROCArray(randn(m2, n2)), AMDGPU.ROCArray(randn(dim_out2)), false)
+    end
 end

@@ -49,8 +49,9 @@ function Variation(
     ) where {N}
     return Variation(Float64, dim_in; threaded, array_type)
 end
-Variation(dim_in::Vararg{Int}; threaded = true, array_type::Type = Array{Float64}) =
-    Variation(dim_in; threaded, array_type)
+function Variation(dim_in::Vararg{Int}; threaded = true, array_type::Type = Array{Float64})
+    return Variation(dim_in; threaded, array_type)
+end
 function Variation(x::AbstractArray; threaded = true)
     S = _array_wrapper(x){eltype(x)}
     T = eltype(x)

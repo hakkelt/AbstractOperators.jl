@@ -1,6 +1,7 @@
 module GpuExt
 
 using GPUArrays
+using KernelAbstractions
 using AbstractOperators
 import LinearAlgebra: mul!
 import AbstractOperators:
@@ -11,7 +12,9 @@ import AbstractOperators:
 using RecursiveArrayTools: ArrayPartition
 
 include("properties.jl")
-include("linearoperators.jl")
+include("linearoperators/getindex.jl")
+include("linearoperators/zeropad.jl")
+include("linearoperators/variation.jl")
 include("cpuwrapper.jl")
 include("guards.jl")
 
