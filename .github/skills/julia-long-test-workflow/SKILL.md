@@ -29,6 +29,24 @@ user-invocable: true
 
 ## Common Commands
 
+Main package coverage:
+
+```sh
+julia --project=test --code-coverage=user test/runtests.jl
+```
+
+Subpackage coverage (DSPOperators, FFTWOperators, NFFTOperators, WaveletOperators have **no** standalone `test/` directory):
+
+> All subpackage code and their GPU extensions are exercised by the parent package's
+> `test/` project. Run the same coverage command above; the `.cov` files under each
+> subpackage's `src/` will be populated automatically.
+
+Process coverage after a local run:
+
+```sh
+julia -e 'using Coverage; Coverage.LCOV.writefile("lcov.info", Coverage.process_folder())'
+```
+
 Filtered test run:
 
 ```julia
@@ -65,19 +83,3 @@ benchpkgtable \
 - JET coverage remains complete for public API touched.
 - Benchmark deltas are measured and reported.
 - Logs are saved under `.temp/`.
-
-## Session Lessons (AbstractOperators GPU migration)
-
-- Julia package extensions can only `import` the parent package, trigger package(s), and stdlib; if extension code needs a parent dependency API, expose it from the parent module first.
-- For FFT plans, prefer `inv(plan)` (AbstractFFTs-generic) over backend-specific `FFTW.plan_inv(...)` to keep CUDA/AMDGPU compatibility.
-- With JLArrays/GPUArrays, avoid `copyto!(gpu, cpu_view)` where source is a `SubArray`; materialize first (for example `src[1:n]`) or copy from a plain array.
-- During large rebases, resolve conflicts by preserving known-good behavior first, then run focused `TestItemRunner` filters before full-suite reruns.
-- Prefer `@testitem` over nested `@testset`; split oversized files into helper modules + multiple test items.
-- For honest GPU coverage, keep JLArray checks separate from real device checks and add backend-specific tags (`:cuda`, `:amdgpu`) plus runtime skip guards.
-- In `test/runtests.jl`, filter backend-tagged testitems when corresponding runtimes are unavailable, but keep per-test safety checks too.
-- Add explicit tests for `domain_storage_type`/`codomain_storage_type` and that `op * x` allocates on the active backend.
-- In benchmark setup code for normal operators, normalize potentially wrapped domain/codomain type traits to scalar element types before calling `randn`/`zeros`.
-- Agent sub-tasks frequently generate `Eye(T, dims, array_type)` (3 positional args) instead of the correct `Eye(T, dims; array_type=...)` (keyword). Always verify agent output for this mistake.
-- When fixing "unexpected pass" Aqua errors: remove the `broken=true` or `persistent_tasks=false` workaround and use `Aqua.test_all(pkg)` once the underlying issue is resolved.
-- JET `@test_opt` catches runtime dispatch from `array_type::Type` (unparameterized). Use `array_type::Type{<:AbstractArray}` annotations AND avoid forwarding kwargs between kwarg-accepting functions (use an internal positional-arg helper like `_make_eye` instead of `Eye(t, dims; array_type) = Eye(t, dims; array_type)`).
-- Stochastic test assertions like `op * randn(n) ≈ op' * (op * randn(n))` are always wrong when the two `randn` calls produce different vectors; capture the vector first.

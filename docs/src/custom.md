@@ -249,7 +249,7 @@ mul!(y_out, L, x)
 @test y_out ≈ L * x
 ```
 
-## Developer Notes: Performance and GPU Storage
+## Performance and GPU Storage
 
 ### Threading heuristic
 

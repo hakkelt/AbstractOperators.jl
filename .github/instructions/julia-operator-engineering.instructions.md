@@ -25,3 +25,5 @@ applyTo: "src/**/*.jl"
 - Prefer behavior-preserving refactors: extract helpers, separate setup from kernels, reduce method size, but do not weaken checks.
 - If modifying copy semantics, preserve the package convention that immutable/read-only arrays are shared while mutable working buffers are copied deliberately.
 - Keep source formatted with Runic-compatible Julia style.
+- GPU extensions live under `ext/GpuExt/` (triggered by `GPUArrays`). Override `mul!` there for any operator whose base implementation uses scalar indexing loops (`@nloops`, `@nref`, `@inbounds y[i] = b[j]`); replace with broadcast-over-view (`y .= view(b, idx...)`).
+- When overriding a threaded operator (e.g. `Variation{..., true}`) for GPU, delegate to the non-threaded variant (`Variation{..., false}`) — the threading strategy is CPU-only.
