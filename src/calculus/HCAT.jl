@@ -44,6 +44,7 @@ struct HCAT{
         L <: NTuple{N, AbstractOperator},
         P <: Tuple,
         C <: AbstractArray,
+        DS <: AbstractArray,  # domain storage type (fixed at construction)
     } <: AbstractOperator
     A::L     # tuple of AbstractOperators
     idxs::P  # indices
@@ -60,8 +61,18 @@ struct HCAT{
         if any([codomain_type(A[1]) != codomain_type(a) for a in A])
             throw(error("operators must all share the same codomain_type!"))
         end
-        return new{N, L, P, C}(A, idxs, buf)
+        DS = _compute_hcat_ds(A, idxs)
+        return new{N, L, P, C, DS}(A, idxs, buf)
     end
+end
+
+function _compute_hcat_ds(A, idxs)
+    ds_list = [d <: ArrayPartition ? [d.parameters[2].types...] : d for d in domain_storage_type.(A)]
+    domain = vcat(ds_list...)
+    p = vcat([[idx...] for idx in idxs]...)
+    invpermute!(domain, p)
+    T = promote_type([eltype(d) for d in domain]...)
+    return ArrayPartition{T, Tuple{domain...}}
 end
 
 function HCAT(A::Vararg{AbstractOperator})
@@ -305,13 +316,7 @@ end
     return :(_hcat_apply_invperm($natural_expr, H.idxs))
 end
 codomain_type(L::HCAT) = codomain_type.(Ref(L.A[1]))
-function domain_storage_type(H::HCAT)
-    domain = vcat([d <: ArrayPartition ? [d.parameters[2].types...] : d for d in domain_storage_type.(H.A)]...)
-    p = vcat([[idx...] for idx in H.idxs]...)
-    invpermute!(domain, p)
-    T = promote_type(domain_type(H)...)
-    return ArrayPartition{T, Tuple{domain...}}
-end
+domain_storage_type(::HCAT{N, L, P, C, DS}) where {N, L, P, C, DS} = DS
 codomain_storage_type(L::HCAT) = codomain_storage_type.(Ref(L.A[1]))
 
 is_linear(L::HCAT) = all(is_linear.(L.A))
@@ -358,3 +363,9 @@ function permute(H::HCAT, p::AbstractVector{Int})
 end
 
 remove_displacement(H::HCAT) = HCAT(remove_displacement.(H.A), H.idxs, H.buf)
+
+function _copy_operator_impl(op::HCAT; storage_type = nothing, threaded = nothing)
+    new_buf = _convert_buffer(op.buf, storage_type)
+    new_ops = tuple([copy_operator(a; storage_type, threaded) for a in op.A]...)
+    return HCAT(new_ops, op.idxs, new_buf)
+end

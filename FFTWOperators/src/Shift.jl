@@ -31,7 +31,7 @@ julia> A2 = FFTShift((2,2), (1,2)); A2 * reshape(1.0:4.0, 2, 2)
  3.0  1.0
 ```
 """
-struct FFTShift{T, N, M} <: ShiftOp
+struct FFTShift{T, N, M, S <: AbstractArray{T}} <: ShiftOp
     dim_in::NTuple{N, Int}
     dirs::NTuple{M, Int}
 end
@@ -55,7 +55,7 @@ julia> B2 = IFFTShift((2,2), (1,2)); B2 * [4.0 3.0; 2.0 1.0] == [1.0 2.0; 3.0 4.
 true
 ```
 """
-struct IFFTShift{T, N, M} <: ShiftOp
+struct IFFTShift{T, N, M, S <: AbstractArray{T}} <: ShiftOp
     dim_in::NTuple{N, Int}
     dirs::NTuple{M, Int}
 end
@@ -92,7 +92,7 @@ julia> S2 = SignAlternation((2,2), (1,2)); S2 * ones(2,2)
  -1.0   1.0
 ```
 """
-struct SignAlternation{S, N, M, Th} <: LinearOperator
+struct SignAlternation{T, N, M, Th, S <: AbstractArray{T}} <: LinearOperator
     dim_in::NTuple{N, Int}
     dirs::NTuple{M, Int}
 end
@@ -104,45 +104,92 @@ function _normalize_dirs(::NTuple{N, Int}, dirs) where {N}
     return d
 end
 
-function FFTShift(::Type{T}, dim_in::NTuple{N, Int}, dirs) where {T <: Number, N}
+function _make_shift(::Type{Op}, ::Type{T}, dim_in::NTuple{N, Int}, dirs, array_type::Type) where {Op, T <: Number, N}
     d = _normalize_dirs(dim_in, dirs)
-    return FFTShift{T, N, length(d)}(dim_in, d)
+    S = _normalize_array_type(array_type, T)
+    return Op{T, N, length(d), S}(dim_in, d)
 end
-function FFTShift(::Type{T}, dim_in::NTuple{N, Int}) where {T <: Number, N}
-    return FFTShift(T, dim_in, Tuple(1:N))
-end
-FFTShift(dim_in::NTuple{N, Int}, dirs) where {N} = FFTShift(Float64, dim_in, dirs)
-FFTShift(dim_in::NTuple{N, Int}) where {N} = FFTShift(Float64, dim_in, Tuple(1:N))
-FFTShift(dim_in::Vararg{Int}) = FFTShift(dim_in)
 
-function IFFTShift(::Type{T}, dim_in::NTuple{N, Int}, dirs) where {T <: Number, N}
-    d = _normalize_dirs(dim_in, dirs)
-    return IFFTShift{T, N, length(d)}(dim_in, d)
+function FFTShift(
+        ::Type{T}, dim_in::NTuple{N, Int}, dirs;
+        array_type::Type{<:AbstractArray} = Array{T},
+    ) where {T <: Number, N}
+    return _make_shift(FFTShift, T, dim_in, dirs, array_type)
 end
-function IFFTShift(::Type{T}, dim_in::NTuple{N, Int}) where {T <: Number, N}
-    return IFFTShift(T, dim_in, Tuple(1:N))
+function FFTShift(
+        ::Type{T}, dim_in::NTuple{N, Int};
+        array_type::Type{<:AbstractArray} = Array{T},
+    ) where {T <: Number, N}
+    return FFTShift(T, dim_in, Tuple(1:N); array_type)
 end
-IFFTShift(dim_in::NTuple{N, Int}, dirs) where {N} = IFFTShift(Float64, dim_in, dirs)
-IFFTShift(dim_in::NTuple{N, Int}) where {N} = IFFTShift(Float64, dim_in, Tuple(1:N))
+function FFTShift(dim_in::NTuple{N, Int}, dirs; array_type::Type{<:AbstractArray} = Array{Float64}) where {N}
+    return FFTShift(Float64, dim_in, dirs; array_type)
+end
+function FFTShift(dim_in::NTuple{N, Int}; array_type::Type{<:AbstractArray} = Array{Float64}) where {N}
+    return FFTShift(Float64, dim_in, Tuple(1:N); array_type)
+end
+FFTShift(dim_in::Vararg{Int}) = FFTShift(dim_in)
+function FFTShift(x::A) where {A <: AbstractArray}
+    return FFTShift(eltype(x), size(x); array_type = typeof(x isa SubArray ? parent(x) : x))
+end
+
+function IFFTShift(
+        ::Type{T}, dim_in::NTuple{N, Int}, dirs;
+        array_type::Type{<:AbstractArray} = Array{T},
+    ) where {T <: Number, N}
+    return _make_shift(IFFTShift, T, dim_in, dirs, array_type)
+end
+function IFFTShift(
+        ::Type{T}, dim_in::NTuple{N, Int};
+        array_type::Type{<:AbstractArray} = Array{T},
+    ) where {T <: Number, N}
+    return IFFTShift(T, dim_in, Tuple(1:N); array_type)
+end
+function IFFTShift(dim_in::NTuple{N, Int}, dirs; array_type::Type{<:AbstractArray} = Array{Float64}) where {N}
+    return IFFTShift(Float64, dim_in, dirs; array_type)
+end
+function IFFTShift(dim_in::NTuple{N, Int}; array_type::Type{<:AbstractArray} = Array{Float64}) where {N}
+    return IFFTShift(Float64, dim_in, Tuple(1:N); array_type)
+end
 IFFTShift(dim_in::Vararg{Int}) = IFFTShift(dim_in)
+function IFFTShift(x::A) where {A <: AbstractArray}
+    return IFFTShift(eltype(x), size(x); array_type = typeof(x isa SubArray ? parent(x) : x))
+end
 
 function SignAlternation(
-        ::Type{S}, dim_in::NTuple{N, Int}, dirs; threaded::Bool = true
-    ) where {S <: Number, N}
+        ::Type{T}, dim_in::NTuple{N, Int}, dirs;
+        threaded::Bool = true, array_type::Type{<:AbstractArray} = Array{T},
+    ) where {T <: Number, N}
     d = _normalize_dirs(dim_in, dirs)
     threaded = threaded && Threads.nthreads() > 1
-    return SignAlternation{S, N, length(d), threaded}(dim_in, d)
+    S = _normalize_array_type(array_type, T)
+    return SignAlternation{T, N, length(d), threaded, S}(dim_in, d)
 end
-function SignAlternation(dim_in::NTuple{N, Int}, dirs; threaded::Bool = true) where {N}
-    return SignAlternation(Float64, dim_in, dirs; threaded)
+function SignAlternation(
+        dim_in::NTuple{N, Int}, dirs;
+        threaded::Bool = true, array_type::Type{<:AbstractArray} = Array{Float64},
+    ) where {N}
+    return SignAlternation(Float64, dim_in, dirs; threaded, array_type)
+end
+function SignAlternation(x::A, dirs; threaded::Bool = true) where {A <: AbstractArray}
+    return SignAlternation(
+        eltype(x), size(x), dirs;
+        threaded, array_type = typeof(x isa SubArray ? parent(x) : x),
+    )
 end
 
 domain_type(::FFTShift{T}) where {T} = T
 codomain_type(::FFTShift{T}) where {T} = T
+domain_storage_type(::FFTShift{T, N, M, S}) where {T, N, M, S} = S
+codomain_storage_type(::FFTShift{T, N, M, S}) where {T, N, M, S} = S
 domain_type(::IFFTShift{T}) where {T} = T
 codomain_type(::IFFTShift{T}) where {T} = T
-domain_type(::SignAlternation{S}) where {S} = S
-codomain_type(::SignAlternation{S}) where {S} = S
+domain_storage_type(::IFFTShift{T, N, M, S}) where {T, N, M, S} = S
+codomain_storage_type(::IFFTShift{T, N, M, S}) where {T, N, M, S} = S
+domain_type(::SignAlternation{T}) where {T} = T
+codomain_type(::SignAlternation{T}) where {T} = T
+domain_storage_type(::SignAlternation{T, N, M, Th, S}) where {T, N, M, Th, S} = S
+codomain_storage_type(::SignAlternation{T, N, M, Th, S}) where {T, N, M, Th, S} = S
 
 size(L::FFTShift) = (L.dim_in, L.dim_in)
 size(L::IFFTShift) = (L.dim_in, L.dim_in)
@@ -354,15 +401,15 @@ function alternate_sign(x::AbstractArray, dirs::Int...; threaded::Bool = true)
 end
 
 function mul!(
-        y::AbstractArray, L::SignAlternation{S, N, M, Th}, b::AbstractArray
-    ) where {S, N, M, Th}
+        y::AbstractArray, L::SignAlternation{T, N, M, Th}, b::AbstractArray
+    ) where {T, N, M, Th}
     check(y, L, b)
     return _alternate_sign!(y, b, L.dirs; threaded = Th)
 end
 
 has_optimized_normalop(::Union{FFTShift, IFFTShift, SignAlternation}) = true
 function get_normal_op(L::Union{FFTShift, IFFTShift, SignAlternation})
-    return Eye(domain_type(L), size(L, 1))
+    return Eye(domain_type(L), size(L, 1); array_type = domain_storage_type(L))
 end
 
 LinearAlgebra.adjoint(L::SignAlternation) = L
@@ -384,7 +431,7 @@ function _check_shift_dirs(::NTuple{N, Int}, dirs::NTuple{M, Int}) where {N, M}
             throw(ArgumentError("dirs must be sorted in ascending order"))
         end
     end
-    return
+    return nothing
 end
 
 function _is_dft_op(op, side)
@@ -412,10 +459,10 @@ function _shift_op(
         _check_shift_dirs(size(op, 2), domain_shifts)
         shifted_domain_dims_shape = size(op, 2)[collect(domain_shifts)]
         if all(iseven, shifted_domain_dims_shape) && _is_dft_op(op, :domain)
-            domain_op = SignAlternation(codomain_type(op), size(op, 1), domain_shifts)
+            domain_op = SignAlternation(codomain_type(op), size(op, 1), domain_shifts; array_type = codomain_storage_type(op))
             op = domain_op * op
         else
-            domain_op = shift_op_type(domain_type(op), size(op, 2), domain_shifts)
+            domain_op = shift_op_type(domain_type(op), size(op, 2), domain_shifts; array_type = domain_storage_type(op))
             op = op * domain_op
         end
     end
@@ -423,10 +470,10 @@ function _shift_op(
         _check_shift_dirs(size(op, 1), codomain_shifts)
         shifted_codomain_dims_shape = size(op, 1)[collect(codomain_shifts)]
         if all(iseven, shifted_codomain_dims_shape) && _is_dft_op(op, :codomain)
-            codomain_op = SignAlternation(domain_type(op), size(op, 2), codomain_shifts)
+            codomain_op = SignAlternation(domain_type(op), size(op, 2), codomain_shifts; array_type = domain_storage_type(op))
             op = op * codomain_op
         else
-            codomain_op = shift_op_type(codomain_type(op), size(op, 1), codomain_shifts)
+            codomain_op = shift_op_type(codomain_type(op), size(op, 1), codomain_shifts; array_type = codomain_storage_type(op))
             op = codomain_op * op
         end
     end

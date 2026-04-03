@@ -242,6 +242,7 @@ function create_BatchOp(
         codomain_batch_dim_mask,
         spreading_dims,
     )
+    threaded = threaded && _should_thread(operators[1])
     if threaded && nthreads() > 1
         type_args = (
             dType,
@@ -318,8 +319,23 @@ function guess_optimal_threading_strategy(operators, batch_size)
     copied_ops_size = Base.summarysize(operators) * min(nthreads(), prod(batch_size))
     domain_array_size = sizeof(domain_type(operators[1])) * prod(size(operators[1], 2))
     codomain_array_size = sizeof(codomain_type(operators[1])) * prod(size(operators[1], 1))
-    if copied_ops_size < 10.0e6 ||
-            copied_ops_size < max(domain_array_size, codomain_array_size) * 2 #= 10MB =#
+    if copied_ops_size < 10.0e6 || copied_ops_size < max(domain_array_size, codomain_array_size) * 2
+        # Public constructors
+
+        # Public constructors
+
+        # Public constructors
+
+        #= 10MB =#
+
+        # Public constructors
+
+        # Public constructors
+
+        # Public constructors
+
+        # Public constructors
+
         threading_strategy = ThreadingStrategy.COPYING
     else
         threading_strategy = ThreadingStrategy.LOCKING
@@ -340,7 +356,7 @@ function create_threaded_SpreadingBatchOp(
         end
         if threading_strategy == ThreadingStrategy.COPYING
             operators = [
-                i == 1 ? operators : [copy_op(op) for op in operators] for
+                i == 1 ? operators : [AbstractOperators.copy_operator(op) for op in operators] for
                     i in 1:min(nthreads(), prod(batch_size))
             ]
             return SpreadingBatchOpCopying{type_args...}(
@@ -574,10 +590,24 @@ fun_name(L::SpreadingBatchOpCopying) = "⟳" * fun_name(L.operators[1][1])
 
 size(L::SpreadingBatchOp) = L.codomain_size, L.domain_size
 
-domain_storage_type(L::SpreadingBatchOp) = domain_storage_type(L.operators[1])
+domain_storage_type(L::SpreadingBatchOpSingleThreaded) = domain_storage_type(L.operators[1])
+domain_storage_type(L::SpreadingBatchOpThreadSafe) = domain_storage_type(L.operators[1])
+domain_storage_type(L::SpreadingBatchOpLocking) = domain_storage_type(L.operators[1])
+domain_storage_type(L::SpreadingBatchOpFixedOperator) = domain_storage_type(L.operators[1])
 domain_storage_type(L::SpreadingBatchOpCopying) = domain_storage_type(L.operators[1][1])
-codomain_storage_type(L::SpreadingBatchOp) = codomain_storage_type(L.operators[1])
+codomain_storage_type(L::SpreadingBatchOpSingleThreaded) = codomain_storage_type(L.operators[1])
+codomain_storage_type(L::SpreadingBatchOpThreadSafe) = codomain_storage_type(L.operators[1])
+codomain_storage_type(L::SpreadingBatchOpLocking) = codomain_storage_type(L.operators[1])
+codomain_storage_type(L::SpreadingBatchOpFixedOperator) = codomain_storage_type(L.operators[1])
 codomain_storage_type(L::SpreadingBatchOpCopying) = codomain_storage_type(L.operators[1][1])
+AbstractOperators._check_domain_storage(domain_array, ::SpreadingBatchOp) = nothing
+AbstractOperators._check_codomain_storage(codomain_array, ::SpreadingBatchOp) = nothing
+AbstractOperators._check_domain_storage(domain_array::ArrayPartition, ::SpreadingBatchOp) = nothing
+function AbstractOperators._check_codomain_storage(
+        codomain_array::ArrayPartition, ::SpreadingBatchOp
+    )
+    return nothing
+end
 
 is_linear(L::SpreadingBatchOp) = is_linear(L.operators[1])
 is_linear(L::SpreadingBatchOpCopying) = is_linear(L.operators[1][1])

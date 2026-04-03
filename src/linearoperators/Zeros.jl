@@ -16,7 +16,7 @@ julia> Zeros([Eye(10,20) Eye(10,20)])
 	
 ```
 """
-struct Zeros{C, N, D, M} <: LinearOperator
+struct Zeros{C, N, D, M, dS, cS} <: LinearOperator
     dim_out::NTuple{N, Int}
     dim_in::NTuple{M, Int}
 end
@@ -24,13 +24,25 @@ end
 # Constructors
 #default
 function Zeros(
-        domain_type::Type, dim_in::NTuple{M, Int}, codomain_type::Type, dim_out::NTuple{N, Int}
-    ) where {N, M}
-    return Zeros{codomain_type, N, domain_type, M}(dim_out, dim_in)
+        domain_type::Type{D},
+        dim_in::NTuple{M, Int},
+        codomain_type::Type{C},
+        dim_out::NTuple{N, Int};
+        array_type::Type = Array{D},
+    ) where {N, M, D, C}
+    dS = _normalize_array_type(array_type, domain_type)
+    cS = _normalize_array_type(array_type, codomain_type)
+    return Zeros{codomain_type, N, domain_type, M, dS, cS}(dim_out, dim_in)
 end
 
-function Zeros(domain_type::Type, dim_in::NTuple{M, Int}, dim_out::NTuple{N, Int}) where {N, M}
-    return Zeros{domain_type, N, domain_type, M}(dim_out, dim_in)
+function Zeros(
+        domain_type::Type{T},
+        dim_in::NTuple{M, Int},
+        dim_out::NTuple{N, Int};
+        array_type::Type = Array{T},
+    ) where {N, M, T}
+    dS = _normalize_array_type(array_type, domain_type)
+    return Zeros{domain_type, N, domain_type, M, dS, dS}(dim_out, dim_in)
 end
 
 function Zeros(
@@ -69,6 +81,8 @@ end
 
 domain_type(::Zeros{C, N, D, M}) where {C, N, D, M} = D
 codomain_type(::Zeros{C, N, D, M}) where {C, N, D, M} = C
+domain_storage_type(::Zeros{C, N, D, M, dS}) where {C, N, D, M, dS} = dS
+codomain_storage_type(::Zeros{C, N, D, M, dS, cS}) where {C, N, D, M, dS, cS} = cS
 is_thread_safe(::Zeros) = true
 
 size(L::Zeros) = (L.dim_out, L.dim_in)

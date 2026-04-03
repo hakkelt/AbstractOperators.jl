@@ -36,6 +36,7 @@ struct NfftNormalOp{N, T, A <: AbstractArray, F, I} <: AbstractOperators.LinearO
 end
 
 function mul!(y::AbstractArray, op::NfftNormalOp, x::AbstractArray)
+    AbstractOperators.check(y, op, x)
     return if op.threaded
         @enable_nfft_threading _mul!(y, op, x)
     else
@@ -67,8 +68,8 @@ function _get_normal_op(op::NFFTOp)
     shape_ext = 2 .* shape
 
     buf = allocate_in_domain(op, shape_ext...)
-    buf .= 0
-    tmp = allocate_in_codomain(op, size(op.plan.k, 2)...)
+    fill!(buf, 0)
+    tmp = allocate_in_codomain(op, size(op.plan.k, 2))
     tmp .= vec(op.dcf)
 
     fftplan = FFTW.plan_fft!(buf)

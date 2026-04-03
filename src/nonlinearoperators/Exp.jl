@@ -9,16 +9,26 @@ e^{ \\mathbf{x} }.
 ```
 
 """
-struct Exp{T, N} <: NonLinearOperator
+struct Exp{T, N, S <: AbstractArray{T}} <: NonLinearOperator
     dim::NTuple{N, Int}
 end
 
-function Exp(domain_type::Type, DomainDim::NTuple{N, Int}) where {N}
-    return Exp{domain_type, N}(DomainDim)
+function Exp(
+        domain_type::Type{T}, DomainDim::NTuple{N, Int}; array_type::Type = Array{T}
+    ) where {T, N}
+    S = _normalize_array_type(array_type, T)
+    return Exp{T, N, S}(DomainDim)
 end
 
-Exp(DomainDim::NTuple{N, Int}) where {N} = Exp{Float64, N}(DomainDim)
-Exp(DomainDim::Vararg{Int}) = Exp{Float64, length(DomainDim)}(DomainDim)
+function Exp(DomainDim::NTuple{N, Int}; array_type::Type = Array{Float64}) where {N}
+    return Exp(Float64, DomainDim; array_type)
+end
+Exp(DomainDim::Vararg{Int}; array_type::Type = Array{Float64}) = Exp(Float64, DomainDim; array_type)
+
+function Exp(x::AbstractArray{T}; array_type::Type = _array_wrapper(x)) where {T}
+    S = _normalize_array_type(array_type, T)
+    return Exp{T, ndims(x), S}(size(x))
+end
 
 function mul!(y::AbstractArray, L::Exp, x::AbstractArray)
     check(y, L, x)
@@ -37,4 +47,6 @@ size(L::Exp) = (L.dim, L.dim)
 
 domain_type(::Exp{T, N}) where {T, N} = T
 codomain_type(::Exp{T, N}) where {T, N} = T
+domain_storage_type(::Exp{T, N, S}) where {T, N, S} = S
+codomain_storage_type(::Exp{T, N, S}) where {T, N, S} = S
 is_thread_safe(::Exp) = true

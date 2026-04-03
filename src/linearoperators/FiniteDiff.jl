@@ -20,32 +20,44 @@ true
 	
 ```
 """
-struct FiniteDiff{N, D, T} <: LinearOperator
+struct FiniteDiff{N, D, T, S <: AbstractArray{T}} <: LinearOperator
     dim_in::NTuple{N, Int}
-    function FiniteDiff{N, D, T}(dim_in) where {N, D, T}
+    function FiniteDiff{N, D, T, S}(dim_in) where {N, D, T, S <: AbstractArray{T}}
         D > N && error("direction is bigger the number of dimension $N")
-        return new{N, D, T}(dim_in)
+        return new{N, D, T, S}(dim_in)
     end
 end
 
 # Constructors
 # Val-dispatch constructor — fully type-stable (D is known at compile time)
-function FiniteDiff(::Type{T}, dim_in::NTuple{N, Int}, ::Val{D}) where {T, N, D}
-    return FiniteDiff{N, D, T}(dim_in)
+function FiniteDiff(
+        ::Type{T}, dim_in::NTuple{N, Int}, ::Val{D}; array_type::Type = Array{T}
+    ) where {T, N, D}
+    S = _normalize_array_type(array_type, T)
+    return FiniteDiff{N, D, T, S}(dim_in)
 end
 
 # Specialized no-direction constructor: D=1 is a compile-time literal — fully type-stable
-FiniteDiff(dim_in::NTuple{N, Int}) where {N} = FiniteDiff{N, 1, Float64}(dim_in)
-
-#default constructor (direction as runtime Int — delegates to Val)
-function FiniteDiff(domain_type::Type, dim_in::NTuple{N, Int}, dir::Int = 1) where {N}
-    return FiniteDiff(domain_type, dim_in, Val(dir))
+function FiniteDiff(dim_in::NTuple{N, Int}; array_type::Type = Array{Float64}) where {N}
+    S = _normalize_array_type(array_type, Float64)
+    return FiniteDiff{N, 1, Float64, S}(dim_in)
 end
 
-FiniteDiff(dim_in::NTuple{N, Int}, dir::Int) where {N} = FiniteDiff(Float64, dim_in, Val(dir))
+#default constructor (direction as runtime Int — delegates to Val)
+function FiniteDiff(
+        domain_type::Type{T}, dim_in::NTuple{N, Int}, dir::Int = 1;
+        array_type::Type = Array{T}
+    ) where {T, N}
+    return FiniteDiff(domain_type, dim_in, Val(dir); array_type)
+end
+
+function FiniteDiff(dim_in::NTuple{N, Int}, dir::Int; array_type::Type = Array{Float64}) where {N}
+    return FiniteDiff(Float64, dim_in, Val(dir); array_type)
+end
 
 function FiniteDiff(x::AbstractArray{T, N}, dir::Int = 1) where {T, N}
-    return FiniteDiff(T, size(x), Val(dir))
+    S = _normalize_array_type(_array_wrapper(x), T)
+    return FiniteDiff{N, dir, T, S}(size(x))
 end
 
 # Mappings
@@ -76,6 +88,8 @@ end
 
 domain_type(::FiniteDiff{<:Any, <:Any, T}) where {T} = T
 codomain_type(::FiniteDiff{<:Any, <:Any, T}) where {T} = T
+domain_storage_type(::FiniteDiff{N, D, T, S}) where {N, D, T, S} = S
+codomain_storage_type(::FiniteDiff{N, D, T, S}) where {N, D, T, S} = S
 is_thread_safe(::FiniteDiff) = true
 
 function size(L::FiniteDiff{N, D}) where {N, D}

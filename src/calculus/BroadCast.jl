@@ -11,7 +11,7 @@ struct NoOperatorBroadCast{T, N, M, Threaded, S} <: AbstractBroadCast{T, N, M, T
         ) where {N, M}
         Base.Broadcast.check_broadcast_shape(dim_out, reshaped_dim_in)
         compact = all(reshaped_dim_in[d] == dim_out[d] for d in 1:N)
-        threaded = threaded && Threads.nthreads() > 1 && compact && prod(dim_in) * sizeof(T) > 2^16
+        threaded = threaded && _should_thread(S) && Threads.nthreads() > 1 && compact && prod(dim_in) * sizeof(T) > 2^16
         return new{T, N, M, threaded, S}(dim_in, reshaped_dim_in, dim_out)
     end
 end
@@ -26,36 +26,27 @@ struct OperatorBroadCast{T, N, M, Threaded, Compact, Imask, L, C, D, K} <: Abstr
             A, dim_out::NTuple{M, Int}; threaded::Bool = true
         ) where {M}
         Base.Broadcast.check_broadcast_shape(dim_out, size(A, 1))
-        threaded = threaded && Threads.nthreads() > 1
+        threaded = threaded && _should_thread(A) && Threads.nthreads() > 1
         N = ndims(A, 1)
         T = codomain_type(A)
         dim_in = size(A, 1)
-        Imask, broadcast_dims, idxs, compact = _setup_broadcast_indices(dim_out, dim_in, N)
+        Imask = Tuple(d ≤ N && (dim_out[d] == dim_in[d]) for d in 1:M)
+        broadcast_dims = Tuple(Imask[d] ? 1 : dim_out[d] for d in eachindex(dim_out))
+        idxs = CartesianIndices(broadcast_dims)
+        compact = all(Imask[1:N])
         bufC = allocate_in_codomain(A)
-        A, bufD = _setup_broadcast_buffers(A, threaded)
+        if threaded
+            bufD = [allocate_in_domain(A) for _ in 1:Threads.nthreads()]
+            A = [i == 1 ? A : AbstractOperators.copy_operator(A) for i in 1:Threads.nthreads()]
+        else
+            bufD = allocate_in_domain(A)
+        end
         L = typeof(A)
         C = typeof(bufC)
         D = typeof(bufD)
         K = length(broadcast_dims)
         return new{T, N, M, threaded, compact, Imask, L, C, D, K}(A, dim_out, idxs, bufC, bufD)
     end
-end
-
-function _setup_broadcast_indices(dim_out::NTuple{M, Int}, dim_in::NTuple{N, Int}, nd::Int) where {M, N}
-    imask = Tuple(d <= nd && (dim_out[d] == dim_in[d]) for d in 1:M)
-    broadcast_dims = Tuple(imask[d] ? 1 : dim_out[d] for d in eachindex(dim_out))
-    idxs = CartesianIndices(broadcast_dims)
-    compact = all(imask[1:nd])
-    return imask, broadcast_dims, idxs, compact
-end
-
-function _setup_broadcast_buffers(A::AbstractOperator, threaded::Bool)
-    if threaded
-        ops = [i == 1 ? A : copy_op(A) for i in 1:Threads.nthreads()]
-        bufs = [allocate_in_domain(A) for _ in 1:Threads.nthreads()]
-        return ops, bufs
-    end
-    return A, allocate_in_domain(A)
 end
 
 # Constructors
@@ -109,18 +100,18 @@ function tbroadcast!(y, x)
 end
 
 # NoOperatorBroadCast
-function mul!(y::AbstractArray, A::NoOperatorBroadCast{T, N, M, false}, b::AbstractArray) where {T, N, M}
+function mul!(y, A::NoOperatorBroadCast{T, N, M, false}, b) where {T, N, M}
     check(y, A, b)
-    b_reshaped = reshape(b, A.reshaped_dim_in)
-    return y .= b_reshaped
+    b = reshape(b, A.reshaped_dim_in)
+    return y .= b # non-threaded broadcasting
 end
 
-function mul!(y::AbstractArray, A::NoOperatorBroadCast{T, N, M, true}, b::AbstractArray) where {T, N, M}
+function mul!(y, A::NoOperatorBroadCast{T, N, M, true}, b) where {T, N, M}
     check(y, A, b)
     return tbroadcast!(y, b) # threaded broadcasting, handles reshaping (threading is only enabled when compact)
 end
 
-function mul!(y::AbstractArray, A::AdjointOperator{<:NoOperatorBroadCast}, b::AbstractArray) # there is no threaded option here
+function mul!(y, A::AdjointOperator{<:NoOperatorBroadCast}, b) # there is no threaded option here
     check(y, A, b)
     y = reshape(y, A.A.reshaped_dim_in)
     return sum!(y, b)
@@ -128,23 +119,23 @@ end
 
 # OperatorBroadCast
 
-function mul!(y::AbstractArray, R::OperatorBroadCast, b::AbstractArray) # Non-threaded
+function mul!(y, R::OperatorBroadCast, b) # Non-threaded
     check(y, R, b)
     mul!(R.bufC, R.A, b)
-    return y .= R.bufC
+    return y .= R.bufC # non-threaded broadcasting
 end
 
-function mul!(y::AbstractArray, R::OperatorBroadCast{T, N, M, true, Compact}, b::AbstractArray) where {T, N, M, Compact} # Threaded
+function mul!(y, R::OperatorBroadCast{T, N, M, true, Compact}, b) where {T, N, M, Compact} # Threaded
     check(y, R, b)
     mul!(R.bufC, R.A[1], b)
     if Compact
         return tbroadcast!(y, R.bufC) # threaded broadcasting
     else
-        return y .= R.bufC
+        return y .= R.bufC # non-threaded broadcasting
     end
 end
 
-function mul!(y::AbstractArray, A::AdjointOperator{<:OperatorBroadCast{T, N, M, false}}, b::AbstractArray) where {T, N, M} # Non-threaded
+function mul!(y, A::AdjointOperator{<:OperatorBroadCast{T, N, M, false}}, b) where {T, N, M} # Non-threaded
     check(y, A, b)
     R = A.A
     for idx in R.idxs
@@ -162,21 +153,16 @@ function mul!(y::AbstractArray, A::AdjointOperator{<:OperatorBroadCast{T, N, M, 
     return y
 end
 
-function mul!(y::AbstractArray, A::AdjointOperator{<:OperatorBroadCast{T, N, M, true}}, b::AbstractArray) where {T, N, M} # Threaded
+function mul!(y, A::AdjointOperator{<:OperatorBroadCast{T, N, M, true}}, b) where {T, N, M} # Threaded
     check(y, A, b)
-    _threaded_broadcast_adjoint!(y, A.A, b)
-    return y
-end
-
-function _threaded_broadcast_adjoint!(y, R::OperatorBroadCast, b)
+    R = A.A
     fill!(y, 0)
     lock = ReentrantLock()
     thread_count = min(Threads.nthreads(), length(R.idxs))
-    chunk = cld(length(R.idxs), thread_count)
-
+    batch_size = length(R.idxs) / thread_count
     @threads for t in 1:thread_count
-        idx_start = (t - 1) * chunk + 1
-        idx_end = min(t * chunk, length(R.idxs))
+        idx_start = max(1, floor(Int, (t - 1) * batch_size + 1))
+        idx_end = min(length(R.idxs), floor(Int, t * batch_size))
         for i in idx_start:idx_end
             b_slice = get_input_slice(R, R.idxs[i], b)
             if size(b_slice) != size(R.A[t], 1)
@@ -186,7 +172,6 @@ function _threaded_broadcast_adjoint!(y, R::OperatorBroadCast, b)
             @lock lock y .+= R.bufD[t]
         end
     end
-
     return y
 end
 
@@ -233,11 +218,11 @@ fun_name(R::OperatorBroadCast{T, N, M, true}) where {T, N, M} = "." * fun_name(R
 remove_displacement(R::NoOperatorBroadCast) = R
 function remove_displacement(R::OperatorBroadCast{T, N, M, false, Imask}) where {T, N, M, Imask}
     new_A = remove_displacement(R.A)
-    return OperatorBroadCast(new_A, R.dim_out, threaded = false)
+    return OperatorBroadCast(new_A, R.dim_out; threaded = false)
 end
 function remove_displacement(R::OperatorBroadCast{T, N, M, true, Imask}) where {T, N, M, Imask}
     new_A = remove_displacement(R.A[1])
-    return OperatorBroadCast(new_A, R.dim_out, threaded = true)
+    return OperatorBroadCast(new_A, R.dim_out; threaded = true)
 end
 
 has_fast_opnorm(::NoOperatorBroadCast) = true
@@ -256,6 +241,23 @@ function permute(R::OperatorBroadCast{T, N, M, false}, p::AbstractVector{Int}) w
 end
 function permute(R::OperatorBroadCast{T, N, M, true}, p::AbstractVector{Int}) where {T, N, M}
     return BroadCast(permute(R.A[1], p), R.dim_out; threaded = true)
+end
+
+function _copy_operator_impl(
+        op::NoOperatorBroadCast{T, N, M, Th, S}; storage_type = nothing, threaded = nothing
+    ) where {T, N, M, Th, S}
+    new_threaded = threaded === nothing ? Th : threaded
+    new_S = storage_type === nothing ? S : storage_type
+    return NoOperatorBroadCast(T, new_S, op.dim_in, op.reshaped_dim_in, op.dim_out; threaded = new_threaded)
+end
+
+function _copy_operator_impl(
+        op::OperatorBroadCast{T, N, M, Th}; storage_type = nothing, threaded = nothing
+    ) where {T, N, M, Th}
+    new_threaded = threaded === nothing ? Th : threaded
+    inner_op = Th ? op.A[1] : op.A
+    new_op = copy_operator(inner_op; storage_type, threaded)
+    return BroadCast(new_op, op.dim_out; threaded = new_threaded)
 end
 
 @generated function get_input_slice(

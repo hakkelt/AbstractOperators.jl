@@ -7,6 +7,8 @@ import LinearAlgebra: mul!
 import Base: size, ndims
 
 import AbstractOperators:
+    _normalize_array_type,
+    _array_wrapper_type,
     domain_type,
     codomain_type,
     fun_name,

@@ -20,8 +20,10 @@ import AbstractOperators:
     allocate_in_codomain,
     domain_storage_type,
     codomain_storage_type,
+    _array_wrapper_type,
     AdjointOperator
 import Base.Threads: nthreads
+
 import FFTW: FFTW
 
 include("NFFTOp.jl")

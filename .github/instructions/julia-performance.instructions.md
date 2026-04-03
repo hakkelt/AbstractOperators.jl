@@ -24,3 +24,5 @@ applyTo: "src/**/*.jl,benchmark/**/*.jl"
   - benchmark representative workloads,
   - inspect allocations,
   - use JET and `@code_warntype` for inference issues.
+- For benchmark harnesses, derive element types robustly when operator type traits may return wrapped array types.
+- Keep benchmark setup deterministic (`Random.seed!(0)`) and validate key benchmark states with one smoke `mul!` path before full runs.

@@ -58,6 +58,8 @@ include("linearoperators/FiniteDiff.jl")
 include("linearoperators/Variation.jl")
 include("linearoperators/LBFGS.jl")
 
+# Calculus rules
+
 # Batch operators
 include("batching/BatchOp.jl")
 include("batching/SimpleBatchOp.jl")
@@ -78,6 +80,7 @@ include("calculus/Axt_mul_Bx.jl")
 include("calculus/Ax_mul_Bxt.jl")
 include("calculus/Ax_mul_Bx.jl")
 include("calculus/HadamardProd.jl")
+include("calculus/OperatorWrapper.jl")
 
 # Non-Linear operators
 include("nonlinearoperators/Pow.jl")

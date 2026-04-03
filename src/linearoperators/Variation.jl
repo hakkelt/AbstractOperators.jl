@@ -23,31 +23,48 @@ julia> Variation(ones(2,2))*[1. 2.; 1. 2.]
 
 ```
 """
-struct Variation{T, N, Th} <: LinearOperator
+struct Variation{T, N, Th, S <: AbstractArray{T}} <: LinearOperator
     dim_in::NTuple{N, Int}
 end
 
 # Constructors
 #default constructor
-function Variation(domain_type::Type, dim_in::NTuple{N, Int}; threaded = true) where {N}
+function Variation(
+        domain_type::Type{T}, dim_in::NTuple{N, Int};
+        threaded = true, array_type::Type = Array{T}
+    ) where {T, N}
     N == 1 && error("use FiniteDiff instead!")
     threaded = threaded && Threads.nthreads() > 1 && prod(dim_in) * sizeof(domain_type) > 2^16
-    return Variation{domain_type, N, threaded}(dim_in)
+    S = _normalize_array_type(array_type, domain_type)
+    return Variation{domain_type, N, threaded, S}(dim_in)
 end
 
-function Variation(domain_type::Type, dim_in::Vararg{Int}; threaded = true)
-    return Variation(domain_type, dim_in; threaded)
+function Variation(
+        domain_type::Type{T}, dim_in::Vararg{Int}; threaded = true, array_type::Type = Array{T}
+    ) where {T}
+    return Variation(domain_type, dim_in; threaded, array_type)
 end
-function Variation(dim_in::NTuple{N, Int}; threaded = true) where {N}
-    return Variation(Float64, dim_in; threaded)
+function Variation(
+        dim_in::NTuple{N, Int}; threaded = true, array_type::Type = Array{Float64}
+    ) where {N}
+    return Variation(Float64, dim_in; threaded, array_type)
 end
-Variation(dim_in::Vararg{Int}; threaded = true) = Variation(dim_in; threaded)
-Variation(x::AbstractArray; threaded = true) = Variation(eltype(x), size(x); threaded)
+function Variation(dim_in::Vararg{Int}; threaded = true, array_type::Type = Array{Float64})
+    return Variation(dim_in; threaded, array_type)
+end
+function Variation(x::AbstractArray; threaded = true)
+    S = _array_wrapper(x){eltype(x)}
+    T = eltype(x)
+    N = ndims(x)
+    threaded = threaded && _should_thread(x)
+    N == 1 && error("use FiniteDiff instead!")
+    return Variation{T, N, threaded, S}(size(x))
+end
 
 # Mappings
 # Non-threaded forward
 @inbounds function LinearAlgebra.mul!(
-        y::AbstractArray, A::Variation{T, N, false}, b::AbstractArray
+        y::AbstractArray, A::Variation{T, N, false, <:Any}, b::AbstractArray
     ) where {T, N}
     check(y, A, b)
     @assert firstindex(b) == 1 "Only support 1-based arrays"
@@ -69,12 +86,12 @@ Variation(x::AbstractArray; threaded = true) = Variation(eltype(x), size(x); thr
                 next_slice_start = (k + 1) * batch_length + 1
                 next_slice_end = (k + 2) * batch_length
                 next_slicing = next_slice_start:next_slice_end
-                y[slicing, d] = b[next_slicing] - b[slicing]
+                @views y[slicing, d] .= b[next_slicing] .- b[slicing]
             else
                 prev_slice_start = (k - 1) * batch_length + 1
                 prev_slice_end = k * batch_length
                 prev_slicing = prev_slice_start:prev_slice_end
-                y[slicing, d] = b[slicing] - b[prev_slicing]
+                @views y[slicing, d] .= b[slicing] .- b[prev_slicing]
             end
         end
         batch_count ÷= size(b, d)
@@ -84,7 +101,7 @@ Variation(x::AbstractArray; threaded = true) = Variation(eltype(x), size(x); thr
 end
 
 @inbounds function LinearAlgebra.mul!(
-        y::AbstractArray, A::Variation{T, N, true}, b::AbstractArray
+        y::AbstractArray, A::Variation{T, N, true, <:Any}, b::AbstractArray
     ) where {T, N}
     check(y, A, b)
     @assert firstindex(b) == 1 "Only support 1-based arrays"
@@ -106,12 +123,12 @@ end
                 next_slice_start = (k + 1) * batch_length + 1
                 next_slice_end = (k + 2) * batch_length
                 next_slicing = next_slice_start:next_slice_end
-                y[slicing, d] = b[next_slicing] - b[slicing]
+                @views y[slicing, d] .= b[next_slicing] .- b[slicing]
             else
                 prev_slice_start = (k - 1) * batch_length + 1
                 prev_slice_end = k * batch_length
                 prev_slicing = prev_slice_start:prev_slice_end
-                y[slicing, d] = b[slicing] - b[prev_slicing]
+                @views y[slicing, d] .= b[slicing] .- b[prev_slicing]
             end
         end
         batch_count ÷= size(b, d)
@@ -122,7 +139,7 @@ end
 
 # Non-threaded adjoint
 @inbounds function LinearAlgebra.mul!(
-        y::AbstractArray, A::AdjointOperator{Variation{T, N, false}}, b::AbstractArray
+        y::AbstractArray, A::AdjointOperator{<:Variation{T, N, false}}, b::AbstractArray
     ) where {T, N}
     check(y, A, b)
     for cnt in LinearIndices(size(y))
@@ -156,7 +173,7 @@ end
 
 # Threaded adjoint
 @inbounds function LinearAlgebra.mul!(
-        y::AbstractArray, A::AdjointOperator{Variation{T, N, true}}, b::AbstractArray
+        y::AbstractArray, A::AdjointOperator{<:Variation{T, N, true}}, b::AbstractArray
     ) where {T, N}
     check(y, A, b)
     @batch for cnt in LinearIndices(size(y))
@@ -192,7 +209,17 @@ end
 
 domain_type(::Variation{T}) where {T} = T
 codomain_type(::Variation{T}) where {T} = T
+domain_storage_type(::Variation{T, N, Th, S}) where {T, N, Th, S} = S
+codomain_storage_type(::Variation{T, N, Th, S}) where {T, N, Th, S} = S
 is_thread_safe(::Variation) = true
+
+function _copy_operator_impl(
+        op::Variation{T, N, Th, S}; storage_type = nothing, threaded = nothing
+    ) where {T, N, Th, S}
+    new_threaded = threaded === nothing ? Th : threaded
+    new_at = storage_type === nothing ? _array_wrapper_type(S) : storage_type
+    return Variation(T, op.dim_in; threaded = new_threaded, array_type = new_at)
+end
 
 size(L::Variation{T, N}) where {T, N} = ((prod(L.dim_in), N), L.dim_in)
 

@@ -25,15 +25,6 @@ end
 get_domain_batch_dim_mask(::Type{<:BatchOp{T1, T2, dM, cM}}) where {T1, T2, dM, cM} = dM
 get_codomain_batch_dim_mask(::Type{<:BatchOp{T1, T2, dM, cM}}) where {T1, T2, dM, cM} = cM
 
-copy_op(x) = deepcopy(x)
-function copy_op(x::T) where {T <: AbstractOperator}
-    return if AbstractOperators.is_thread_safe(x)
-        x
-    else
-        T.name.wrapper([copy_op(getfield(x, k)) for k in fieldnames(T)]...)
-    end
-end
-
 function prepare_batch_op(
         operator::AbstractOperators.AbstractOperator,
         domain_size::NTuple{M1, Int},

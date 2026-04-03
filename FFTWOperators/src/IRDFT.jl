@@ -17,7 +17,7 @@ julia> A = IRDFT((5,10,8),19,2)
 	
 ```
 """
-struct IRDFT{T <: Number, N, D, T1 <: AbstractFFTs.Plan, T2 <: AbstractFFTs.Plan, T3 <: NTuple{N, Any}} <:
+struct IRDFT{T <: Number, N, D, T1 <: AbstractFFTs.Plan, T2 <: AbstractFFTs.Plan, T3 <: NTuple{N, Any}, S} <:
     LinearOperator
     dim_in::NTuple{N, Int}
     dim_out::NTuple{N, Int}
@@ -39,7 +39,8 @@ function IRDFT(x::AbstractArray{Complex{T}, N}, d::Int, dims::Int = 1) where {T 
         idx = i == dims ? (idx..., 2:ceil(Int, d / 2)) : (idx..., Colon())
     end
     At = plan_rfft(similar(x, T, dim_out), dims)
-    return IRDFT{T, N, dims, typeof(A), typeof(At), typeof(idx)}(dim_in, dim_out, A, At, idx)
+    S = _array_wrapper_type(typeof(x isa SubArray ? parent(x) : x))
+    return IRDFT{T, N, dims, typeof(A), typeof(At), typeof(idx), S}(dim_in, dim_out, A, At, idx)
 end
 
 function IRDFT(T::Type, dim_in::NTuple{N, Int}, d::Int, dims::Int = 1) where {N}
@@ -54,12 +55,15 @@ end
 function mul!(
         y::C1, L::IRDFT{T, N, D, T1, T2, T3}, b::C2
     ) where {N, T, D, T1, T2, T3, C1 <: AbstractArray{T, N}, C2 <: AbstractArray{Complex{T}, N}}
-    return mul!(y, L.A, b)
+    check(y, L, b)
+    mul!(y, L.A, b)
+    return y
 end
 
 function mul!(
-        y::C2, L::AdjointOperator{IRDFT{T, N, D, T1, T2, T3}}, b::C1
-    ) where {N, T, D, T1, T2, T3, C1 <: AbstractArray{T, N}, C2 <: AbstractArray{Complex{T}, N}}
+        y::C2, L::AdjointOperator{<:IRDFT{T, N, D}}, b::C1
+    ) where {N, T, D, C1 <: AbstractArray{T, N}, C2 <: AbstractArray{Complex{T}, N}}
+    check(y, L, b)
     A = L.A
     mul!(y, A.At, b)
     y ./= size(b, D)
@@ -76,6 +80,13 @@ fun_name(A::IRDFT) = "ℱ⁻¹"
 domain_type(::IRDFT{T}) where {T} = Complex{T}
 codomain_type(::IRDFT{T}) where {T} = T
 is_thread_safe(::IRDFT) = true
+
+function domain_storage_type(::IRDFT{T, N, D, T1, T2, T3, S}) where {T, N, D, T1, T2, T3, S}
+    return S{Complex{T}}
+end
+function codomain_storage_type(::IRDFT{T, N, D, T1, T2, T3, S}) where {T, N, D, T1, T2, T3, S}
+    return S{T}
+end
 
 is_AAc_diagonal(L::IRDFT) = false #TODO but might be true?
 is_invertible(L::IRDFT) = true

@@ -18,7 +18,7 @@ A  ℝ^4 -> ℝ^5
 	
 ```
 """
-struct MyLinOp{N, M, C, D, F <: Function, G <: Function} <: LinearOperator
+struct MyLinOp{N, M, C, D, F <: Function, G <: Function, dS, cS} <: LinearOperator
     dim_out::NTuple{N, Int}
     dim_in::NTuple{M, Int}
     Fwd!::F
@@ -28,35 +28,42 @@ end
 # Constructors
 
 function MyLinOp(
-        domain_type::Type,
+        domain_type::Type{T},
         dim_in::NTuple{N, Int},
         dim_out::NTuple{M, Int},
         Fwd!::F,
         Adj!::G,
-    ) where {N, M, F <: Function, G <: Function}
-    return MyLinOp{N, M, domain_type, domain_type, F, G}(dim_out, dim_in, Fwd!, Adj!)
+        ; array_type::Type = Array{T},
+    ) where {T, N, M, F <: Function, G <: Function}
+    dS = _normalize_array_type(array_type, domain_type)
+    return MyLinOp{N, M, domain_type, domain_type, F, G, dS, dS}(dim_out, dim_in, Fwd!, Adj!)
 end
 
 function MyLinOp(
-        domain_type::Type,
+        domain_type::Type{T},
         dim_in::NTuple{N, Int},
-        codomain_type::Type,
+        codomain_type::Type{C},
         dim_out::NTuple{M, Int},
         Fwd!::F,
         Adj!::G,
-    ) where {N, M, F <: Function, G <: Function}
-    return MyLinOp{N, M, domain_type, codomain_type, F, G}(dim_out, dim_in, Fwd!, Adj!)
+        ; array_type::Type = Array{T},
+    ) where {T, C, N, M, F <: Function, G <: Function}
+    dS = _normalize_array_type(array_type, domain_type)
+    cS = _normalize_array_type(array_type, codomain_type)
+    return MyLinOp{N, M, domain_type, codomain_type, F, G, dS, cS}(dim_out, dim_in, Fwd!, Adj!)
 end
 
 # Mappings
 
 function mul!(y::AbstractArray, L::MyLinOp, b::AbstractArray)
     check(y, L, b)
-    return L.Fwd!(y, b)
+    L.Fwd!(y, b)
+    return y
 end
 function mul!(y::AbstractArray, L::AdjointOperator{<:MyLinOp}, b::AbstractArray)
     check(y, L, b)
-    return L.A.Adj!(y, b)
+    L.A.Adj!(y, b)
+    return y
 end
 
 # Properties
@@ -65,5 +72,7 @@ size(L::MyLinOp) = (L.dim_out, L.dim_in)
 
 codomain_type(::MyLinOp{N, M, C}) where {N, M, C} = C
 domain_type(::MyLinOp{N, M, C, D}) where {N, M, C, D} = D
+domain_storage_type(::MyLinOp{N, M, C, D, F, G, dS}) where {N, M, C, D, F, G, dS} = dS
+codomain_storage_type(::MyLinOp{N, M, C, D, F, G, dS, cS}) where {N, M, C, D, F, G, dS, cS} = cS
 
 fun_name(L::MyLinOp) = "A"

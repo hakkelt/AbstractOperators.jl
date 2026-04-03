@@ -13,7 +13,7 @@ Supported indices are:
 - `Tuple`: a tuple of indices, where each element can be one of the above types.
 
 ```jldoctest
-julia> x = (1:10) .* 1.0;
+julia> x = collect(1.0:10.0);
 
 julia> G = GetIndex(Float64,(10,), 1:3)
 ↓  ℝ^10 -> ℝ^3
@@ -44,36 +44,51 @@ struct GetIndex{I, N, M, T, S} <: LinearOperator
     end
 end
 
+_prepare_getindex_intvec(idx, ::Type{<:AbstractArray}) = idx
+_prepare_getindex_boolmask(mask, ::Type{<:AbstractArray}) = mask
+
 # Constructors
 # default
-function GetIndex(domain_type::Type, dim_in::Dims, idx::Tuple)
+function GetIndex(
+        domain_type::Type{T}, dim_in::Dims, idx::Tuple; array_type::Type = Array{T}
+    ) where {T}
     dim_out = get_dim_out(dim_in, idx...)
     if dim_out == dim_in
         return Eye(domain_type, dim_in)
     else
-        return GetIndex(domain_type, Array{domain_type}, dim_out, dim_in, idx)
+        S = _normalize_array_type(array_type, domain_type)
+        return GetIndex(domain_type, S, dim_out, dim_in, idx)
     end
 end
 
 function GetIndex(
-        domain_type::Type,
+        domain_type::Type{T},
         dim_in::Dims,
         idx::Union{AbstractVector{Int}, AbstractVector{<:CartesianIndex}},
-    )
+        ; array_type::Type = Array{T},
+    ) where {T}
+    idx = _prepare_getindex_intvec(idx, array_type)
     dim_out = (length(idx),)
-    return GetIndex(domain_type, Array{domain_type}, dim_out, dim_in, idx)
+    S = _normalize_array_type(array_type, domain_type)
+    return GetIndex(domain_type, S, dim_out, dim_in, idx)
 end
 
-function GetIndex(domain_type::Type, dim_in::Dims, mask::AbstractArray{Bool})
-    dim_out = (sum(mask),)
+function GetIndex(
+        domain_type::Type{T}, dim_in::Dims, mask::AbstractArray{Bool}; array_type::Type = Array{T}
+    ) where {T}
+    mask = _prepare_getindex_boolmask(mask, array_type)
+    dim_out = mask isa AbstractArray{Bool} ? (sum(mask),) : (length(mask),)
     if dim_out[1] == prod(dim_in)
         return reshape(Eye(domain_type, dim_in), dim_out)
     else
-        return GetIndex(domain_type, Array{domain_type}, dim_out, dim_in, mask)
+        S = _normalize_array_type(array_type, domain_type)
+        return GetIndex(domain_type, S, dim_out, dim_in, mask)
     end
 end
 
-GetIndex(domain_type::Type, dim_in::Dims, idx...) = GetIndex(domain_type, dim_in, idx)
+function GetIndex(domain_type::Type{T}, dim_in::Dims, idx...; array_type::Type = Array{T}) where {T}
+    return GetIndex(domain_type, dim_in, idx; array_type)
+end
 GetIndex(dim_in::Dims, idx...) = GetIndex(Float64, dim_in, idx)
 GetIndex(dim_in::Dims, idx::Tuple) = GetIndex(Float64, dim_in, idx)
 GetIndex(dim_in::Dims, idx) = GetIndex(Float64, dim_in, idx)
@@ -83,7 +98,7 @@ function GetIndex(x::AbstractArray, idx::Tuple)
     if dim_out == dim_in
         return Eye(eltype(x), dim_in)
     else
-        S = typeof(x isa SubArray ? parent(x) : x).name.wrapper{eltype(x)}
+        S = _array_wrapper(x){eltype(x)}
         return GetIndex(eltype(x), S, dim_out, dim_in, idx)
     end
 end
@@ -96,23 +111,21 @@ function GetIndex(
     if dim_out == dim_in
         return Eye(eltype(x), dim_in)
     else
-        S = typeof(x isa SubArray ? parent(x) : x).name.wrapper{eltype(x)}
+        S = _array_wrapper(x){eltype(x)}
         return GetIndex(eltype(x), S, dim_out, dim_in, idx)
     end
 end
 
 # Mappings
 
-@generated function mul!(
-        y::AbstractArray, L::GetIndex{I}, b::AbstractArray
-    ) where {K, I <: Tuple{Vararg{Any, K}}}
-    return if K == 1
+@generated function mul!(y, L::GetIndex{I}, b) where {K, I <: Tuple{Vararg{Any, K}}}
+    if K == 1
         if I.parameters[1] <: AbstractArray{Bool}
             indices = :(to_indices(b, L.idx)[1])
         else
             indices = :(L.idx[1])
         end
-        quote
+        return quote
             check(y, L, b)
             for (i, j) in enumerate($indices)
                 @inbounds y[i] = b[j]
@@ -120,7 +133,7 @@ end
             return y
         end
     else
-        quote
+        return quote
             check(y, L, b)
             indices = to_indices(b, L.idx)
             j = 1

@@ -1,5 +1,7 @@
 export Filt
 
+abstract type AbstractFilt{T, N, S <: AbstractArray} <: LinearOperator end
+
 """
 	Filt([domain_type=Float64::Type,] dim_in::Tuple, b::AbstractVector, [a::AbstractVector,])
 	Filt(x::AbstractVector, b::AbstractVector, [a::AbstractVector,])
@@ -14,7 +16,7 @@ IIR  ℝ^10 -> ℝ^10
 	
 ```
 """
-struct Filt{T, N, B <: AbstractVector{T}} <: LinearOperator
+struct Filt{T, N, B <: AbstractVector{T}} <: AbstractFilt{T, N, Array{T}}
     dim_in::NTuple{N, Int}
     b::B
     a::B
@@ -84,7 +86,7 @@ function mul!(y::AbstractArray, L::Filt, x::AbstractArray)
             fir!(y, L.b, x, L.si, col, col)
         end
     end
-    return
+    return y
 end
 
 function mul!(y::AbstractArray, L::AdjointOperator{<:Filt}, x::AbstractArray)
@@ -97,7 +99,7 @@ function mul!(y::AbstractArray, L::AdjointOperator{<:Filt}, x::AbstractArray)
             fir_rev!(y, A.b, x, A.si, col, col)
         end
     end
-    return
+    return y
 end
 
 function iir!(y, b, a, x, si, coly, colx)
@@ -112,7 +114,7 @@ function iir!(y, b, a, x, si, coly, colx)
         y[i, coly] = val
     end
     si .= 0.0 #reset state
-    return
+    return nothing
 end
 
 # Utilities
@@ -129,7 +131,7 @@ function iir_rev!(y, b, a, x, si, coly, colx)
         y[i, coly] = val
     end
     si .= 0.0
-    return
+    return nothing
 end
 
 function fir!(y, b, x, si, coly, colx)
@@ -144,7 +146,7 @@ function fir!(y, b, x, si, coly, colx)
         y[i, coly] = val
     end
     si .= 0.0
-    return
+    return nothing
 end
 
 function fir_rev!(y, b, x, si, coly, colx)
@@ -159,20 +161,22 @@ function fir_rev!(y, b, x, si, coly, colx)
         y[i, coly] = val
     end
     si .= 0.0
-    return
+    return nothing
 end
 
 # Properties
 
-domain_type(::Filt{T}) where {T} = T
-codomain_type(::Filt{T}) where {T} = T
-is_thread_safe(::Filt) = false
+domain_type(::AbstractFilt{T}) where {T} = T
+codomain_type(::AbstractFilt{T}) where {T} = T
+domain_storage_type(::AbstractFilt{T, N, S}) where {T, N, S} = S
+codomain_storage_type(::AbstractFilt{T, N, S}) where {T, N, S} = S
+is_thread_safe(::AbstractFilt) = false
 
-size(L::Filt) = L.dim_in, L.dim_in
+size(L::AbstractFilt) = L.dim_in, L.dim_in
 
-fun_name(L::Filt) = size(L.a, 1) != 1 ? "IIR" : "FIR"
+fun_name(L::AbstractFilt) = size(L.a, 1) != 1 ? "IIR" : "FIR"
 
 #TODO find out a way to verify this,
 # probably for IIR it means zeros inside unit circle
-is_full_row_rank(L::Filt) = true
-is_full_column_rank(L::Filt) = true
+is_full_row_rank(::AbstractFilt) = true
+is_full_column_rank(::AbstractFilt) = true

@@ -25,32 +25,48 @@ end
 # Constructors
 
 ###standard constructor Operator{N}(D::Type, domain_dim::NTuple{N,Int})
-function DiagOp(D::Type, domain_dim::NTuple{N, Int}, d::T; threaded::Bool = true) where {N, T <: AbstractArray}
+function DiagOp(
+        D::Type, domain_dim::NTuple{N, Int}, d::T;
+        threaded::Bool = true, array_type::Type = _array_wrapper(d),
+    ) where {N, T <: AbstractArray}
     size(d) != domain_dim && error("dimension of d must coincide with domain_dim")
     C = promote_type(eltype(d), D)
-    threaded = threaded && Threads.nthreads() > 1 && length(d) * sizeof(D) > 2^16
+    threaded = threaded && _should_thread(d)
     B = threaded ? FastBroadcast.True() : FastBroadcast.False()
-    dS = typeof(d isa SubArray ? parent(d) : d).name.wrapper{D}
-    cS = typeof(d isa SubArray ? parent(d) : d).name.wrapper{C}
+    dS = _normalize_array_type(array_type, D)
+    cS = _normalize_array_type(array_type, C)
     return DiagOp{B, D, C, N, dS, cS, T}(domain_dim, d)
 end
 
 ###standard constructor with Scalar
-function DiagOp(D::Type, domain_dim::NTuple{N, Int}, d::T; threaded::Bool = true) where {N, T <: Number}
+function DiagOp(
+        D::Type, domain_dim::NTuple{N, Int}, d::T;
+        threaded::Bool = true, array_type::Type = Array{D},
+    ) where {N, T <: Number}
     C = promote_type(eltype(d), D)
-    threaded = threaded && Threads.nthreads() > 1 && length(d) > 2^16
+    threaded = threaded && _should_thread(d)
     B = threaded ? FastBroadcast.True() : FastBroadcast.False()
-    return DiagOp{B, D, C, N, Array{D}, Array{C}, T}(domain_dim, d)
+    dS = _normalize_array_type(array_type, D)
+    cS = _normalize_array_type(array_type, C)
+    return DiagOp{B, D, C, N, dS, cS, T}(domain_dim, d)
 end
 
 # other constructors
-function DiagOp(d::AbstractArray{T, N}; threaded::Bool = true) where {N, T <: Number}
+function DiagOp(
+        d::AbstractArray{T, N};
+        threaded::Bool = true, array_type::Type = _array_wrapper(d),
+    ) where {N, T <: Number}
     C = eltype(d)
-    B = (threaded && length(d) > 2^16) ? FastBroadcast.True() : FastBroadcast.False()
-    S = typeof(d isa SubArray ? parent(d) : d).name.wrapper{T}
+    threaded = threaded && _should_thread(d)
+    B = threaded ? FastBroadcast.True() : FastBroadcast.False()
+    S = _normalize_array_type(array_type, T)
     return DiagOp{B, eltype(d), C, N, S, S, typeof(d)}(size(d), d)
 end
-DiagOp(domain_dim::NTuple{N, Int}, d::A; threaded::Bool = true) where {N, A <: Number} = DiagOp(Float64, domain_dim, d; threaded)
+function DiagOp(
+        domain_dim::NTuple{N, Int}, d::A; threaded::Bool = true, array_type::Type = Array{Float64}
+    ) where {N, A <: Number}
+    return DiagOp(Float64, domain_dim, d; threaded, array_type)
+end
 
 # scale of DiagOp
 function Scale(coeff::T, L::DiagOp{B, D, C, N, dS, cS}) where {T <: Number, B, D, C, N, dS, cS}
@@ -94,6 +110,13 @@ diag_AcA(L::DiagOp{B}) where {B} = @.. thread = B conj(L.d) * L.d
 domain_type(::DiagOp{<:Any, D}) where {D} = D
 codomain_type(::DiagOp{<:Any, <:Any, C}) where {C} = C
 is_thread_safe(::DiagOp) = true
+
+function _copy_operator_impl(op::DiagOp{B}; storage_type = nothing, threaded = nothing) where {B}
+    new_threaded = threaded === nothing ? (B == FastBroadcast.True()) : threaded
+    new_d = storage_type === nothing ? op.d : _convert_buffer(op.d, storage_type)
+    new_at = storage_type === nothing ? _array_wrapper(op.d) : storage_type
+    return DiagOp(domain_type(op), op.dim_in, new_d; threaded = new_threaded, array_type = new_at)
+end
 
 size(L::DiagOp) = (L.dim_in, L.dim_in)
 

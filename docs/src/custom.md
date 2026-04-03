@@ -248,3 +248,28 @@ y_out = similar(y)
 mul!(y_out, L, x)
 @test y_out ≈ L * x
 ```
+
+## Performance and GPU Storage
+
+### Threading heuristic
+
+`_should_thread(x)` controls whether constructors enable threaded kernels.
+GPU extensions should override `_should_thread(::AbstractGPUArray)=false` to avoid mixing host threading with device arrays.
+
+### Storage-type correctness
+
+When implementing custom operators, define both `domain_storage_type` and `codomain_storage_type` whenever buffers are allocated internally.
+This ensures that `op * x` and `allocate_in_*` keep outputs on the same backend (Array, JLArray, CuArray, ROCArray, etc.).
+
+### Generic FFT backend compatibility
+
+Prefer backend-generic APIs (`inv(plan)`, AbstractFFTs dispatch) instead of backend-specific functions (e.g. `FFTW.plan_inv`) in code paths that must support CUDA/AMDGPU.
+
+### Test conventions for backend coverage
+
+Use utility backends from `test/utils.jl`:
+- `ALL_BACKENDS`: CPU + JLArray + available real GPU backends
+- `GPU_BACKENDS`: JLArray + available real GPU backends
+- tagged checks via `get_backend(:cuda)` / `get_backend(:amdgpu)`
+
+For backend-specific testitems, add tags `:cuda` / `:amdgpu` and include safety guards with `@test_skip` when unavailable.

@@ -57,14 +57,18 @@ RDFT(T::Type, dim_in::Vararg{Int}) = RDFT(T, dim_in)
 function mul!(
         y::T3, L::RDFT{T, N, T1, T2, T3}, b::T4
     ) where {N, T, T1, T2, T3, T4 <: AbstractArray{T, N}}
-    return mul!(y, L.A, b)
+    check(y, L, b)
+    mul!(y, L.A, b)
+    return y
 end
 
 function mul!(
         y::T4, L::AdjointOperator{RDFT{T, N, T1, T2, T3}}, b::T3
     ) where {N, T, T1, T2, T3, T4 <: AbstractArray{T, N}}
+    check(y, L, b)
     A = L.A
-    mul!(A.b2, A.Zp, b)
+    fill!(A.b2, zero(eltype(A.b2)))
+    copyto!(view(A.b2, ntuple(i -> Base.OneTo(size(b, i)), N)...), b)
     mul!(A.y2, A.At, A.b2)
     y .= real.(A.y2)
     return y
@@ -79,6 +83,13 @@ fun_name(A::RDFT) = "ℱ"
 domain_type(::RDFT{T}) where {T} = T
 codomain_type(::RDFT{T}) where {T} = Complex{T}
 is_thread_safe(::RDFT) = false
+
+function domain_storage_type(L::RDFT{T, N, T1, T2, T3}) where {T, N, T1, T2, T3}
+    return T3.name.wrapper{T}
+end
+function codomain_storage_type(L::RDFT{T, N, T1, T2, T3}) where {T, N, T1, T2, T3}
+    return T3.name.wrapper{Complex{T}}
+end
 
 is_AAc_diagonal(L::RDFT) = false #TODO but might be true?
 is_invertible(L::RDFT) = true

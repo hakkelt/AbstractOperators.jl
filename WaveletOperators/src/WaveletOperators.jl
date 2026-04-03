@@ -9,6 +9,8 @@ import Base: size
 import AbstractOperators:
     domain_type,
     codomain_type,
+    domain_storage_type,
+    codomain_storage_type,
     fun_name,
     is_thread_safe,
     has_fast_opnorm
@@ -85,12 +87,14 @@ end
 # Mappings
 
 function mul!(y::AbstractArray{T}, L::WaveletOp{T}, x::AbstractArray{T}) where {T}
+    AbstractOperators.check(y, L, x)
     return dwt!(y, x, L.wavelet, L.levels)
 end
 
 function mul!(
         y::AbstractArray{T}, L::AdjointOperator{<:WaveletOp{T}}, x::AbstractArray{T}
     ) where {T}
+    AbstractOperators.check(y, L, x)
     return idwt!(y, x, L.A.wavelet, L.A.levels)
 end
 
@@ -102,6 +106,8 @@ size(L::WaveletOp) = (L.dim_in, L.dim_in)
 
 domain_type(::WaveletOp{T}) where {T} = T
 codomain_type(::WaveletOp{T}) where {T} = T
+domain_storage_type(::WaveletOp{T}) where {T} = Array{T}
+codomain_storage_type(::WaveletOp{T}) where {T} = Array{T}
 
 is_AcA_diagonal(L::WaveletOp) = true
 is_AAc_diagonal(L::WaveletOp) = true

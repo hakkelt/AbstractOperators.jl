@@ -9,17 +9,32 @@ Creates the sigmoid non-linear operator with input dimensions `dim_in`.
 ```
 
 """
-struct Sigmoid{T, N, G <: Real} <: NonLinearOperator
+struct Sigmoid{T, N, G <: Real, S <: AbstractArray{T}} <: NonLinearOperator
     dim::NTuple{N, Int}
     gamma::G
 end
 
-function Sigmoid(domain_type::Type, DomainDim::NTuple{N, Int}, gamma::G = 1.0) where {N, G <: Real}
-    return Sigmoid{domain_type, N, G}(DomainDim, gamma)
+function Sigmoid(
+        domain_type::Type{T},
+        DomainDim::NTuple{N, Int},
+        gamma::G = 1.0;
+        array_type::Type = Array{T},
+    ) where {T, N, G <: Real}
+    S = _normalize_array_type(array_type, T)
+    return Sigmoid{T, N, G, S}(DomainDim, gamma)
 end
 
-function Sigmoid(DomainDim::NTuple{N, Int}, gamma::G = 1.0) where {N, G}
-    return Sigmoid{Float64, N, G}(DomainDim, gamma)
+function Sigmoid(
+        DomainDim::NTuple{N, Int}, gamma::G = 1.0; array_type::Type = Array{Float64}
+    ) where {N, G}
+    return Sigmoid(Float64, DomainDim, gamma; array_type)
+end
+
+function Sigmoid(
+        x::AbstractArray{T}; gamma::G = 1.0, array_type::Type = _array_wrapper(x)
+    ) where {T, G <: Real}
+    S = _normalize_array_type(array_type, T)
+    return Sigmoid{T, ndims(x), G, S}(size(x), gamma)
 end
 
 function mul!(y::AbstractArray, L::Sigmoid, x::AbstractArray)
@@ -42,4 +57,6 @@ size(L::Sigmoid) = (L.dim, L.dim)
 
 domain_type(::Sigmoid{T, N, D}) where {T, N, D} = T
 codomain_type(::Sigmoid{T, N, D}) where {T, N, D} = T
+domain_storage_type(::Sigmoid{T, N, D, S}) where {T, N, D, S} = S
+codomain_storage_type(::Sigmoid{T, N, D, S}) where {T, N, D, S} = S
 is_thread_safe(::Sigmoid) = true

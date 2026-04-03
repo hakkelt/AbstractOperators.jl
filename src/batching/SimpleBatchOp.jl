@@ -132,51 +132,6 @@ function create_BatchOp(
     )
 end
 
-function _build_threaded_operators(operator::AbstractOperators.AbstractOperator, batch_size::Tuple)
-    batch_length = prod(batch_size)
-    copies = min(nthreads(), batch_length)
-    return tuple([i == 1 ? operator : copy_op(operator) for i in 1:copies]...)
-end
-
-function _build_single_threaded_batchop(
-        operator,
-        domain_size,
-        codomain_size,
-        batch_size,
-        domain_batch_dim_mask,
-        codomain_batch_dim_mask,
-        dType,
-        cdType,
-    )
-    B = length(batch_size)
-    opType = typeof(operator)
-    N = length(domain_size)
-    M = length(codomain_size)
-    return SimpleBatchOpSingleThreaded{
-        dType, cdType, domain_batch_dim_mask, codomain_batch_dim_mask, opType, N, M, B,
-    }(operator, domain_size, codomain_size, batch_size)
-end
-
-function _build_multi_threaded_batchop(
-        operator,
-        domain_size,
-        codomain_size,
-        batch_size,
-        domain_batch_dim_mask,
-        codomain_batch_dim_mask,
-        dType,
-        cdType,
-    )
-    operators = _build_threaded_operators(operator, batch_size)
-    C = length(operators)
-    opType = typeof(operator)
-    N = length(domain_size)
-    M = length(codomain_size)
-    return SimpleBatchOpMultiThreaded{
-        dType, cdType, domain_batch_dim_mask, codomain_batch_dim_mask, opType, N, M, C,
-    }(operators, domain_size, codomain_size, CartesianIndices(batch_size))
-end
-
 function create_BatchOp(
         operator::AbstractOperators.AbstractOperator,
         domain_size::NTuple{N, Int},
@@ -190,30 +145,30 @@ function create_BatchOp(
     batch_size, dType, cdType = prepare_batch_op(
         operator, domain_size, domain_batch_dim_mask, codomain_size, codomain_batch_dim_mask
     )
-
-    if threaded && nthreads() > 1
-        return _build_multi_threaded_batchop(
-            operator,
-            domain_size,
-            codomain_size,
-            batch_size,
-            domain_batch_dim_mask,
-            codomain_batch_dim_mask,
-            dType,
-            cdType,
+    opType = typeof(operator)
+    threaded = threaded && _should_thread(operator)
+    return if threaded && nthreads() > 1
+        batch_length = prod(batch_size)
+        operators = tuple(
+            [
+                i == 1 ? operator : AbstractOperators.copy_operator(operator) for
+                    i in 1:min(nthreads(), batch_length)
+            ]...,
+        )
+        C = length(operators)
+        SimpleBatchOpMultiThreaded{
+            dType, cdType, domain_batch_dim_mask, codomain_batch_dim_mask, opType, N, M, C,
+        }(
+            operators, domain_size, codomain_size, CartesianIndices(batch_size)
+        )
+    else
+        B = length(batch_size)
+        SimpleBatchOpSingleThreaded{
+            dType, cdType, domain_batch_dim_mask, codomain_batch_dim_mask, opType, N, M, B,
+        }(
+            operator, domain_size, codomain_size, batch_size
         )
     end
-
-    return _build_single_threaded_batchop(
-        operator,
-        domain_size,
-        codomain_size,
-        batch_size,
-        domain_batch_dim_mask,
-        codomain_batch_dim_mask,
-        dType,
-        cdType,
-    )
 end
 
 # mul! implementations
@@ -392,7 +347,7 @@ function get_normal_op(
         L::SimpleBatchOpMultiThreaded{dT, cT, dM, cM, opT, N, M, C}
     ) where {dT, cT, dM, cM, opT, N, M, C}
     new_op = get_normal_op(L.operator[1])
-    new_ops = tuple([i == 1 ? new_op : copy_op(new_op) for i in 1:length(L.operator)]...)
+    new_ops = tuple([i == 1 ? new_op : AbstractOperators.copy_operator(new_op) for i in 1:length(L.operator)]...)
     return SimpleBatchOpMultiThreaded{dT, cT, dM, dM, typeof(new_op), N, N, C}(
         new_ops, L.domain_size, L.domain_size, L.batch_indices
     )

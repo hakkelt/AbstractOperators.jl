@@ -85,7 +85,9 @@ function mul!(y::AbstractArray, J::AdjointOperator{<:HadamardProdJac}, b::Abstra
 end
 
 # Properties
-Base.:(==)(P1::HadamardProd{L1, L2, C, D}, P2::HadamardProd{L1, L2, C, D}) where {L1, L2, C, D} = P1.A == P2.A && P1.B == P2.B
+function Base.:(==)(P1::HadamardProd{L1, L2, C, D}, P2::HadamardProd{L1, L2, C, D}) where {L1, L2, C, D}
+    return P1.A == P2.A && P1.B == P2.B
+end
 size(P::Union{HadamardProd, HadamardProdJac}) = (size(P.A, 1), size(P.A, 2))
 
 fun_name(L::Union{HadamardProd, HadamardProdJac}) = fun_name(L.A) * ".*" * fun_name(L.B)
@@ -107,5 +109,25 @@ end
 function remove_displacement(P::HadamardProd)
     return HadamardProd(
         remove_displacement(P.A), remove_displacement(P.B), P.bufA, P.bufB, P.bufD
+    )
+end
+
+function _copy_operator_impl(op::HadamardProd; storage_type = nothing, threaded = nothing)
+    new_bufA = _convert_buffer(op.bufA, storage_type)
+    new_bufB = _convert_buffer(op.bufB, storage_type)
+    new_bufD = _convert_buffer(op.bufD, storage_type)
+    new_A = copy_operator(op.A; storage_type, threaded)
+    new_B = copy_operator(op.B; storage_type, threaded)
+    return HadamardProd(new_A, new_B, new_bufA, new_bufB, new_bufD)
+end
+
+function _copy_operator_impl(op::HadamardProdJac; storage_type = nothing, threaded = nothing)
+    new_bufA = _convert_buffer(op.bufA, storage_type)
+    new_bufB = _convert_buffer(op.bufB, storage_type)
+    new_bufD = _convert_buffer(op.bufD, storage_type)
+    new_A = copy_operator(op.A; storage_type, threaded)
+    new_B = copy_operator(op.B; storage_type, threaded)
+    return HadamardProdJac{typeof(new_A), typeof(new_B), typeof(new_bufA), typeof(new_bufD)}(
+        new_A, new_B, new_bufA, new_bufB, new_bufD
     )
 end

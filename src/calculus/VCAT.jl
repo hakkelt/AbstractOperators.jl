@@ -32,6 +32,7 @@ struct VCAT{
         L <: NTuple{N, AbstractOperator},
         P <: Tuple,
         C <: AbstractArray,
+        CS <: AbstractArray,  # codomain storage type (fixed at construction)
     } <: AbstractOperator
     A::L     # tuple of AbstractOperators
     idxs::P  # indices
@@ -50,8 +51,18 @@ struct VCAT{
         if any([domain_type(A[1]) != domain_type(a) for a in A])
             throw(error("operators must all share the same domain_type!"))
         end
-        return new{N, L, P, C}(A, idxs, buf)
+        CS = _compute_vcat_cs(A, idxs)
+        return new{N, L, P, C, CS}(A, idxs, buf)
     end
+end
+
+function _compute_vcat_cs(A, idxs)
+    cs_list = [d <: ArrayPartition ? [d.parameters[2].types...] : d for d in codomain_storage_type.(A)]
+    codomain = vcat(cs_list...)
+    p = vcat([[idx...] for idx in idxs]...)
+    invpermute!(codomain, p)
+    T = promote_type([eltype(d) for d in codomain]...)
+    return ArrayPartition{T, Tuple{codomain...}}
 end
 
 function VCAT(A::Vararg{AbstractOperator})
@@ -159,7 +170,9 @@ end
 
 # Properties
 
-Base.:(==)(H1::VCAT{N, L1, P1, C}, H2::VCAT{N, L2, P2, C}) where {N, L1, L2, P1, P2, C} = H1.A == H2.A && H1.idxs == H2.idxs
+function Base.:(==)(H1::VCAT{N, L1, P1, C}, H2::VCAT{N, L2, P2, C}) where {N, L1, L2, P1, P2, C}
+    return H1.A == H2.A && H1.idxs == H2.idxs
+end
 
 @generated function size(H::VCAT{N, L, P}) where {N, L, P}
     exprs = []
@@ -205,13 +218,7 @@ domain_type(L::VCAT) = domain_type.(Ref(L.A[1]))
     return :(_vcat_apply_invperm($natural_expr, H.idxs))
 end
 domain_storage_type(L::VCAT) = domain_storage_type.(Ref(L.A[1]))
-function codomain_storage_type(H::VCAT)
-    codomain = vcat([d <: ArrayPartition ? [d.parameters[2].types...] : d for d in codomain_storage_type.(H.A)]...)
-    p = vcat([[idx...] for idx in H.idxs]...)
-    invpermute!(codomain, p)
-    T = promote_type(codomain_type(H)...)
-    return ArrayPartition{T, Tuple{codomain...}}
-end
+codomain_storage_type(::VCAT{N, L, P, C, CS}) where {N, L, P, C, CS} = CS
 
 is_linear(L::VCAT) = all(is_linear.(L.A))
 is_AcA_diagonal(L::VCAT) = all(is_AcA_diagonal.(L.A))
@@ -276,3 +283,9 @@ function permute(H::VCAT{N, L, P, C}, p::AbstractVector{Int}) where {N, L, P, C}
 end
 
 remove_displacement(V::VCAT) = VCAT(remove_displacement.(V.A), V.idxs, V.buf)
+
+function _copy_operator_impl(op::VCAT; storage_type = nothing, threaded = nothing)
+    new_buf = _convert_buffer(op.buf, storage_type)
+    new_ops = tuple([copy_operator(a; storage_type, threaded) for a in op.A]...)
+    return VCAT(new_ops, op.idxs, new_buf)
+end

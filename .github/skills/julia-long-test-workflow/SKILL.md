@@ -29,6 +29,24 @@ user-invocable: true
 
 ## Common Commands
 
+Main package coverage:
+
+```sh
+julia --project=test --code-coverage=user test/runtests.jl
+```
+
+Subpackage coverage (DSPOperators, FFTWOperators, NFFTOperators, WaveletOperators have **no** standalone `test/` directory):
+
+> All subpackage code and their GPU extensions are exercised by the parent package's
+> `test/` project. Run the same coverage command above; the `.cov` files under each
+> subpackage's `src/` will be populated automatically.
+
+Process coverage after a local run:
+
+```sh
+julia -e 'using Coverage; Coverage.LCOV.writefile("lcov.info", Coverage.process_folder())'
+```
+
 Filtered test run:
 
 ```julia
@@ -40,12 +58,27 @@ TestItemRunner.run_tests(pwd(); filter = ti -> ti.name == "DCT") # example of fi
 AirSpeedVelocity comparison:
 
 ```sh
+mkdir -p .temp/asv
 benchpkg \
   --path . \
   --rev master,dirty \
   --script benchmark/benchmarks.jl \
   --output-dir .temp/asv \
   --exeflags="--threads=4"
+```
+
+Filtered AirSpeedVelocity comparison for a single benchmark family:
+
+```sh
+mkdir -p .temp/asv
+benchpkg \
+  --path . \
+  --rev master,dirty \
+  --script benchmark/benchmarks.jl \
+  --output-dir .temp/asv \
+  --exeflags="--threads=4" \
+  --add RecursiveArrayTools \
+  --filter MIMOFilt
 ```
 
 Render a comparison table:

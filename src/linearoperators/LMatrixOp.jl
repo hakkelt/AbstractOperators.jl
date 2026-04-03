@@ -21,7 +21,7 @@ julia> op*ones(3,4)
 	
 ```
 """
-struct LMatrixOp{T, A <: Union{AbstractVector, AbstractMatrix}, B <: AbstractMatrix} <:
+struct LMatrixOp{T, A <: Union{AbstractVector, AbstractMatrix}, B <: AbstractMatrix, dS, cS} <:
     LinearOperator
     b::A
     bt::B
@@ -32,15 +32,18 @@ end
 # Constructors
 function LMatrixOp(
         domain_type::Type, DomainDim::Tuple{Int, Int}, b::A
+        ; array_type::Type = _array_wrapper_type(A),
     ) where {A <: Union{AbstractVector, AbstractMatrix}}
     bt = b'
-    return LMatrixOp{domain_type, A, typeof(bt)}(b, bt, DomainDim[1])
+    dS = _normalize_array_type(array_type, domain_type)
+    cS = _normalize_array_type(array_type, domain_type)
+    return LMatrixOp{domain_type, A, typeof(bt), dS, cS}(b, bt, DomainDim[1])
 end
 
 function LMatrixOp(
         b::A, n_row_in::Int
     ) where {T, A <: Union{AbstractVector{T}, AbstractMatrix{T}}}
-    return LMatrixOp(T, (n_row_in, size(b, 1)), b)
+    return LMatrixOp(T, (n_row_in, size(b, 1)), b; array_type = _array_wrapper_type(A))
 end
 
 # Mappings
@@ -62,14 +65,16 @@ end
 # Properties
 domain_type(::LMatrixOp{T}) where {T} = T
 codomain_type(::LMatrixOp{T}) where {T} = T
+domain_storage_type(::LMatrixOp{T, A, B, dS}) where {T, A, B, dS} = dS
+codomain_storage_type(::LMatrixOp{T, A, B, dS, cS}) where {T, A, B, dS, cS} = cS
 is_thread_safe(::LMatrixOp) = true
 
 fun_name(L::LMatrixOp) = "(⋅)b"
 
-function size(L::LMatrixOp{T, A, B}) where {T, A <: AbstractVector, B <: Adjoint}
+function size(L::LMatrixOp{T, A, B, dS, cS}) where {T, A <: AbstractVector, B <: Adjoint, dS, cS}
     return (L.n_row_in,), (L.n_row_in, length(L.b))
 end
-function size(L::LMatrixOp{T, A, B}) where {T, A <: AbstractMatrix, B <: AbstractMatrix}
+function size(L::LMatrixOp{T, A, B, dS, cS}) where {T, A <: AbstractMatrix, B <: AbstractMatrix, dS, cS}
     return (L.n_row_in, size(L.b, 2)), (L.n_row_in, size(L.b, 1))
 end
 

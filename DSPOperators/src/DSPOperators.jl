@@ -1,9 +1,9 @@
 module DSPOperators
 
 using AbstractOperators, FFTW
+using AbstractFFTs: AbstractFFTs
 import LinearAlgebra: mul!
 import Base: size, ndims
-using DSP: xcorr, conv
 
 import AbstractOperators:
     domain_type,
@@ -18,7 +18,6 @@ import AbstractOperators:
     is_full_column_rank,
     is_full_row_rank,
     is_thread_safe
-
 
 include("Conv.jl")
 include("Filt.jl")

@@ -68,33 +68,45 @@ function NFFTOp(
         trajectory::AbstractArray{T},
         dcf::AbstractArray;
         threaded::Bool = true,
+        array_type::Type = Array{T},
         kwargs...,
     ) where {T, D}
     check_traj_and_dcf(trajectory, dcf, D)
-    plan = create_plan(trajectory, image_size, threaded; kwargs...)
-    ksp_buffer = similar(
-        trajectory, complex(eltype(trajectory)), size(trajectory)[2:end]...
-    )
-    return NFFTOp{T, D, typeof(plan), typeof(ksp_buffer), typeof(dcf)}(plan, ksp_buffer, dcf, threaded)
+    arr_wrapper = _array_wrapper_type(array_type)
+    plan = _nfft_plan(arr_wrapper, trajectory, image_size, threaded; kwargs...)
+    ksp_shape = size(trajectory)[2:end]
+    ksp_buffer = _nfft_adapt(arr_wrapper, zeros(complex(T), ksp_shape...))
+    adapted_dcf = _nfft_adapt(arr_wrapper, collect(dcf))
+    threaded_flag = threaded && arr_wrapper === Array
+    return NFFTOp{T, D, typeof(plan), typeof(ksp_buffer), typeof(adapted_dcf)}(plan, ksp_buffer, adapted_dcf, threaded_flag)
 end
 
 function NFFTOp(
         image_size::NTuple{D, Int},
         trajectory::AbstractArray{T};
         threaded::Bool = true,
+        array_type::Type = Array{T},
         dcf_estimation_iterations::Int = 20,
         dcf_correction_function::Function = identity,
         kwargs...,
     ) where {T, D}
     check_traj(trajectory, D)
-    plan = create_plan(trajectory, image_size, threaded; kwargs...)
-    ksp_buffer = similar(
-        trajectory, complex(eltype(trajectory)), size(trajectory)[2:end]...
-    )
+    arr_wrapper = _array_wrapper_type(array_type)
+    plan = _nfft_plan(arr_wrapper, trajectory, image_size, threaded; kwargs...)
+    ksp_shape = size(trajectory)[2:end]
+    ksp_buffer = _nfft_adapt(arr_wrapper, zeros(complex(T), ksp_shape...))
     raw_dcf = NFFTTools.sdc(plan; iters = dcf_estimation_iterations)
-    dcf = dcf_correction_function(reshape(raw_dcf, size(ksp_buffer)))
-    return NFFTOp{T, D, typeof(plan), typeof(ksp_buffer), typeof(dcf)}(plan, ksp_buffer, dcf, threaded)
+    dcf_cpu = dcf_correction_function(reshape(raw_dcf, ksp_shape))
+    adapted_dcf = _nfft_adapt(arr_wrapper, collect(dcf_cpu))
+    threaded_flag = threaded && arr_wrapper === Array
+    return NFFTOp{T, D, typeof(plan), typeof(ksp_buffer), typeof(adapted_dcf)}(plan, ksp_buffer, adapted_dcf, threaded_flag)
 end
+
+# Default (CPU) implementations — overridden by NFFTOperatorsGPUArraysExt for GPU types
+function _nfft_plan(::Type{Array}, trajectory, image_size, threaded; kwargs...)
+    return create_plan(trajectory, image_size, threaded; kwargs...)
+end
+_nfft_adapt(::Type{Array}, arr::AbstractArray) = collect(arr)
 
 function set_nfft_threading_expr(threading_state_expr, thread_count_expr, body_expr)
     return quote
@@ -126,18 +138,19 @@ end
 
 function mul!(
         img::AbstractArray,
-        op::AbstractOperators.AdjointOperator{<:NFFTOp},
+        adjop::AbstractOperators.AdjointOperator{<:NFFTOp},
         ksp::AbstractArray,
     )
-    op = op.A
-    AbstractOperators.check(ksp, op, img)
-    return if op.threaded
+    AbstractOperators.check(img, adjop, ksp)
+    op = adjop.A
+    if op.threaded
         @.. thread = true op.ksp_buffer = ksp * op.dcf
         @enable_nfft_threading mul!(img, op.plan', vec(op.ksp_buffer))
     else
         @.. op.ksp_buffer = ksp * op.dcf
         @disable_nfft_threading mul!(img, op.plan', vec(op.ksp_buffer))
     end
+    return img
 end
 
 # Properties
@@ -146,6 +159,8 @@ size(L::NFFTOp) = size(L.ksp_buffer), NFFT.size_in(L.plan)
 fun_name(::NFFTOp) = "𝒩"
 domain_type(::NFFTOp{T}) where {T} = complex(T)
 codomain_type(::NFFTOp{T}) where {T} = complex(T)
+domain_storage_type(op::NFFTOp) = typeof(op.plan.tmpVec)
+codomain_storage_type(op::NFFTOp{T, D, P, K}) where {T, D, P, K} = K
 
 # Utility
 

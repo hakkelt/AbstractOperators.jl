@@ -1,7 +1,5 @@
 export Eye
 
-abstract type AbstractEye{T, N, S <: AbstractArray} <: LinearOperator end
-
 """
 	Eye([domain_type=Float64::Type,] dim_in::Tuple)
 	Eye([domain_type=Float64::Type,] dims...)
@@ -20,60 +18,71 @@ true
 	
 ```
 """
-struct Eye{T, N, S <: AbstractArray{T}} <: AbstractEye{T, N, S}
+struct Eye{T, N, S <: AbstractArray{T}} <: LinearOperator
     dim::NTuple{N, Int}
 end
 
 # Constructors
-###standard constructor Operator{N}(domain_type::Type, DomainDim::NTuple{N,Int})
-function Eye(
-        domain_type::Type{T}, domainDim::NTuple{N, <:Integer}, storageType::Type{S} = Array{T}
-    ) where {N, T, S <: AbstractArray{T}}
-    return Eye{domain_type, N, storageType}(map(Int, domainDim))
-end
-###
+@inline _make_eye(::Type{T}, dims::NTuple{N, Int}, ::Type{S}) where {T, N, S <: AbstractArray} =
+    Eye{T, N, _normalize_array_type(S, T)}(dims)
 
-Eye(t::Type, dims::Vararg{Integer}) = Eye(t, dims)
-Eye(dims::NTuple{N, Integer}) where {N} = Eye(Float64, dims)
-Eye(dims::Vararg{Integer}) = Eye(Float64, dims)
-Eye(x::A) where {A <: AbstractArray} = Eye(eltype(x), size(x), Array{eltype(x)})
+function Eye(
+        domain_type::Type{T}, domainDim::NTuple{N, <:Integer}; array_type::Type{<:AbstractArray} = Array{T}
+    ) where {N, T}
+    return _make_eye(domain_type, map(Int, domainDim), array_type)
+end
+
+function Eye(
+        t::Type{T}, dims::Vararg{Integer}; array_type::Type{<:AbstractArray} = Array{T}
+    ) where {T}
+    return _make_eye(t, map(Int, dims), array_type)
+end
+function Eye(dims::NTuple{N, Integer}; array_type::Type{<:AbstractArray} = Array{Float64}) where {N}
+    return _make_eye(Float64, map(Int, dims), array_type)
+end
+function Eye(dims::Vararg{Integer}; array_type::Type{<:AbstractArray} = Array{Float64})
+    return _make_eye(Float64, map(Int, dims), array_type)
+end
+function Eye(x::A) where {A <: AbstractArray}
+    return _make_eye(eltype(x), size(x), typeof(x isa SubArray ? parent(x) : x))
+end
 
 # Mappings
 
-function mul!(y::AbstractArray, L::AbstractEye, b::AbstractArray)
+function mul!(y::AbstractArray, L::Eye, b::AbstractArray)
     check(y, L, b)
     y .= b
     return y
 end
 
 # Properties
-diag(::AbstractEye) = 1.0
-diag_AcA(::AbstractEye) = 1.0
-diag_AAc(::AbstractEye) = 1.0
+diag(::Eye) = 1.0
+diag_AcA(::Eye) = 1.0
+diag_AAc(::Eye) = 1.0
 
-domain_type(::AbstractEye{T, N}) where {T, N} = T
-codomain_type(::AbstractEye{T, N}) where {T, N} = T
-domain_storage_type(::AbstractEye{T, N, S}) where {T, N, S} = S
-codomain_storage_type(::AbstractEye{T, N, S}) where {T, N, S} = S
+domain_type(::Eye{T, N}) where {T, N} = T
+codomain_type(::Eye{T, N}) where {T, N} = T
+domain_storage_type(::Eye{T, N, S}) where {T, N, S} = S
+codomain_storage_type(::Eye{T, N, S}) where {T, N, S} = S
 is_thread_safe(::Eye) = true
 
-size(L::AbstractEye) = (L.dim, L.dim)
+size(L::Eye) = (L.dim, L.dim)
 
-fun_name(::AbstractEye) = "I"
+fun_name(::Eye) = "I"
 
-is_eye(::AbstractEye) = true
-is_diagonal(::AbstractEye) = true
-is_orthogonal(::AbstractEye) = true
-is_invertible(::AbstractEye) = true
-is_full_row_rank(::AbstractEye) = true
-is_full_column_rank(::AbstractEye) = true
-is_symmetric(::AbstractEye) = true
-is_positive_definite(::AbstractEye) = true
-is_positive_semidefinite(::AbstractEye) = true
+is_eye(::Eye) = true
+is_diagonal(::Eye) = true
+is_orthogonal(::Eye) = true
+is_invertible(::Eye) = true
+is_full_row_rank(::Eye) = true
+is_full_column_rank(::Eye) = true
+is_symmetric(::Eye) = true
+is_positive_definite(::Eye) = true
+is_positive_semidefinite(::Eye) = true
 
-has_optimized_normalop(::AbstractEye) = true
-get_normal_op(L::AbstractEye) = L
+has_optimized_normalop(::Eye) = true
+get_normal_op(L::Eye) = L
 
-has_fast_opnorm(::AbstractEye) = true
-LinearAlgebra.opnorm(L::AbstractEye) = one(real(domain_type(L)))
-AdjointOperator(L::AbstractEye) = L
+has_fast_opnorm(::Eye) = true
+LinearAlgebra.opnorm(L::Eye) = one(real(domain_type(L)))
+AdjointOperator(L::Eye) = L
