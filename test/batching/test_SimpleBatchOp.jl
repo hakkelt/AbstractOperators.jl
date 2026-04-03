@@ -1,6 +1,5 @@
-@testitem "SimpleBatchOp" tags = [:batching, :SimpleBatchOp] setup = [TestUtils] begin
-    using Random, BenchmarkTools, AbstractOperators
-    Random.seed!(0)
+@testmodule SimpleBatchOpHelpers begin
+    using Random, BenchmarkTools, LinearAlgebra, AbstractOperators, JLArrays, Test
 
     function test_simple_batchop(op, batch_op, x, y, z, threaded)
         if threaded && Threads.nthreads() > 1
@@ -70,17 +69,13 @@
     function other_tests(threaded)
         op = DiagOp([1.0, 2.0])
         batch_op = BatchOp(op, (2,); threaded)
-        # show (fun_name)
         io = IOBuffer(); show(io, batch_op); s = String(take!(io))
         @test occursin("⟳", s)
-        # == and isequal
-        batch_op_copy = AbstractOperators.copy_op(batch_op)
+        batch_op_copy = AbstractOperators.copy_operator(batch_op)
         @test batch_op == batch_op_copy
         @test isequal(batch_op, batch_op_copy)
-        # storage types
         @test domain_storage_type(batch_op) == domain_storage_type(op)
         @test codomain_storage_type(batch_op) == codomain_storage_type(op)
-        # property queries
         @test is_linear(batch_op) == is_linear(op)
         @test is_eye(batch_op) == is_eye(op)
         @test is_null(batch_op) == is_null(op)
@@ -92,89 +87,111 @@
         @test is_full_column_rank(batch_op) == is_full_column_rank(op)
         @test is_sliced(batch_op) == is_sliced(op)
         @test is_thread_safe(batch_op) == is_thread_safe(op)
-        # has_optimized_normalop, get_normal_op
         @test AbstractOperators.has_optimized_normalop(batch_op) == AbstractOperators.has_optimized_normalop(op)
         n_op = AbstractOperators.get_normal_op(batch_op)
         @test typeof(n_op) <: typeof(batch_op)
-        # opnorm, estimate_opnorm -- exact solution is expected for both
         @test AbstractOperators.has_fast_opnorm(batch_op) == AbstractOperators.has_fast_opnorm(op)
         @test opnorm(batch_op) == opnorm(op)
         @test estimate_opnorm(batch_op) == estimate_opnorm(op)
         @test estimate_opnorm(batch_op) == opnorm(batch_op)
-        # diag, diag_AcA, diag_AAc
         @test diag(batch_op) == [diag(op)'; diag(op)']'
         @test diag_AcA(batch_op) == [diag_AcA(op)'; diag_AcA(op)']'
         @test diag_AAc(batch_op) == [diag_AAc(op)'; diag_AAc(op)']'
-        # error path: mismatched input type
         x_bad = rand(Int, 2, 2)
         y_bad = zeros(2, 2)
         @test_throws ArgumentError mul!(y_bad, batch_op, x_bad)
-        # error path: mismatched input size
         x_bad2 = rand(2, 3)
         @test_throws DimensionMismatch mul!(y_bad, batch_op, x_bad2)
-        # error path: mismatched output type
         y_bad2 = rand(Int, 2, 2)
         x_good = rand(2, 2)
         @test_throws ArgumentError mul!(y_bad2, batch_op, x_good)
-        # error path: mismatched output size
         y_bad3 = zeros(3, 2)
         @test_throws DimensionMismatch mul!(y_bad3, batch_op, x_good)
-
-        # scalar-diag path (Eye reports scalar diagonal)
         eye_batch = BatchOp(Eye(Float64, (2,)), (2,); threaded)
         @test diag(eye_batch) == 1.0
         @test diag_AcA(eye_batch) == 1.0
         @test diag_AAc(eye_batch) == 1.0
         return
     end
+end
 
-    @testset "SimpleBatchOp" begin
-        @testset "Shape-keeping op (DiagOp)" begin
-            @testset "non-threaded" begin
-                test_shape_keeping_simple_batch_op(false)
-            end
-            if Threads.nthreads() > 1
-                @testset "threaded (thread-safe)" begin
-                    test_shape_keeping_simple_batch_op(true)
-                end
-            end
-        end
-        @testset "Dimension count changing op (Variation)" begin
-            @testset "non-threaded" begin
-                test_variation_simple_batch_op(false)
-            end
-            if Threads.nthreads() > 1
-                @testset "threaded (thread-safe)" begin
-                    test_variation_simple_batch_op(true)
-                end
-            end
-        end
-        @testset "Shape-changing op (DiagOp∘FiniteDiff)" begin
-            @testset "non-threaded" begin
-                test_shape_changing_simple_batch_op(false)
-            end
-            if Threads.nthreads() > 1
-                @testset "threaded (thread-safe)" begin
-                    test_shape_changing_simple_batch_op(true)
-                end
-            end
-        end
-        @testset "Other tests" begin
-            @testset "non-threaded" begin
-                other_tests(false)
-            end
-            if Threads.nthreads() > 1
-                @testset "threaded (thread-safe)" begin
-                    other_tests(true)
-                end
-            end
-        end
-        if Threads.nthreads() > 1 && get(ENV, "CI", "false") == "false"
-            @testset "Benchmark" begin
-                t_single_threaded = benchmark_threading(false)
-                t_multi_threaded = benchmark_threading(true)
-                @test t_multi_threaded < t_single_threaded
-            end
-        end
+@testitem "SimpleBatchOp shape-keeping non-threaded" tags = [:batching, :SimpleBatchOp] setup = [TestUtils, SimpleBatchOpHelpers] begin
+    using Random
+    Random.seed!(0)
+    SimpleBatchOpHelpers.test_shape_keeping_simple_batch_op(false)
+end
+
+@testitem "SimpleBatchOp shape-keeping threaded" tags = [:batching, :SimpleBatchOp] setup = [TestUtils, SimpleBatchOpHelpers] begin
+    using Random
+    Random.seed!(0)
+    if Threads.nthreads() > 1
+        SimpleBatchOpHelpers.test_shape_keeping_simple_batch_op(true)
     end
-end  # @testitem "SimpleBatchOp"
+end
+
+@testitem "SimpleBatchOp variation non-threaded" tags = [:batching, :SimpleBatchOp] setup = [TestUtils, SimpleBatchOpHelpers] begin
+    using Random
+    Random.seed!(0)
+    SimpleBatchOpHelpers.test_variation_simple_batch_op(false)
+end
+
+@testitem "SimpleBatchOp variation threaded" tags = [:batching, :SimpleBatchOp] setup = [TestUtils, SimpleBatchOpHelpers] begin
+    using Random
+    Random.seed!(0)
+    if Threads.nthreads() > 1
+        SimpleBatchOpHelpers.test_variation_simple_batch_op(true)
+    end
+end
+
+@testitem "SimpleBatchOp shape-changing non-threaded" tags = [:batching, :SimpleBatchOp] setup = [TestUtils, SimpleBatchOpHelpers] begin
+    using Random
+    Random.seed!(0)
+    SimpleBatchOpHelpers.test_shape_changing_simple_batch_op(false)
+end
+
+@testitem "SimpleBatchOp shape-changing threaded" tags = [:batching, :SimpleBatchOp] setup = [TestUtils, SimpleBatchOpHelpers] begin
+    using Random
+    Random.seed!(0)
+    if Threads.nthreads() > 1
+        SimpleBatchOpHelpers.test_shape_changing_simple_batch_op(true)
+    end
+end
+
+@testitem "SimpleBatchOp other tests non-threaded" tags = [:batching, :SimpleBatchOp] setup = [TestUtils, SimpleBatchOpHelpers] begin
+    using Random
+    Random.seed!(0)
+    SimpleBatchOpHelpers.other_tests(false)
+end
+
+@testitem "SimpleBatchOp other tests threaded" tags = [:batching, :SimpleBatchOp] setup = [TestUtils, SimpleBatchOpHelpers] begin
+    using Random
+    Random.seed!(0)
+    if Threads.nthreads() > 1
+        SimpleBatchOpHelpers.other_tests(true)
+    end
+end
+
+@testitem "SimpleBatchOp benchmark" tags = [:batching, :SimpleBatchOp] setup = [TestUtils, SimpleBatchOpHelpers] begin
+    using Random
+    Random.seed!(0)
+    if Threads.nthreads() > 1 && get(ENV, "CI", "false") == "false"
+        t_single_threaded = SimpleBatchOpHelpers.benchmark_threading(false)
+        t_multi_threaded = SimpleBatchOpHelpers.benchmark_threading(true)
+        @test t_multi_threaded < t_single_threaded
+    end
+end
+
+@testitem "SimpleBatchOp GPU (JLArray)" tags = [:batching, :SimpleBatchOp] setup = [TestUtils, GpuTestUtils, SimpleBatchOpHelpers] begin
+    using Random, AbstractOperators, JLArrays
+    Random.seed!(0)
+    op = DiagOp(jl([1.0, 2.0]))
+    batch_op = BatchOp(op, (3, 4), (:_, :b, :b))
+    x = jl(ones(2, 3, 4))
+    y_gpu = batch_op * x
+    @test size(Array(y_gpu)) == (2, 3, 4)
+    @test all(Array(y_gpu)[1, :, :] .≈ 1.0)
+    @test all(Array(y_gpu)[2, :, :] .≈ 2.0)
+    y_gpu2 = similar(y_gpu)
+    mul!(y_gpu2, batch_op, x)
+    @test Array(y_gpu2) ≈ Array(y_gpu)
+end

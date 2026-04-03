@@ -1,15 +1,26 @@
-@testitem "LMatrixOp" tags = [:linearoperator, :LMatrixOp] setup = [TestUtils] begin
+@testitem "LMatrixOp: basic mul" tags = [:linearoperator, :LMatrixOp] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing LMatrixOp --- ")
+    verb && println(" --- Testing LMatrixOp: basic mul --- ")
+
+    function test_lmatrixop_mul(conv, verb)
+        n, m = 5, 6
+        b = randn(m)
+        op = LMatrixOp(Float64, (n, m), conv(b))
+        test_op(op, conv(randn(n, m)), conv(randn(n)), verb)
+    end
+
+    test_lmatrixop_mul(identity, verb)
 
     n, m = 5, 6
     b = randn(m)
     op = LMatrixOp(Float64, (n, m), b)
+    op_array_type = LMatrixOp(Float64, (n, m), b; array_type = Array{ComplexF32, 2})
+    @test domain_storage_type(op_array_type) == Array{Float64}
+    @test codomain_storage_type(op_array_type) == Array{Float64}
     x1 = randn(n, m)
     y1 = test_op(op, x1, randn(n), verb)
     y2 = x1 * b
-
     @test all(norm.(y1 .- y2) .<= 1.0e-12)
     # size (codomain, domain)
     @test size(op) == ((n,), (n, m))
@@ -22,7 +33,6 @@
     x1 = randn(n, m) + im * randn(n, m)
     y1 = test_op(op, x1, randn(n) + im * randn(n), verb)
     y2 = x1 * b
-
     @test all(norm.(y1 .- y2) .<= 1.0e-12)
     @test size(op) == ((n,), (n, m))
 
@@ -32,7 +42,6 @@
     x1 = randn(n, m)
     y1 = test_op(op, x1, randn(n, l), verb)
     y2 = x1 * b
-
     @test all(norm.(y1 .- y2) .<= 1.0e-12)
     @test size(op) == ((n, l), (n, m))
 
@@ -42,9 +51,16 @@
     x1 = randn(n, m) + im * randn(n, m)
     y1 = test_op(op, x1, randn(n, l) + im * randn(n, l), verb)
     y2 = x1 * b
-
     @test all(norm.(y1 .- y2) .<= 1.0e-12)
     @test size(op) == ((n, l), (n, m))
+end
+
+@testitem "LMatrixOp: other constructors" tags = [:linearoperator, :LMatrixOp] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
+    verb && println(" --- Testing LMatrixOp: other constructors --- ")
+
+    n, m, l = 5, 6, 7
 
     ## other constructors (vector b and matrix b)
     bvec = randn(m)
@@ -79,6 +95,17 @@
     Zout2 = zeros(n, m)
     mul!(Zout2, op_mat2', Zrhs)
     @test Zout2 ≈ Zrhs * b_mat'
+end
+
+@testitem "LMatrixOp: scale and properties" tags = [:linearoperator, :LMatrixOp] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
+    verb && println(" --- Testing LMatrixOp: scale and properties --- ")
+
+    n, m, l = 5, 6, 7
+    bvec = randn(m)
+    op_vec = LMatrixOp(bvec, n)
+    X = randn(n, m)
 
     # Scaling
     Sop = Scale(2.5, op_vec)
@@ -91,6 +118,9 @@
     # Error path: dimension mismatch (wrong inner dimension)
     Xbad = randn(n, m + 1)
     @test_throws DimensionMismatch (op_vec * Xbad)
+
+    b = randn(m, l) + im * randn(m, l)
+    op = LMatrixOp(Complex{Float64}, (n, m), b)
 
     ##properties
     @test is_linear(op) == true
@@ -105,5 +135,43 @@
     @test is_full_column_rank(op) == false
 
     # Show output symbol
-    io = IOBuffer(); show(io, op_vec); s = String(take!(io)); @test occursin("(⋅)b", s)
+    io = IOBuffer()
+    show(io, op_vec)
+    s = String(take!(io))
+    @test occursin("(⋅)b", s)
+end
+
+@testitem "LMatrixOp (JLArray)" tags = [:linearoperator, :LMatrixOp, :gpu, :jlarray] setup = [TestUtils, GpuTestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
+    n, m = 5, 6
+    b = jl(randn(m))
+    op = LMatrixOp(Float64, (n, m), b)
+    test_op(op, jl(randn(n, m)), jl(randn(n)), false)
+end
+
+@testitem "LMatrixOp (CUDA)" tags = [:gpu, :cuda, :linearoperator, :LMatrixOp] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    using CUDA
+    if CUDA.functional()
+        Random.seed!(0)
+        n, m = 5, 6
+        b = CuArray(randn(m))
+        op = LMatrixOp(Float64, (n, m), b)
+        test_op(op, CuArray(randn(n, m)), CuArray(randn(n)), false)
+    end
+end
+
+@testitem "LMatrixOp (AMDGPU)" tags = [:gpu, :amdgpu, :linearoperator, :LMatrixOp] setup = [
+    TestUtils,
+] begin
+    using Random, AbstractOperators
+    using AMDGPU
+    if AMDGPU.functional()
+        Random.seed!(0)
+        n, m = 5, 6
+        b = AMDGPU.ROCArray(randn(m))
+        op = LMatrixOp(Float64, (n, m), b)
+        test_op(op, AMDGPU.ROCArray(randn(n, m)), AMDGPU.ROCArray(randn(n)), false)
+    end
 end

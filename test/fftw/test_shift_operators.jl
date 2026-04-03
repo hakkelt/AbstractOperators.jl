@@ -1,4 +1,5 @@
 @testitem "FFTShift/IFFTShift Operators" tags = [:fftw, :FFTShift] setup = [TestUtils] begin
+    using AbstractOperators
     using LinearAlgebra, Random, FFTWOperators
     # 1D even length
     n = 4
@@ -22,7 +23,7 @@
 
     # 2D, both dims
     n, m = 2, 3
-    X = reshape(1.0:(n * m), n, m)
+    X = collect(reshape(1.0:(n * m), n, m))
     A = FFTShift((n, m), (1, 2))
     B = IFFTShift((n, m), (1, 2))
     Y = A * X
@@ -39,6 +40,7 @@
 end
 
 @testitem "SignAlternation Operator" tags = [:fftw, :SignAlternation] setup = [TestUtils] begin
+    using AbstractOperators
     using LinearAlgebra, Random, FFTWOperators
     # 1D
     n = 6
@@ -73,13 +75,13 @@ end
     @test v == [1.0, -2.0, 3.0, -4.0]
 
     # out-of-place with dest
-    x = reshape(1.0:4.0, 2, 2)
+    x = collect(reshape(1.0:4.0, 2, 2))
     y = similar(x)
     alternate_sign!(y, x, 1, 2)
     @test y == [1.0 -3.0; -2.0 4.0]
 
     # functional copy
-    u = alternate_sign(reshape(1.0:4.0, 2, 2), 1, 2)
+    u = alternate_sign(collect(reshape(1.0:4.0, 2, 2)), 1, 2)
     @test u == [1.0 -3.0; -2.0 4.0]
 
     # no dirs → identity
@@ -133,6 +135,7 @@ end
 end
 
 @testitem "Combination rules: FFTShift/IFFTShift with DFT/IDFT" tags = [:fftw, :CombinationRules] setup = [TestUtils] begin
+    using AbstractOperators
     using LinearAlgebra, Random, FFTWOperators
     using AbstractOperators: can_be_combined, combine
 
@@ -182,4 +185,41 @@ end
     c5 = combine(dft2, sh2)
     X = randn(ComplexF64, n, m)
     @test (c5 * X) ≈ ((dft2 * sh2) * X)
+end
+
+@testitem "FFTShift/IFFTShift (GPU)" tags = [:gpu, :fftw, :FFTShift] setup = [TestUtils, GpuTestUtils] begin
+    using LinearAlgebra, FFTWOperators, JLArrays
+
+    n = 4
+    x = jl(collect(1.0:n))
+    A = FFTShift((n,), (1,); array_type = typeof(x))
+    y = A * x
+    @test collect(y) == [3.0, 4.0, 1.0, 2.0]
+    # adjoint roundtrip
+    @test collect(A' * y) ≈ collect(x)
+
+    # 2D
+    n2, m2 = 2, 4
+    X = jl(ones(n2, m2))
+    A2 = FFTShift((n2, m2), (1, 2); array_type = typeof(X))
+    Y = A2 * X
+    @test collect(Y) ≈ ones(n2, m2)  # shifting all-ones stays all-ones
+end
+
+@testitem "SignAlternation (JLArray)" tags = [:gpu, :jlarray, :fftw, :SignAlternation] setup = [TestUtils, GpuTestUtils] begin
+    using LinearAlgebra, FFTWOperators, JLArrays
+
+    n = 6
+    x = jl(ones(n))
+    S = SignAlternation((n,), (1,); array_type = typeof(x))
+    y = S * x
+    @test collect(y) == [1.0, -1.0, 1.0, -1.0, 1.0, -1.0]
+    # SignAlternation is involutory: S*S*x == x
+    @test collect(S * y) ≈ collect(x)
+
+    # 2D
+    X2 = jl(ones(2, 2))
+    S2 = SignAlternation((2, 2), (1, 2); array_type = typeof(X2))
+    Y2 = S2 * X2
+    @test collect(Y2) == [1.0 -1.0; -1.0 1.0]
 end

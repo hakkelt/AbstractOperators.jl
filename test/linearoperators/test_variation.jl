@@ -1,12 +1,23 @@
-@testitem "Variation" tags = [:linearoperator, :Variation] setup = [TestUtils] begin
+@testitem "Variation: basic mul" tags = [:linearoperator, :Variation] setup = [TestUtils] begin
     using Random, SparseArrays, LinearAlgebra, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing Variation --- ")
+    verb && println(" --- Testing Variation: basic mul --- ")
+
+    function test_variation_mul(conv, verb)
+        n, m = 10, 5
+        op = Variation(conv(zeros(Float64, n, m)); threaded = false)
+        test_op(op, conv(randn(n, m)), conv(randn(n * m, 2)), verb)
+    end
+
+    test_variation_mul(identity, verb)
 
     for threaded in (false, true)
         n, m = 10, 5
         verb && println("  - threaded = $threaded")
         op = Variation(Float64, (n, m); threaded)
+        op_array_type = Variation(Float64, (n, m); threaded, array_type = Array{ComplexF32, 2})
+        @test domain_storage_type(op_array_type) == Array{Float64}
+        @test codomain_storage_type(op_array_type) == Array{Float64}
         x1 = randn(n, m)
         y1 = test_op(op, x1, randn(m * n, 2), verb)
         # size & types
@@ -34,7 +45,15 @@
 
         x1 = randn(n, m)
         @test norm(op * x1 - reshape(TV * (x1[:]), n * m, 2)) < 1.0e-12
+    end
+end
 
+@testitem "Variation: 3D mul and constructors" tags = [:linearoperator, :Variation] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
+    verb && println(" --- Testing Variation: 3D mul and constructors --- ")
+
+    for threaded in (false, true)
         n, m, l = 100, 50, 30
         verb && println("  - threaded = $threaded")
         op = Variation(Float64, (n, m, l); threaded)
@@ -59,13 +78,24 @@
         @test_throws ErrorException Variation(Float64, (n,))
         badX = randn(n, m + 1)
         @test_throws DimensionMismatch op * badX
+    end
+end
+
+@testitem "Variation: adjoint and properties" tags = [:linearoperator, :Variation] setup = [TestUtils] begin
+    using Random, LinearAlgebra, AbstractOperators
+    Random.seed!(0)
+    verb && println(" --- Testing Variation: adjoint and properties --- ")
+
+    for threaded in (false, true)
+        n, m, l = 100, 50, 30
+        op = Variation(Float64, (n, m, l); threaded)
 
         # Adjoint consistency: <Vx, Y> == <x, V'Y>
         x_test = randn(n, m)
         verb && println("  - threaded = $threaded")
         V = Variation(Float64, (n, m); threaded)
         Y = randn(n * m, 2)
-        lhs = dot(V * x_test |> vec, vec(Y))  # vec(Vx) ⋅ vec(Y)
+        lhs = dot(vec(V * x_test), vec(Y))  # vec(Vx) ⋅ vec(Y)
         z = zeros(n, m)
         mul!(z, V', Y)
         rhs = dot(vec(x_test), vec(z))
@@ -85,7 +115,10 @@
         @test_throws ErrorException Scale(1 + 2im, V)
 
         # Show output symbol
-        io = IOBuffer(); show(io, V); s = String(take!(io)); @test occursin("Ʋ", s)
+        io = IOBuffer()
+        show(io, V)
+        s = String(take!(io))
+        @test occursin("Ʋ", s)
 
         ###properties
         @test is_linear(op) == true
@@ -98,5 +131,38 @@
         @test is_invertible(op) == false
         @test is_full_row_rank(op) == false
         @test is_full_column_rank(op) == false
+    end
+end
+
+@testitem "Variation (JLArray)" tags = [:linearoperator, :Variation, :gpu, :jlarray] setup = [TestUtils, GpuTestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
+    n, m = 10, 5
+    op = Variation(jl(zeros(Float64, n, m)); threaded = false)
+    test_op(op, jl(randn(n, m)), jl(randn(n * m, 2)), false)
+end
+
+@testitem "Variation (CUDA)" tags = [:gpu, :cuda, :linearoperator, :Variation] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    using CUDA: CuArray
+    using CUDA
+    if CUDA.functional()
+        Random.seed!(0)
+        n, m = 10, 5
+        op = Variation(CUDA.zeros(Float64, n, m); threaded = false)
+        test_op(op, CuArray(randn(n, m)), CuArray(randn(n * m, 2)), false)
+    end
+end
+
+@testitem "Variation (AMDGPU)" tags = [:gpu, :amdgpu, :linearoperator, :Variation] setup = [
+    TestUtils,
+] begin
+    using Random, AbstractOperators
+    using AMDGPU
+    if AMDGPU.functional()
+        Random.seed!(0)
+        n, m = 10, 5
+        op = Variation(AMDGPU.zeros(Float64, n, m); threaded = false)
+        test_op(op, AMDGPU.ROCArray(randn(n, m)), AMDGPU.ROCArray(randn(n * m, 2)), false)
     end
 end

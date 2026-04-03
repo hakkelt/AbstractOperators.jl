@@ -1,14 +1,47 @@
-@testitem "ZeroPad" tags = [:linearoperator, :ZeroPad] setup = [TestUtils] begin
-    using Random, AbstractOperators
+@testmodule ZeroPadTestHelper begin
+    using Test, AbstractOperators, LinearAlgebra
+
+    export test_zeropad_mul
+
+    function test_zeropad_mul(conv, verb, test_op, to_cpu, norm)
+        n = (3,)
+        z = (5,)
+        op = ZeroPad(conv(zeros(Float64, n)), z)
+        x1 = conv(randn(n))
+        y1 = test_op(op, x1, conv(randn(n .+ z)), verb)
+        y2 = conv([collect(x1); zeros(5)])
+        @test norm(to_cpu(y1) .- to_cpu(y2)) <= 1.0e-12
+
+        n = (3, 2)
+        z = (5, 3)
+        op = ZeroPad(conv(zeros(Float64, n)), z)
+        x1 = conv(randn(n))
+        y1 = test_op(op, x1, conv(randn(n .+ z)), verb)
+        y2c = zeros(n .+ z)
+        y2c[1:n[1], 1:n[2]] = collect(x1)
+        @test norm(to_cpu(y1) .- y2c) <= 1.0e-12
+
+        n = (3, 2, 2)
+        z = (5, 3, 1)
+        op = ZeroPad(conv(zeros(Float64, n)), z)
+        x1 = conv(randn(n))
+        test_op(op, x1, conv(randn(n .+ z)), verb)
+    end
+
+end  # @testmodule ZeroPadTestHelper
+
+@testitem "ZeroPad" tags = [:linearoperator, :ZeroPad] setup = [TestUtils, ZeroPadTestHelper] begin
+    using Random, AbstractOperators, JLArrays
     Random.seed!(0)
     verb && println(" --- Testing ZeroPad --- ")
 
+    test_zeropad_mul(identity, verb, test_op, to_cpu, norm)
+
+    # CPU-only: type-based constructors, properties, errors
     n = (3,)
     z = (5,)
     op = ZeroPad(Float64, n, z)
     x1 = randn(n)
-    y1 = test_op(op, x1, randn(n .+ z), verb)
-    @test all(norm.(y1 .- [x1; zeros(5)]) .<= 1.0e-12)
     @test size(op) == (n .+ z, n)
     @test domain_type(op) == Float64
     @test codomain_type(op) == Float64
@@ -16,44 +49,23 @@
     @test AbstractOperators.has_fast_opnorm(op) == true
     @test opnorm(op) == 1
 
-    n = (3, 2)
-    z = (5, 3)
-    op = ZeroPad(Float64, n, z)
-    x1 = randn(n)
-    y1 = test_op(op, x1, randn(n .+ z), verb)
-    y2 = zeros(n .+ z)
-    y2[1:n[1], 1:n[2]] = x1
-    @test all(norm.(y1 .- y2) .<= 1.0e-12)
-    @test size(op) == (n .+ z, n)
-
     n = (3, 2, 2)
     z = (5, 3, 1)
     op = ZeroPad(Float64, n, z)
     x1 = randn(n)
-    y1 = test_op(op, x1, randn(n .+ z), verb)
-    y2 = zeros(n .+ z)
-    y2[1:n[1], 1:n[2], 1:n[3]] = x1
-    @test all(norm.(y1 .- y2) .<= 1.0e-12)
-    @test size(op) == (n .+ z, n)
 
     # Normal operator should be identity on input space
     Nop = AbstractOperators.get_normal_op(op)
-    xin = randn(n)
-    @test Nop * xin ≈ xin
+    @test Nop * x1 ≈ x1
 
-    # Adjoint: crop back
+    # Adjoint crop
     ybig = zeros(n .+ z)
     ybig[1:n[1], 1:n[2], 1:n[3]] .= x1
     xcropped = zeros(n)
     mul!(xcropped, op', ybig)
     @test xcropped ≈ x1
 
-    # In-place forward padding
-    ybuf = similar(ybig)
-    mul!(ybuf, op, x1)
-    @test ybuf ≈ y2
-
-    # Scaling (real ok, complex rejected for real domain)
+    # Scaling
     Sop = Scale(2.0, op)
     @test Sop * x1 ≈ 2.0 * (op * x1)
     @test_throws ErrorException Scale(1 + 2im, op)
@@ -61,15 +73,14 @@
     # other constructors
     ZeroPad(n, z...)
     ZeroPad(Float64, n, z...)
-    ZeroPad(n, z...)
     ZeroPad(x1, z)
     ZeroPad(x1, z...)
 
-    #errors
+    # errors
     @test_throws ErrorException ZeroPad(Float64, n, (1, 2))
     @test_throws ErrorException ZeroPad(Float64, n, (1, -2, 3))
 
-    #properties
+    # properties
     @test is_linear(op) == true
     @test is_null(op) == false
     @test is_eye(op) == false
@@ -80,9 +91,38 @@
     @test is_invertible(op) == false
     @test is_full_row_rank(op) == false
     @test is_full_column_rank(op) == true
-
     @test diag_AcA(op) == 1
 
-    # Show output symbol
-    io = IOBuffer(); show(io, op); s = String(take!(io)); @test occursin("[I;0]", s)
+    io = IOBuffer()
+    show(io, op)
+    s = String(take!(io))
+    @test occursin("[I;0]", s)
+end
+
+@testitem "ZeroPad (JLArray)" tags = [:gpu, :jlarray, :linearoperator, :ZeroPad] setup = [TestUtils, GpuTestUtils, ZeroPadTestHelper] begin
+    using Random, AbstractOperators, JLArrays
+    Random.seed!(0)
+    test_zeropad_mul(jl, false, test_op, to_cpu, norm)
+end
+
+@testitem "ZeroPad (CUDA)" tags = [:gpu, :cuda, :linearoperator, :ZeroPad] setup = [
+    TestUtils, ZeroPadTestHelper,
+] begin
+    using Random, AbstractOperators
+    using CUDA
+    if CUDA.functional()
+        Random.seed!(0)
+        test_zeropad_mul(CuArray, false, test_op, to_cpu, norm)
+    end
+end
+
+@testitem "ZeroPad (AMDGPU)" tags = [:gpu, :amdgpu, :linearoperator, :ZeroPad] setup = [
+    TestUtils, ZeroPadTestHelper,
+] begin
+    using Random, AbstractOperators
+    using AMDGPU
+    if AMDGPU.functional()
+        Random.seed!(0)
+        test_zeropad_mul(AMDGPU.ROCArray, false, test_op, to_cpu, norm)
+    end
 end

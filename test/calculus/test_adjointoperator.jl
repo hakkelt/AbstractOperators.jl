@@ -89,3 +89,59 @@
 
     @test opA1' == opA1'
 end
+
+@testitem "AdjointOperator (GPU)" tags = [:gpu, :calculus, :AdjointOperator] setup = [TestUtils, GpuTestUtils] begin
+    using Random, AbstractOperators, JLArrays
+    Random.seed!(0)
+
+    # Construct from GPU arrays to get GPU storage type
+    n = 5
+    op = FiniteDiff(jl(zeros(Float64, n)))
+    opT = AdjointOperator(op)
+    test_op(opT, jl(randn(n - 1)), jl(randn(n)), false)
+
+    n = 4
+    op = DiagOp(jl(randn(n)))
+    opT = AdjointOperator(op)
+    test_op(opT, jl(randn(n)), jl(randn(n)), false)
+end
+
+@testitem "AdjointOperator (CUDA)" tags = [:gpu, :cuda, :calculus, :AdjointOperator] setup = [
+    TestUtils,
+] begin
+    using Random, AbstractOperators
+    using CUDA
+    if CUDA.functional()
+        Random.seed!(0)
+
+        n = 5
+        op = FiniteDiff(CUDA.zeros(Float64, n))
+        opT = AdjointOperator(op)
+        test_op(opT, CuArray(randn(n - 1)), CuArray(randn(n)), false)
+
+        n = 4
+        op = DiagOp(CuArray(randn(n)))
+        opT = AdjointOperator(op)
+        test_op(opT, CuArray(randn(n)), CuArray(randn(n)), false)
+    end
+end
+
+@testitem "AdjointOperator (AMDGPU)" tags = [:gpu, :amdgpu, :calculus, :AdjointOperator] setup = [
+    TestUtils,
+] begin
+    using Random, AbstractOperators
+    using AMDGPU
+    if AMDGPU.functional()
+        Random.seed!(0)
+
+        n = 5
+        op = FiniteDiff(AMDGPU.zeros(Float64, n))
+        opT = AdjointOperator(op)
+        test_op(opT, AMDGPU.ROCArray(randn(n - 1)), AMDGPU.ROCArray(randn(n)), false)
+
+        n = 4
+        op = DiagOp(AMDGPU.ROCArray(randn(n)))
+        opT = AdjointOperator(op)
+        test_op(opT, AMDGPU.ROCArray(randn(n)), AMDGPU.ROCArray(randn(n)), false)
+    end
+end

@@ -1,56 +1,59 @@
-@testitem "DiagOp" tags = [:linearoperator, :DiagOp] setup = [TestUtils] begin
-    using Random, AbstractOperators
+@testmodule DiagOpTestHelper begin
+    using Test, AbstractOperators, LinearAlgebra
+
+    export test_diagop_mul
+
+    function test_diagop_mul(conv, verb, test_op, to_cpu, norm)
+        n = 4
+        d = conv(randn(n))
+        op = DiagOp(d)
+        x1 = conv(randn(n))
+        y1 = test_op(op, x1, conv(randn(n)), verb)
+        y2 = d .* x1
+        @test norm(to_cpu(y1) .- to_cpu(y2)) <= 1.0e-12
+
+        d = conv(randn(n) + im * randn(n))
+        op = DiagOp(d)
+        x1 = conv(randn(n) .+ im * randn(n))
+        y1 = test_op(op, x1, conv(randn(n) .+ im * randn(n)), verb)
+        y2 = d .* x1
+        @test norm(to_cpu(y1) .- to_cpu(y2)) <= 1.0e-12
+    end
+
+end  # @testmodule DiagOpTestHelper
+
+@testitem "DiagOp: mul and constructors" tags = [:linearoperator, :DiagOp] setup = [TestUtils, DiagOpTestHelper] begin
+    using Random, AbstractOperators, JLArrays
     Random.seed!(0)
     verb && println(" --- Testing DiagOp --- ")
 
+    test_diagop_mul(identity, verb, test_op, to_cpu, norm)
+
+    # scalar diagonal tests (CPU-only, not array-dependent)
     n = 4
-    d = randn(n)
-    op = DiagOp(Float64, (n,), d)
     x1 = randn(n)
-    y1 = test_op(op, x1, randn(n), verb)
-    y2 = d .* x1
-
-    @test all(norm.(y1 .- y2) .<= 1.0e-12)
-
-    n = 4
-    d = randn(n) + im * randn(n)
-    op = DiagOp(Float64, (n,), d)
-    x1 = randn(n)
-    y1 = test_op(op, x1, randn(n) .+ im * randn(n), verb)
-    y2 = d .* x1
-
-    @test all(norm.(y1 .- y2) .<= 1.0e-12)
-
-    n = 4
     d = pi
     op = DiagOp(Float64, (n,), d)
-    x1 = randn(n)
     y1 = test_op(op, x1, randn(n), verb)
-    y2 = d .* x1
+    @test all(norm.(y1 .- d .* x1) .<= 1.0e-12)
 
-    @test all(norm.(y1 .- y2) .<= 1.0e-12)
-
-    n = 4
     d = im
     op = DiagOp(Float64, (n,), d)
-    x1 = randn(n)
     y1 = test_op(op, x1, randn(n) + im * randn(n), verb)
     @test domain_type(op) == Float64
     @test codomain_type(op) == Complex{Float64}
-    y2 = d .* x1
-
-    @test all(norm.(y1 .- y2) .<= 1.0e-12)
 
     # other constructors
-    d = randn(4)
-    op = DiagOp(d)
+    op = DiagOp(randn(4))
+    op = DiagOp(randn(4) .+ im)
+    op = DiagOp((n,), pi)
+end
 
-    d = randn(4) .+ im
-    op = DiagOp(d)
-
+@testitem "DiagOp: properties and helpers" tags = [:linearoperator, :DiagOp] setup = [TestUtils, DiagOpTestHelper] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
     n = 4
-    d = pi
-    op = DiagOp((n,), d)
+    op = DiagOp((n,), pi)
 
     #properties
     @test is_linear(op) == true
@@ -67,25 +70,19 @@
     @test is_full_column_rank(op) == true
     @test is_full_column_rank(DiagOp([ones(5); 0])) == false
 
-    @test diag(op) == d
-    @test norm(op' * (op * x1) .- diag_AcA(op) .* x1) <= 1.0e-12
-    @test norm(op * (op' * x1) .- diag_AAc(op) .* x1) <= 1.0e-12
-
-    n = 4
+    @test diag(op) == pi
     d = pi
     op = DiagOp((n,), d)
     x1 = randn(n)
-
-    @test diag(op) == d
     @test norm(op' * (op * x1) .- diag_AcA(op) .* x1) <= 1.0e-12
     @test norm(op * (op' * x1) .- diag_AAc(op) .* x1) <= 1.0e-12
 
-    # Scale: create scaled operator and verify diagonal scaling and properties
+    # Scale
     op_scaled = Scale(3.0, op)
     @test diag(op_scaled) == 3.0 .* diag(op)
     @test size(op_scaled) == size(op)
 
-    # get_normal_op: should produce diagonal with abs2 of original diag
+    # get_normal_op
     normal_op = AbstractOperators.get_normal_op(op)
     @test diag(normal_op) == abs2.(diag(op))
     @test is_diagonal(normal_op) == true
@@ -98,12 +95,47 @@
     @test AbstractOperators.has_optimized_normalop(op) == true
     @test AbstractOperators.has_optimized_normalop(op') == true
 
-    # invertibility false path (contains a zero)
+    # invertibility false path
     op_sing = DiagOp([1.0, 0.0, 2.0, 3.0])
     @test is_invertible(op_sing) == false
     @test is_full_row_rank(op_sing) == false
     @test is_full_column_rank(op_sing) == false
 
-    # size returns (domain_dim, domain_dim)
     @test size(op) == ((n,), (n,))
+end
+
+@testitem "DiagOp (GPU)" tags = [:gpu, :jlarray, :linearoperator, :DiagOp] setup = [TestUtils, GpuTestUtils, DiagOpTestHelper] begin
+    using Random, AbstractOperators, JLArrays
+    Random.seed!(0)
+    test_diagop_mul(jl, false, test_op, to_cpu, norm)
+end
+
+@testitem "DiagOp (CUDA)" tags = [:gpu, :cuda, :linearoperator, :DiagOp] setup = [
+    TestUtils, DiagOpTestHelper,
+] begin
+    using Random, AbstractOperators
+    using CUDA
+    if CUDA.functional()
+        Random.seed!(0)
+        test_diagop_mul(CuArray, false, test_op, to_cpu, norm)
+        x = CuArray(randn(4))
+        op = DiagOp(x)
+        @test domain_storage_type(op) <: CUDA.CuArray
+        @test codomain_storage_type(op) <: CUDA.CuArray
+    end
+end
+
+@testitem "DiagOp (AMDGPU)" tags = [:gpu, :amdgpu, :linearoperator, :DiagOp] setup = [
+    TestUtils, DiagOpTestHelper,
+] begin
+    using Random, AbstractOperators
+    using AMDGPU
+    if AMDGPU.functional()
+        Random.seed!(0)
+        test_diagop_mul(AMDGPU.ROCArray, false, test_op, to_cpu, norm)
+        x = AMDGPU.ROCArray(randn(4))
+        op = DiagOp(x)
+        @test domain_storage_type(op) <: AMDGPU.ROCArray
+        @test codomain_storage_type(op) <: AMDGPU.ROCArray
+    end
 end

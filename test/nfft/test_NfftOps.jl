@@ -1,53 +1,57 @@
-@testitem "NFFTOp" tags = [:nfft, :NFFTOp] setup = [TestUtils] begin
+@testmodule NFFTTestHelper begin
+    using Test
+    using AbstractOperators
     using LinearAlgebra, Random, NFFT, NFFTOperators
 
     function test_nufft_op(op, plan, image, dcf)
-        ksp₁ = similar(image, ComplexF64, size(op, 1))
-        mul!(vec(ksp₁), plan, image)
-        ksp₂ = similar(ksp₁)
-        mul!(ksp₂, op, image)
-        @test ksp₂ == ksp₁
-        image₂ = similar(image)
+        ksp1 = similar(image, ComplexF64, size(op, 1))
+        mul!(vec(ksp1), plan, image)
+        ksp2 = similar(ksp1)
+        mul!(ksp2, op, image)
+        @test ksp2 == ksp1
+
+        image2 = similar(image)
         if dcf === nothing
-            mul!(image₂, plan', vec(ksp₂ .* op.dcf))
-            @test norm(image₂ .- image) / norm(image) < 0.5
+            mul!(image2, plan', vec(ksp2 .* op.dcf))
+            @test norm(image2 .- image) / norm(image) < 0.5
         else
-            image₁ = similar(image)
-            mul!(image₁, plan', vec(ksp₁ .*= dcf))
-            mul!(image₂, op', ksp₂)
-            @test image₂ ≈ image₁
+            image1 = similar(image)
+            mul!(image1, plan', vec(ksp1 .*= dcf))
+            mul!(image2, op', ksp2)
+            @test image2 ≈ image1
         end
+
         normal_op = AbstractOperators.get_normal_op(op)
-        image₃ = similar(image)
-        mul!(image₃, normal_op, image)
-        return @test image₃ ≈ image₂
+        image3 = similar(image)
+        mul!(image3, normal_op, image)
+        @test image3 ≈ image2
     end
 
-    function test_2D_nufft_op(threaded)
+    function test_2d_nufft(threaded)
         trajectory = rand(2, 128, 50) .- 0.5
         dcf = rand(128, 50)
         image_size = (128, 128)
         image = rand(ComplexF64, image_size)
         plan = plan_nfft(reshape(trajectory, 2, :), image_size)
         op = NFFTOp(image_size, trajectory, dcf; threaded)
-        return test_nufft_op(op, plan, image, dcf)
+        test_nufft_op(op, plan, image, dcf)
     end
 
-    function test_3D_nufft_op(threaded)
+    function test_3d_nufft(threaded)
         trajectory = rand(3, 128, 50) .- 0.5
         dcf = rand(128, 50)
         image_size = (64, 64, 64)
         image = rand(ComplexF64, image_size)
         plan = plan_nfft(reshape(trajectory, 3, :), image_size)
         op = NFFTOp(image_size, trajectory, dcf; threaded)
-        return test_nufft_op(op, plan, image, dcf)
+        test_nufft_op(op, plan, image, dcf)
     end
 
-    function test_realistic_2D_nufft_op(threaded)
+    function test_realistic_2d_nufft(threaded)
         trajectory = Array{Float64}(undef, 2, 256, 201)
-        ϕₛₜₑₚ = 2π / 201
+        ϕstep = 2π / 201
         for i in 1:201
-            ϕ = i * ϕₛₜₑₚ
+            ϕ = i * ϕstep
             trajectory[1, :, i] = cos(ϕ) .* ((-64:0.5:63.5) ./ 128)
             trajectory[2, :, i] = sin(ϕ) .* ((-64:0.5:63.5) ./ 128)
         end
@@ -61,39 +65,8 @@
         end
         plan = plan_nfft(reshape(trajectory, 2, :), image_size)
         op = NFFTOp(image_size, trajectory; threaded)
-        return test_nufft_op(op, plan, image, nothing)
+        test_nufft_op(op, plan, image, nothing)
     end
-
-    @testset "NFFTOp" begin
-        @testset "2D" begin
-            @testset "single-threaded" begin
-                test_2D_nufft_op(false)
-            end
-            @testset "multi-threaded" begin
-                test_2D_nufft_op(true)
-            end
-        end
-        @testset "realistic 2D" begin
-            @testset "single-threaded" begin
-                test_realistic_2D_nufft_op(false)
-            end
-            @testset "multi-threaded" begin
-                test_realistic_2D_nufft_op(true)
-            end
-        end
-        @testset "3D" begin
-            @testset "single-threaded" begin
-                test_3D_nufft_op(false)
-            end
-            @testset "multi-threaded" begin
-                test_3D_nufft_op(true)
-            end
-        end
-    end
-end
-
-@testitem "NfftNormalOp" tags = [:nfft, :NfftNormalOp] setup = [TestUtils] begin
-    using LinearAlgebra, Random, NFFT, NFFTOperators, AbstractOperators
 
     function test_nfft_normal_op(threaded)
         trajectory = rand(2, 128, 50) .- 0.5
@@ -102,23 +75,33 @@ end
         image = rand(ComplexF64, image_size)
         op = NFFTOp(image_size, trajectory, dcf; threaded)
         normal_op = AbstractOperators.get_normal_op(op)
-        # Normal op should compute A' * A * image
+
         image_out1 = similar(image)
         mul!(image_out1, normal_op, image)
-        # Manually compute A' * A * image
         ksp = similar(image, ComplexF64, size(op, 1))
         mul!(ksp, op, image)
         image_out2 = similar(image)
         mul!(image_out2, op', ksp)
-        return @test image_out1 ≈ image_out2
+        @test image_out1 ≈ image_out2
     end
+end
 
-    @testset "NfftNormalOp" begin
-        @testset "single-threaded" begin
-            test_nfft_normal_op(false)
-        end
-        @testset "multi-threaded" begin
-            test_nfft_normal_op(true)
-        end
-    end
+@testitem "NFFTOp 2D" tags = [:nfft, :NFFTOp] setup = [TestUtils, NFFTTestHelper] begin
+    NFFTTestHelper.test_2d_nufft(false)
+    NFFTTestHelper.test_2d_nufft(true)
+end
+
+@testitem "NFFTOp realistic 2D" tags = [:nfft, :NFFTOp] setup = [TestUtils, NFFTTestHelper] begin
+    NFFTTestHelper.test_realistic_2d_nufft(false)
+    NFFTTestHelper.test_realistic_2d_nufft(true)
+end
+
+@testitem "NFFTOp 3D" tags = [:nfft, :NFFTOp] setup = [TestUtils, NFFTTestHelper] begin
+    NFFTTestHelper.test_3d_nufft(false)
+    NFFTTestHelper.test_3d_nufft(true)
+end
+
+@testitem "NfftNormalOp" tags = [:nfft, :NfftNormalOp] setup = [TestUtils, NFFTTestHelper] begin
+    NFFTTestHelper.test_nfft_normal_op(false)
+    NFFTTestHelper.test_nfft_normal_op(true)
 end

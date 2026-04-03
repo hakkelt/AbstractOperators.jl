@@ -1,25 +1,73 @@
 @testmodule TestUtils begin
     using Test
     using AbstractOperators
+    using RecursiveArrayTools
     using RecursiveArrayTools: ArrayPartition
     using LinearAlgebra
     using Random
 
     export verb, test_op, test_NLop, gradient_fd, ArrayPartition, norm, dot, diag, opnorm
+    export to_cpu, test_NLop_gpu
+    export assert_cpu_approx, assert_adjoint_invariant
 
-    const verb = false
+    const verb = get(ENV, "ABSTRACTOPERATORS_TEST_VERBOSE", "false") == "true"
+
+    to_cpu(x::AbstractArray) = collect(x)
+    to_cpu(x::RecursiveArrayTools.ArrayPartition) = RecursiveArrayTools.ArrayPartition(collect.(x.x)...)
+
+    function assert_cpu_approx(x, y; atol = 1.0e-8)
+        @test norm(to_cpu(x) .- to_cpu(y)) <= atol
+    end
+
+    function assert_adjoint_invariant(x, Ax, y, Acy; atol = 1.0e-8)
+        s1 = real(dot(to_cpu(Ax), to_cpu(y)))
+        s2 = real(dot(to_cpu(x), to_cpu(Acy)))
+        @test abs(s1 - s2) < atol
+    end
+
+    function assert_backend_output_type(op::AbstractOperator, x::AbstractArray, y)
+        expected = typeof(similar(x, codomain_type(op), size(op, 1)...))
+        @test y isa expected
+    end
+
+    assert_backend_output_type(::AbstractOperator, ::ArrayPartition, ::Any) = nothing
+    assert_backend_output_type(::AbstractOperator, ::AbstractArray, ::ArrayPartition) = nothing
+
+    function test_NLop_gpu(A::AbstractOperator, x, y, verb::Bool = false)
+        verb && (println(), println(A))
+
+        Ax = A * x
+        assert_backend_output_type(A, x, Ax)
+        Ax2 = similar(Ax)
+        mul!(Ax2, A, x)
+        assert_cpu_approx(Ax, Ax2)
+
+        @test_throws ErrorException A'
+
+        J = Jacobian(A, x)
+        grad = J' * y
+        mul!(Ax2, A, x)  # redo forward
+        grad2 = similar(grad)
+        mul!(grad2, J', y)
+        assert_cpu_approx(grad, grad2; atol = 1.0e-8)
+
+        return Ax, grad
+    end
 
     ########### Test for LinearOperators
     function test_op(A::AbstractOperator, x, y, verb::Bool = false)
         verb && (println(); show(A); println())
 
         Ax = A * x
+        if !(x isa Array) && !(x isa ArrayPartition)
+            assert_backend_output_type(A, x, Ax)
+        end
         Ax2 = similar(Ax)
         verb && println("forward preallocated")
         mul!(Ax2, A, x) #verify in-place linear operator works
         verb && @time mul!(Ax2, A, x)
 
-        @test norm(Ax .- Ax2) <= 1.0e-8
+        assert_cpu_approx(Ax, Ax2)
 
         Acy = A' * y
         Acy2 = similar(Acy)
@@ -28,11 +76,8 @@
         mul!(Acy2, At, y) #verify in-place linear operator works
         verb && @time mul!(Acy2, At, y)
 
-        @test norm(Acy .- Acy2) <= 1.0e-8
-
-        s1 = real(dot(Ax2, y))
-        s2 = real(dot(x, Acy2))
-        @test abs(s1 - s2) < 1.0e-8
+        assert_cpu_approx(Acy, Acy2)
+        assert_adjoint_invariant(x, Ax2, y, Acy2)
 
         return Ax
     end

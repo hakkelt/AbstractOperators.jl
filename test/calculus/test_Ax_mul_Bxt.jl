@@ -1,7 +1,8 @@
-@testitem "Ax_mul_Bxt" tags = [:calculus, :Ax_mul_Bxt] setup = [TestUtils] begin
+@testitem "Ax_mul_Bxt: basic mul" tags = [:calculus, :Ax_mul_Bxt] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing Ax_mul_Bxt --- ")
+    verb && println(" --- Testing Ax_mul_Bxt: basic mul --- ")
+
     n = 10
     A, B = Eye(n), Sin(n)
     P = Ax_mul_Bxt(A, B)
@@ -33,6 +34,12 @@
     r = randn(n, n)
     y, grad = test_NLop(P, x, r, verb)
     @test norm((A * x) * (B * x)' - y) < 1.0e-8
+end
+
+@testitem "Ax_mul_Bxt: HCAT and permute" tags = [:calculus, :Ax_mul_Bxt] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
+    verb && println(" --- Testing Ax_mul_Bxt: HCAT and permute --- ")
 
     # testing with HCAT
     m, n = 3, 5
@@ -62,6 +69,12 @@
 
     @test_throws Exception Ax_mul_Bxt(Eye(2, 2), Eye(2, 1))
     @test_throws Exception Ax_mul_Bxt(Eye(2, 2, 2), Eye(2, 2, 2))
+end
+
+@testitem "Ax_mul_Bxt: error paths and equality" tags = [:calculus, :Ax_mul_Bxt] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
+    verb && println(" --- Testing Ax_mul_Bxt: error paths and equality --- ")
 
     # ndims==2 branch with mismatched second codomain dimension
     struct AxDummy2D <: AbstractOperator
@@ -93,6 +106,52 @@
     # test equality
     n, m = 3, 4
     A, B = MatrixOp(randn(n, m)), MatrixOp(randn(n, m))
+    # x matches the HCAT ArrayPartition context used in original test
+    x = ArrayPartition(randn(3), randn(5))
     @test Ax_mul_Bxt(A, B) == Ax_mul_Bxt(A, B)
     @test Jacobian(Ax_mul_Bxt(A, B), x) == Jacobian(Ax_mul_Bxt(A, B), x)
+end
+
+@testitem "Ax_mul_Bxt (GPU)" tags = [:gpu, :calculus, :Ax_mul_Bxt] setup = [TestUtils, GpuTestUtils] begin
+    using Random, AbstractOperators, JLArrays
+    Random.seed!(0)
+
+    # Use GPU-typed Eye and Sin
+    n = 10
+    P = Ax_mul_Bxt(Eye(Float64, (n,); array_type = JLArray{Float64}), Sin(jl(zeros(n))))
+    x = jl(randn(n))
+    r = jl(randn(n, n))
+    test_NLop_gpu(P, x, r, false)
+end
+
+@testitem "Ax_mul_Bxt (CUDA)" tags = [:gpu, :cuda, :calculus, :Ax_mul_Bxt] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    using CUDA
+    if CUDA.functional()
+        Random.seed!(0)
+
+        n = 10
+        P = Ax_mul_Bxt(
+            Eye(Float64, (n,); array_type = CUDA.CuArray{Float64, 1}), Sin(CUDA.zeros(Float64, n))
+        )
+        x = CuArray(randn(n))
+        r = CuArray(randn(n, n))
+        test_NLop_gpu(P, x, r, false)
+    end
+end
+
+@testitem "Ax_mul_Bxt (AMDGPU)" tags = [:gpu, :amdgpu, :calculus, :Ax_mul_Bxt] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    using AMDGPU
+    if AMDGPU.functional()
+        Random.seed!(0)
+
+        n = 10
+        P = Ax_mul_Bxt(
+            Eye(Float64, (n,); array_type = AMDGPU.ROCArray{Float64, 1}), Sin(AMDGPU.zeros(Float64, n))
+        )
+        x = AMDGPU.ROCArray(randn(n))
+        r = AMDGPU.ROCArray(randn(n, n))
+        test_NLop_gpu(P, x, r, false)
+    end
 end

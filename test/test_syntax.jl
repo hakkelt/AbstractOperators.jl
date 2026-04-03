@@ -1,22 +1,27 @@
-@testitem "Syntax" tags = [:misc, :Syntax] setup = [TestUtils] begin
-    verb && println(" --- Testing Syntax --- ")
-    ###### ' ######
+@testitem "Syntax: Adjoint" tags = [:misc, :Syntax] setup = [TestUtils] begin
+    using AbstractOperators
     n, m = 5, 3
     A = randn(n, m)
-    B = randn(n, m)
-    C = randn(n, m)
-    x1 = randn(m)
     x2 = randn(n)
     opA = MatrixOp(A)
-    opB = MatrixOp(B)
-    opC = MatrixOp(C)
 
     opt = opA'
     y1 = opt * x2
     y2 = A' * x2
     @test norm(y1 - y2) < 1.0e-9
+end
 
-    ######+,-######
+@testitem "Syntax: Addition and Subtraction" tags = [:misc, :Syntax] setup = [TestUtils] begin
+    using AbstractOperators
+    n, m = 5, 3
+    A = randn(n, m)
+    B = randn(n, m)
+    C = randn(n, m)
+    x1 = randn(m)
+    opA = MatrixOp(A)
+    opB = MatrixOp(B)
+    opC = MatrixOp(C)
+
     opp = +opA
     y1 = opp * x1
     y2 = A * x1
@@ -54,9 +59,10 @@
     y1 = opss * x1
     y2 = -A * x1 + B * x1 + C * x1
     @test norm(y1 - y2) < 1.0e-9
+end
 
-    ###### * ######
-
+@testitem "Syntax: Multiplication" tags = [:misc, :Syntax] setup = [TestUtils] begin
+    using AbstractOperators
     n, m, l = 5, 3, 7
     A = randn(n, m)
     B = randn(l, n)
@@ -104,8 +110,16 @@
     y1 = opc * x1
     y2 = x1
     @test norm(y1 - y2) < 1.0e-9
+end
 
-    ###### getindex ######
+@testitem "Syntax: Getindex basic" tags = [:misc, :Syntax] setup = [TestUtils] begin
+    using AbstractOperators
+    n, m, l = 5, 3, 7
+    A = randn(n, m)
+    B = randn(l, n)
+    x1 = randn(m)
+    opA = MatrixOp(A)
+    opB = MatrixOp(B)
 
     ops = opA[1:(n - 1)]
     y1 = ops * x1
@@ -121,7 +135,6 @@
     @test norm(y1 - y2) < 1.0e-9
 
     opF = DiagOp(d)
-    x3 = randn(n, m, l)
     ops = opF[1:(n - 1), 2:m, 1]
     y1 = ops * x3
     y2 = (d .* x3)[1:(n - 1), 2:m, 1]
@@ -149,9 +162,10 @@
     sliced_diag = comp_diag[1:3]
     xdiag = randn(n)
     @test sliced_diag * xdiag ≈ (comp_diag * xdiag)[1:3]
+end
 
-    #slicing HCAT
-
+@testitem "Syntax: Getindex HCAT" tags = [:misc, :Syntax] setup = [TestUtils] begin
+    using AbstractOperators
     n, m1, m2, m3 = 5, 6, 7, 8
     A = randn(n, m1)
     B = randn(n, m2)
@@ -163,10 +177,12 @@
     opB = MatrixOp(B)
     opC = MatrixOp(C)
     opH = HCAT(opA, opB, opC)
+
     opH2 = opH[1:2]
     y1 = opH2 * ArrayPartition(x1, x2)
     y2 = A * x1 + B * x2
     @test all(norm.(y1 .- y2) .<= 1.0e-12)
+
     opH3 = opH[3]
     y1 = opH3 * x3
     y2 = C * x3
@@ -190,44 +206,56 @@
     @test norm(opHA[3] * x3 - (C * x3 + d)) < 1.0e-9
 
     m4 = 9
-    x4 = randn(m4)
     D = randn(n, n)
     E = randn(n, m4)
     opD = MatrixOp(D)
     opE = MatrixOp(E)
     opCH = opD * opH
-
     opHCH = HCAT(opCH, opE)
-
     opH4 = opHCH[4]
     @test opH4 == opE
     @test_throws ErrorException opHCH[1]
     @test_throws ErrorException opHCH[1:2]
 
-    # check() utility error paths
-    op_diag = DiagOp(rand(3))
-    ygood = zeros(3)
-    xgood = rand(3)
-    @test_throws ArgumentError AbstractOperators.check(ygood, op_diag, "bad")
-    @test_throws ArgumentError AbstractOperators.check("bad", op_diag, xgood)
-    @test_throws ArgumentError AbstractOperators.check(ygood, op_diag, ArrayPartition(rand(3), rand(3)))
-    @test_throws ArgumentError AbstractOperators.check(ArrayPartition(zeros(3), zeros(3)), op_diag, xgood)
+    # HCAT getindex split-error path with stacked indices
+    h_joint = HCAT(MatrixOp(randn(4, 2)), MatrixOp(randn(4, 3)))
+    h_stacked = HCAT((h_joint, MatrixOp(randn(4, 5))), zeros(4))
+    @test_throws ErrorException h_stacked[1]
 
-    #slicing VCAT
+    # AffineAdd{HCAT} ndoms==1 branch via low-level single-operator HCAT
+    Hsingle = HCAT((MatrixOp(randn(4, 4)),), (1,), zeros(4))
+    AHsingle = AffineAdd(Hsingle, randn(4))
+    @test AHsingle[1:2] isa AbstractOperator
 
+    # Compose getindex branch for diagonal tail (ndoms(A,2)>1)
+    Hbase = HCAT((MatrixOp(randn(4, 2)), MatrixOp(randn(4, 3))), zeros(4))
+    Cdiag = DiagOp(randn(4)) * Hbase
+    xin = ArrayPartition(randn(2), randn(3))
+    @test Cdiag[[2, 1]] * ArrayPartition(xin.x[2], xin.x[1]) ≈ Cdiag * xin
+
+    # Compose getindex error path for non-diagonal tail
+    Cnondiag = MatrixOp(randn(4, 4)) * Hbase
+    @test_throws ErrorException Cnondiag[[2, 1]]
+end
+
+@testitem "Syntax: Getindex VCAT" tags = [:misc, :Syntax] setup = [TestUtils] begin
+    using AbstractOperators
     n1, n2, n3, m = 5, 6, 7, 8
     A = randn(n1, m)
     B = randn(n2, m)
     C = randn(n3, m)
     x1 = randn(m)
+    x3 = randn(m)
     opA = MatrixOp(A)
     opB = MatrixOp(B)
     opC = MatrixOp(C)
     opV = VCAT(opA, opB, opC)
+
     opV2 = opV[1:2]
     y1 = opV2 * x1
     y2 = ArrayPartition(A * x1, B * x1)
     @test norm(y1 - y2) <= 1.0e-12
+
     opV3 = opV[3]
     y1 = opV3 * x3
     y2 = C * x3
@@ -245,29 +273,21 @@
     comp_single = FiniteDiff((m,)) * MatrixOp(randn(m, m))
     x_comp = randn(m)
     @test comp_single[1:3] * x_comp ≈ (comp_single * x_comp)[1:3]
+end
 
-    # Compose getindex branch for diagonal tail (ndoms(A,2)>1)
-    Hbase = HCAT((MatrixOp(randn(4, 2)), MatrixOp(randn(4, 3))), zeros(4))
-    Cdiag = DiagOp(randn(4)) * Hbase
-    xin = ArrayPartition(randn(2), randn(3))
-    @test Cdiag[[2, 1]] * ArrayPartition(xin.x[2], xin.x[1]) ≈ Cdiag * xin
+@testitem "Syntax: Check utility" tags = [:misc, :Syntax] setup = [TestUtils] begin
+    using AbstractOperators
+    op_diag = DiagOp(rand(3))
+    ygood = zeros(3)
+    xgood = rand(3)
+    @test_throws ArgumentError AbstractOperators.check(ygood, op_diag, "bad")
+    @test_throws ArgumentError AbstractOperators.check("bad", op_diag, xgood)
+    @test_throws ArgumentError AbstractOperators.check(ygood, op_diag, ArrayPartition(rand(3), rand(3)))
+    @test_throws ArgumentError AbstractOperators.check(ArrayPartition(zeros(3), zeros(3)), op_diag, xgood)
+end
 
-    # Compose getindex error path for non-diagonal tail
-    Cnondiag = MatrixOp(randn(4, 4)) * Hbase
-    @test_throws ErrorException Cnondiag[[2, 1]]
-
-    # HCAT getindex split-error path with stacked indices
-    h_joint = HCAT(MatrixOp(randn(4, 2)), MatrixOp(randn(4, 3)))
-    h_stacked = HCAT((h_joint, MatrixOp(randn(4, 5))), zeros(4))
-    @test_throws ErrorException h_stacked[1]
-
-    # AffineAdd{HCAT} ndoms==1 branch via low-level single-operator HCAT
-    Hsingle = HCAT((MatrixOp(randn(4, 4)),), (1,), zeros(4))
-    AHsingle = AffineAdd(Hsingle, randn(4))
-    @test AHsingle[1:2] isa AbstractOperator
-
-    ###### hcat ######
-
+@testitem "Syntax: HCAT and VCAT construction" tags = [:misc, :Syntax] setup = [TestUtils] begin
+    using AbstractOperators
     n, m1, m2 = 5, 6, 7
     A = randn(n, m1)
     B = randn(n, m2)
@@ -285,8 +305,6 @@
     y2 = [A B B] * [x1; x2; x2]
     @test norm(y1 - y2) <= 1.0e-12
 
-    ###### vcat ######
-
     n, m1, m2 = 5, 6, 7
     A = randn(m1, n)
     B = randn(m2, n)
@@ -302,8 +320,10 @@
     y1 = opVV * x1
     y2 = ArrayPartition(A * x1, A * x1, B * x1)
     @test norm(y1 - y2) <= 1.0e-12
+end
 
-    ###### reshape ######
+@testitem "Syntax: Reshape ndims ndoms" tags = [:misc, :Syntax] setup = [TestUtils] begin
+    using AbstractOperators
     n, m = 10, 5
     A = randn(n, m)
     x1 = randn(m)
@@ -314,7 +334,6 @@
     y2 = reshape(A * x1, 2, 5)
     @test norm(y1 - y2) <= 1.0e-12
 
-    # testing ndims & ndoms
     L = Variation((3, 4, 5))
     @test ndims(L) == (2, 3)
     @test ndims(L, 1) == 2
@@ -330,15 +349,16 @@
     D = DCAT(L, L)
     @test ndims(D) == ((2, 2), (3, 3))
     @test ndoms(D) == (2, 2)
+end
 
-    ###### jacobian ######
+@testitem "Syntax: Jacobian convert displacement" tags = [:misc, :Syntax] setup = [TestUtils] begin
+    using AbstractOperators
     n, m = 10, 5
     A = MatrixOp(randn(n, m))
     B = Sigmoid(Float64, (n,), 100.0)
     op = B * A
     J = jacobian(op, randn(m))
 
-    #### convert ####
     L = Eye(10)
     LL = convert(AbstractOperator, Float64, (10,), L)
     @test LL == L
@@ -348,7 +368,73 @@
 
     @test_throws MethodError convert(NonLinearOperator, Float64, (10,), L)
 
-    ### displacement ###
     L = Eye(10)
     @test displacement(L) == 0.0
+end
+
+@testitem "Syntax: VCAT and HCAT with Tuple input" tags = [:misc, :Syntax] setup = [TestUtils] begin
+    using AbstractOperators, RecursiveArrayTools
+    n1, n2, m = 3, 4, 5
+    x1 = randn(n1)
+    x2 = randn(n2)
+
+    # HCAT * Tuple  (returns codomain array, not ArrayPartition)
+    opH = HCAT(MatrixOp(randn(m, n1)), MatrixOp(randn(m, n2)))
+    yH = opH * (x1, x2)
+    @test yH ≈ opH * ArrayPartition(x1, x2)
+
+    # VCAT * Tuple (multi-domain VCAT — each sub-op is an HCAT, so domain is a tuple)
+    # opV has domain (n1,)×(n2,) and codomain (m,)×(m,); input must be a Tuple
+    opH1 = HCAT(MatrixOp(randn(m, n1)), MatrixOp(randn(m, n2)))
+    opH2 = HCAT(MatrixOp(randn(m, n1)), MatrixOp(randn(m, n2)))
+    opV = VCAT(opH1, opH2)
+    yV = opV * (x1, x2)          # calls *(L::VCAT, b::Tuple) → returns y.x as Tuple
+    @test yV isa Tuple
+    ref = opV * ArrayPartition(x1, x2)
+    @test all(collect(yV[i]) ≈ ref.x[i] for i in eachindex(yV))
+end
+
+@testitem "Syntax: L * coeff (operator-right scalar mul)" tags = [:misc, :Syntax] setup = [
+    TestUtils,
+] begin
+    using AbstractOperators
+    n = 4
+    op = FiniteDiff(Float64, (n,), 1)
+    alpha = 3.0
+    s1 = op * alpha
+    s2 = alpha * op
+    x = randn(n)
+    @test s1 * x ≈ s2 * x
+end
+
+@testitem "Syntax: mul! fallback throws MethodError" tags = [:misc, :Syntax] setup = [TestUtils] begin
+    using AbstractOperators
+    # Custom operator with no mul! defined so the fallback in syntax.jl fires
+    struct _NoMulOp <: AbstractOperators.LinearOperator end
+    AbstractOperators.size(::_NoMulOp) = ((3,), (3,))
+    AbstractOperators.domain_type(::_NoMulOp) = Float64
+    AbstractOperators.codomain_type(::_NoMulOp) = Float64
+    op = _NoMulOp()
+    @test_throws MethodError mul!(zeros(3), op, zeros(3))
+end
+
+@testitem "Syntax: Sum getindex (multi-domain)" tags = [:misc, :Syntax] setup = [TestUtils] begin
+    using AbstractOperators
+    n = 5
+    A = MatrixOp(randn(n, n))
+    B = DiagOp(randn(n))
+    S = Sum(A, B)
+    sliced = S[2:(n - 1)]
+    x = randn(n)
+    @test sliced * x ≈ (S * x)[2:(n - 1)]
+end
+
+@testitem "Syntax: Scale getindex (ndoms == 1 branch)" tags = [:misc, :Syntax] setup = [TestUtils] begin
+    using AbstractOperators
+    n = 5
+    op = FiniteDiff(Float64, (n,), 1)   # ndoms(Scale(coeff, op), 2) == 1
+    s = Scale(2.0, op)
+    sliced = s[1:2]
+    x = randn(n)
+    @test sliced * x ≈ (s * x)[1:2]
 end

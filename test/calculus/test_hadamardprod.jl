@@ -1,6 +1,6 @@
-@testitem "HadamardProd" tags = [:calculus, :HadamardProd] setup = [TestUtils] begin
+@testitem "HadamardProd: basic mul" tags = [:calculus, :HadamardProd] setup = [TestUtils] begin
     using AbstractOperators
-    verb && println(" --- Testing HadamardProd --- ")
+    verb && println(" --- Testing HadamardProd: basic mul --- ")
 
     # Basic square identity factors (Eye.*Eye)
     n = 3
@@ -34,6 +34,25 @@
     P = HadamardProd(op1, op2)
     y, grad = test_NLop(P, x, r, verb)
     @test norm((op1 * x) .* (op2 * x) - y) < 1.0e-9
+end
+
+@testitem "HadamardProd: properties" tags = [:calculus, :HadamardProd] setup = [TestUtils] begin
+    using AbstractOperators
+    verb && println(" --- Testing HadamardProd: properties --- ")
+
+    # Re-create the HCAT-based P for remove_displacement and permute tests
+    m, n = 3, 5
+    x = ArrayPartition(randn(m), randn(n))
+    r = randn(m)
+    b = randn(m)
+    A1 = AffineAdd(Sin(Float64, (m,)), b)
+    B1 = MatrixOp(randn(m, n))
+    op1 = HCAT(A1, B1)
+    C1 = Cos(Float64, (m,))
+    D1 = MatrixOp(randn(m, n))
+    op2 = HCAT(C1, D1)
+    P = HadamardProd(op1, op2)
+    y, grad = test_NLop(P, x, r, verb)
 
     # remove_displacement and its idempotence
     y2, grad2 = test_NLop(remove_displacement(P), x, r, verb)
@@ -62,7 +81,12 @@
     show(io, P)
     str = String(take!(io))
     @test occursin(".*", str)
-    # --- Additional coverage ---
+end
+
+@testitem "HadamardProd: equality and permute" tags = [:calculus, :HadamardProd] setup = [TestUtils] begin
+    using AbstractOperators
+    verb && println(" --- Testing HadamardProd: equality and permute --- ")
+
     # Equality / inequality
     n = 3
     A = Eye(n, n)
@@ -82,17 +106,22 @@
     @test codomain_storage_type(P1) !== nothing
 
     # fun_name direct
-    io = IOBuffer(); show(io, P1); sP1 = String(take!(io))
+    io = IOBuffer()
+    show(io, P1)
+    sP1 = String(take!(io))
     @test occursin(".*", sP1)
 
     # permute with more than 2 domains (using HCAT)
-    mH = 4; n1 = 2; n2 = 2
+    mH = 4
+    n1 = 2
+    n2 = 2
     A1p = MatrixOp(randn(mH, n1))
     A2p = MatrixOp(randn(mH, n2))
     H1 = HCAT(A1p, A2p)
     H2 = HCAT(A2p, A1p)
     P = HadamardProd(H1, H2)
-    x1p = randn(n1); x2p = randn(n2)
+    x1p = randn(n1)
+    x2p = randn(n2)
     y_orig, _ = test_NLop(P, ArrayPartition(x1p, x2p), randn(mH), verb)
     p = [2, 1]
     Pp = AbstractOperators.permute(P, p)
@@ -104,4 +133,91 @@
     Pdisp = HadamardProd(AffineAdd(A, b), B)
     Prd = remove_displacement(Pdisp)
     @test remove_displacement(Prd) == Prd
+end
+
+@testitem "HadamardProd (GPU)" tags = [:gpu, :calculus, :HadamardProd] setup = [TestUtils, GpuTestUtils] begin
+    using AbstractOperators, JLArrays
+
+    # Use GPU-typed Eye so output is GPU
+    n = 3
+    P = HadamardProd(Eye(Float64, (n, n); array_type = JLArray{Float64}), Eye(Float64, (n, n); array_type = JLArray{Float64}))
+    x = jl(randn(n, n))
+    r = jl(randn(n, n))
+    test_NLop_gpu(P, x, r, false)
+
+    # Sin .* Cos (both element-wise, GPU-typed via array constructor)
+    n2, l = 3, 2
+    P2 = HadamardProd(Sin(jl(zeros(n2, l))), Cos(jl(zeros(n2, l))))
+    x2 = jl(randn(n2, l))
+    r2 = jl(randn(n2, l))
+    test_NLop_gpu(P2, x2, r2, false)
+end
+
+@testitem "HadamardProd (CUDA)" tags = [:gpu, :cuda, :calculus, :HadamardProd] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    using CUDA
+    if CUDA.functional()
+        Random.seed!(0)
+
+        n = 3
+        P = HadamardProd(
+            Eye(Float64, (n, n); array_type = CUDA.CuArray{Float64, 2}),
+            Eye(Float64, (n, n); array_type = CUDA.CuArray{Float64, 2}),
+        )
+        x = CuArray(randn(n, n))
+        r = CuArray(randn(n, n))
+        test_NLop_gpu(P, x, r, false)
+
+        n2, l = 3, 2
+        P2 = HadamardProd(Sin(CUDA.zeros(Float64, n2, l)), Cos(CUDA.zeros(Float64, n2, l)))
+        x2 = CuArray(randn(n2, l))
+        r2 = CuArray(randn(n2, l))
+        test_NLop_gpu(P2, x2, r2, false)
+    end
+end
+
+@testitem "HadamardProd (AMDGPU)" tags = [:gpu, :amdgpu, :calculus, :HadamardProd] setup = [
+    TestUtils,
+] begin
+    using Random, AbstractOperators
+    using AMDGPU
+    if AMDGPU.functional()
+        Random.seed!(0)
+
+        n = 3
+        P = HadamardProd(
+            Eye(Float64, (n, n); array_type = AMDGPU.ROCArray{Float64, 2}),
+            Eye(Float64, (n, n); array_type = AMDGPU.ROCArray{Float64, 2}),
+        )
+        x = AMDGPU.ROCArray(randn(n, n))
+        r = AMDGPU.ROCArray(randn(n, n))
+        test_NLop_gpu(P, x, r, false)
+
+        n2, l = 3, 2
+        P2 = HadamardProd(Sin(AMDGPU.zeros(Float64, n2, l)), Cos(AMDGPU.zeros(Float64, n2, l)))
+        x2 = AMDGPU.ROCArray(randn(n2, l))
+        r2 = AMDGPU.ROCArray(randn(n2, l))
+        test_NLop_gpu(P2, x2, r2, false)
+    end
+end
+
+@testitem "HadamardProd: copy_operator" tags = [:calculus, :HadamardProd] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(3)
+
+    n = 6
+    P = HadamardProd(Sin((n,)), Cos((n,)))
+    P2 = copy_operator(P)
+    @test P2 isa HadamardProd
+    x = randn(n)
+    y1 = zeros(n)
+    y2 = zeros(n)
+    mul!(y1, P, x)
+    mul!(y2, P2, x)
+    @test y1 ≈ y2
+    # Verify buffer independence — a second forward should not cross-contaminate
+    x2 = randn(n)
+    y3 = zeros(n)
+    mul!(y3, P2, x2)
+    @test y3 ≈ P * x2
 end

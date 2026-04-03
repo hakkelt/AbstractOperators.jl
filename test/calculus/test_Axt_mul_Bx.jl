@@ -1,7 +1,8 @@
-@testitem "Axt_mul_Bx" tags = [:calculus, :Axt_mul_Bx] setup = [TestUtils] begin
+@testitem "Axt_mul_Bx: basic mul" tags = [:calculus, :Axt_mul_Bx] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing Axt_mul_Bx --- ")
+    verb && println(" --- Testing Axt_mul_Bx: basic mul --- ")
+
     n = 10
     A, B = Eye(n), Sin(n)
     P = Axt_mul_Bx(A, B)
@@ -35,6 +36,12 @@
     r = randn(m, m)
     y, grad = test_NLop(P, x, r, verb)
     @test norm((A * x)' * (B * x) - y) < 1.0e-8
+end
+
+@testitem "Axt_mul_Bx: HCAT and permute" tags = [:calculus, :Axt_mul_Bx] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
+    verb && println(" --- Testing Axt_mul_Bx: HCAT and permute --- ")
 
     # testing with HCAT
     m, n = 3, 5
@@ -64,6 +71,12 @@
 
     @test_throws Exception Axt_mul_Bx(Eye(2, 2), Eye(2, 1))
     @test_throws Exception Axt_mul_Bx(Eye(2, 2, 2), Eye(2, 2, 2))
+end
+
+@testitem "Axt_mul_Bx: error paths and equality" tags = [:calculus, :Axt_mul_Bx] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
+    verb && println(" --- Testing Axt_mul_Bx: error paths and equality --- ")
 
     # ndims==2 branch with mismatched first codomain dimension
     struct AxtDummy2D <: AbstractOperator
@@ -95,6 +108,94 @@
     # test equality
     n, m = 3, 4
     A, B = MatrixOp(randn(n, m)), MatrixOp(randn(n, m))
+    # x matches the HCAT ArrayPartition context used in original test
+    x = ArrayPartition(randn(3), randn(5))
     @test Axt_mul_Bx(A, B) == Axt_mul_Bx(A, B)
     @test Jacobian(Axt_mul_Bx(A, B), x) == Jacobian(Axt_mul_Bx(A, B), x)
+end
+
+@testitem "Axt_mul_Bx (GPU)" tags = [:gpu, :calculus, :Axt_mul_Bx] setup = [TestUtils, GpuTestUtils] begin
+    using Random, AbstractOperators, JLArrays, LinearAlgebra
+    Random.seed!(0)
+
+    n, m = 3, 4
+    AL = jl(randn(n, m))
+    BL = jl(randn(n, m))
+    A, B = MatrixOp(AL), MatrixOp(BL)
+    P = Axt_mul_Bx(A, B)
+    x = jl(randn(m))
+    y = jl(zeros(1))
+    mul!(y, P, x)
+    Acpu, Bcpu, xcpu = Array(AL), Array(BL), Array(x)
+    @test Array(y)[1] ≈ dot(Acpu * xcpu, Bcpu * xcpu)
+
+    # matrix case
+    n, m, l = 3, 5, 4
+    A2, B2 = MatrixOp(jl(randn(n, m)), l), MatrixOp(jl(randn(n, m)), l)
+    P2 = Axt_mul_Bx(A2, B2)
+    x2 = jl(randn(m, l))
+    y2 = jl(zeros(l, l))
+    mul!(y2, P2, x2)
+    Ax = Array(A2.A) * Array(x2)
+    Bx = Array(B2.A) * Array(x2)
+    @test Array(y2) ≈ Ax' * Bx
+end
+
+@testitem "Axt_mul_Bx (CUDA)" tags = [:gpu, :cuda, :calculus, :Axt_mul_Bx] setup = [TestUtils] begin
+    using Random, AbstractOperators, LinearAlgebra
+    using CUDA
+    if CUDA.functional()
+        Random.seed!(0)
+
+        n, m = 3, 4
+        AL = CuArray(randn(n, m))
+        BL = CuArray(randn(n, m))
+        A, B = MatrixOp(AL), MatrixOp(BL)
+        P = Axt_mul_Bx(A, B)
+        x = CuArray(randn(m))
+        y = CUDA.zeros(Float64, 1)
+        mul!(y, P, x)
+        Acpu, Bcpu, xcpu = Array(AL), Array(BL), Array(x)
+        @test Array(y)[1] ≈ dot(Acpu * xcpu, Bcpu * xcpu)
+
+        n, m, l = 3, 5, 4
+        A2, B2 = MatrixOp(CuArray(randn(n, m)), l), MatrixOp(CuArray(randn(n, m)), l)
+        P2 = Axt_mul_Bx(A2, B2)
+        x2 = CuArray(randn(m, l))
+        y2 = CUDA.zeros(Float64, l, l)
+        mul!(y2, P2, x2)
+        Ax = Array(A2.A) * Array(x2)
+        Bx = Array(B2.A) * Array(x2)
+        @test Array(y2) ≈ Ax' * Bx
+    end
+end
+
+@testitem "Axt_mul_Bx (AMDGPU)" tags = [:gpu, :amdgpu, :calculus, :Axt_mul_Bx] setup = [TestUtils] begin
+    using Random, AbstractOperators, LinearAlgebra
+    using AMDGPU
+    if AMDGPU.functional()
+        Random.seed!(0)
+
+        n, m = 3, 4
+        AL = AMDGPU.ROCArray(randn(n, m))
+        BL = AMDGPU.ROCArray(randn(n, m))
+        A, B = MatrixOp(AL), MatrixOp(BL)
+        P = Axt_mul_Bx(A, B)
+        x = AMDGPU.ROCArray(randn(m))
+        y = AMDGPU.zeros(1)
+        mul!(y, P, x)
+        Acpu, Bcpu, xcpu = Array(AL), Array(BL), Array(x)
+        @test Array(y)[1] ≈ dot(Acpu * xcpu, Bcpu * xcpu)
+
+        n, m, l = 3, 5, 4
+        A2, B2 = MatrixOp(AMDGPU.ROCArray(randn(n, m)), l),
+            MatrixOp(AMDGPU.ROCArray(randn(n, m)), l)
+        P2 = Axt_mul_Bx(A2, B2)
+        x2 = AMDGPU.ROCArray(randn(m, l))
+        y2 = AMDGPU.zeros(l, l)
+        mul!(y2, P2, x2)
+        Ax = Array(A2.A) * Array(x2)
+        Bx = Array(B2.A) * Array(x2)
+        @test Array(y2) ≈ Ax' * Bx
+    end
 end
