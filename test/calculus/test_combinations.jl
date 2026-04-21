@@ -1,7 +1,6 @@
 @testitem "Combinations: HCAT and Compose" tags = [:calculus, :Combinations] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(42)
-    verb && println(" --- Testing Combinations: HCAT and Compose --- ")
 
     m1, m2, m3, m4 = 4, 7, 3, 2
     A1 = randn(m3, m1)
@@ -45,7 +44,6 @@ end
 @testitem "Combinations: VCAT and HCAT mixtures" tags = [:calculus, :Combinations] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(43)
-    verb && println(" --- Testing Combinations: VCAT/HCAT --- ")
 
     # VCAT of HCATs
     m1, m2, n1 = 4, 7, 3
@@ -100,7 +98,6 @@ end
 @testitem "Combinations: Sum structures" tags = [:calculus, :Combinations] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(44)
-    verb && println(" --- Testing Combinations: Sum --- ")
 
     # Sum of HCATs
     m, n1, n2, n3 = 4, 7, 5, 3
@@ -145,7 +142,6 @@ end
 @testitem "Combinations: Scale structures" tags = [:calculus, :Combinations] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(45)
-    verb && println(" --- Testing Combinations: Scale --- ")
 
     # Scale of DCAT
     m1, n1 = 4, 7
@@ -233,7 +229,6 @@ end
 @testitem "Combinations: Nonlinear" tags = [:calculus, :Combinations] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(46)
-    verb && println(" --- Testing Combinations: Nonlinear --- ")
 
     # Nonlinear HCAT of VCAT
     n, m1, m2, m3 = 4, 3, 2, 7

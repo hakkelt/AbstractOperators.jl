@@ -130,8 +130,8 @@ domain_type(L::LBFGS) = eltype(L.y_M[1])
 domain_type(L::LBFGS{R, T}) where {R, T <: ArrayPartition} = eltype.(L.y_M[1].x)
 codomain_type(L::LBFGS) = eltype(L.y_M[1])
 codomain_type(L::LBFGS{R, T}) where {R, T <: ArrayPartition} = eltype.(L.y_M[1].x)
-domain_storage_type(L::LBFGS) = typeof(L.s)
-codomain_storage_type(L::LBFGS) = typeof(L.s)
+domain_array_type(L::LBFGS) = typeof(L.s)
+codomain_array_type(L::LBFGS) = typeof(L.s)
 is_thread_safe(L::LBFGS) = false
 
 size(A::LBFGS{R, T}) where {R, T <: ArrayPartition} = (size.(A.s.x), size.(A.s.x))

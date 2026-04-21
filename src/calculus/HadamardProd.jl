@@ -94,8 +94,8 @@ fun_name(L::Union{HadamardProd, HadamardProdJac}) = fun_name(L.A) * ".*" * fun_n
 
 domain_type(L::Union{HadamardProd, HadamardProdJac}) = domain_type(L.A)
 codomain_type(L::Union{HadamardProd, HadamardProdJac}) = codomain_type(L.A)
-domain_storage_type(L::Union{HadamardProd, HadamardProdJac}) = domain_storage_type(L.A)
-codomain_storage_type(L::Union{HadamardProd, HadamardProdJac}) = codomain_storage_type(L.A)
+domain_array_type(L::Union{HadamardProd, HadamardProdJac}) = domain_array_type(L.A)
+codomain_array_type(L::Union{HadamardProd, HadamardProdJac}) = codomain_array_type(L.A)
 
 # utils
 function permute(
@@ -112,21 +112,21 @@ function remove_displacement(P::HadamardProd)
     )
 end
 
-function _copy_operator_impl(op::HadamardProd; storage_type = nothing, threaded = nothing)
-    new_bufA = _convert_buffer(op.bufA, storage_type)
-    new_bufB = _convert_buffer(op.bufB, storage_type)
-    new_bufD = _convert_buffer(op.bufD, storage_type)
-    new_A = copy_operator(op.A; storage_type, threaded)
-    new_B = copy_operator(op.B; storage_type, threaded)
+function _copy_operator_impl(op::HadamardProd; array_type = nothing, threaded = nothing)
+    new_bufA = _convert_buffer(op.bufA, array_type)
+    new_bufB = _convert_buffer(op.bufB, array_type)
+    new_bufD = _convert_buffer(op.bufD, array_type)
+    new_A = copy_operator(op.A; array_type, threaded)
+    new_B = copy_operator(op.B; array_type, threaded)
     return HadamardProd(new_A, new_B, new_bufA, new_bufB, new_bufD)
 end
 
-function _copy_operator_impl(op::HadamardProdJac; storage_type = nothing, threaded = nothing)
-    new_bufA = _convert_buffer(op.bufA, storage_type)
-    new_bufB = _convert_buffer(op.bufB, storage_type)
-    new_bufD = _convert_buffer(op.bufD, storage_type)
-    new_A = copy_operator(op.A; storage_type, threaded)
-    new_B = copy_operator(op.B; storage_type, threaded)
+function _copy_operator_impl(op::HadamardProdJac; array_type = nothing, threaded = nothing)
+    new_bufA = _convert_buffer(op.bufA, array_type)
+    new_bufB = _convert_buffer(op.bufB, array_type)
+    new_bufD = _convert_buffer(op.bufD, array_type)
+    new_A = copy_operator(op.A; array_type, threaded)
+    new_B = copy_operator(op.B; array_type, threaded)
     return HadamardProdJac{typeof(new_A), typeof(new_B), typeof(new_bufA), typeof(new_bufD)}(
         new_A, new_B, new_bufA, new_bufB, new_bufD
     )

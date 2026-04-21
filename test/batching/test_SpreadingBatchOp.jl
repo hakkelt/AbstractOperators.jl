@@ -1,5 +1,5 @@
 @testmodule SpreadingBatchOpHelpers begin
-    using Random, BenchmarkTools, LinearAlgebra, AbstractOperators, JLArrays, Test
+    using Random, BenchmarkTools, LinearAlgebra, AbstractOperators, Test
 
     function test_spreading_batchop(operators, batch_op, x, y, z, threaded)
         if !threaded
@@ -84,8 +84,8 @@
         @test occursin("⟳", s)
         cod, dom = size(bop)
         @test cod == size(bop, 1) && dom == size(bop, 2)
-        @test domain_storage_type(bop) == domain_storage_type(ops[1])
-        @test codomain_storage_type(bop) == codomain_storage_type(ops[1])
+        @test domain_array_type(bop) == domain_array_type(ops[1])
+        @test codomain_array_type(bop) == codomain_array_type(ops[1])
         @test is_linear(bop) == is_linear(ops[1])
         @test is_eye(bop) == is_eye(ops[1])
         @test is_null(bop) == is_null(ops[1])
@@ -219,8 +219,8 @@ end
         ops = [DiagOp(rand(5)) * FiniteDiff((6,)) for i in 1:3]
         bop = BatchOp(ops, 4, (:_, :s, :b); threaded = true, threading_strategy = AbstractOperators.ThreadingStrategy.COPYING)
         io = IOBuffer(); show(io, bop); s = String(take!(io)); @test occursin("⟳", s)
-        @test domain_storage_type(bop) == domain_storage_type(ops[1])
-        @test codomain_storage_type(bop) == codomain_storage_type(ops[1])
+        @test domain_array_type(bop) == domain_array_type(ops[1])
+        @test codomain_array_type(bop) == codomain_array_type(ops[1])
         @test is_linear(bop) == is_linear(ops[1])
         @test is_eye(bop) == is_eye(ops[1])
         @test is_AAc_diagonal(bop) == is_AAc_diagonal(ops[1])
@@ -313,7 +313,7 @@ end
         Random.seed!(0)
         ops = [DiagOp(to_gpu(backend, [1.0, 2.0])) for _ in 1:4]
         bop = BatchOp(ops, 3, (:_, :s, :b))
-        y_gpu = bop * gpu_ones(backend, 2, 4, 3)
+        y_gpu = bop * gpu_ones(backend, Float64, 2, 4, 3)
         @test size(Array(y_gpu)) == (2, 4, 3)
         @test all(Array(y_gpu)[1, :, :] .≈ 1.0)
         @test all(Array(y_gpu)[2, :, :] .≈ 2.0)

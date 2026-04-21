@@ -18,9 +18,8 @@
 end  # @testmodule EyeTestHelper
 
 @testitem "Eye" tags = [:linearoperator, :Eye] setup = [TestUtils, EyeTestHelper] begin
-    using Random, AbstractOperators, JLArrays
+    using Random, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing Eye --- ")
 
     test_eye_mul(identity, verb, test_op, to_cpu, norm)
 
@@ -71,8 +70,8 @@ end  # @testmodule EyeTestHelper
     # Storage type helpers
     @test domain_type(op) == Float64
     @test codomain_type(op) == Float64
-    @test domain_storage_type(op) == Array{Float64}
-    @test codomain_storage_type(op) == Array{Float64}
+    @test domain_array_type(op) == Array{Float64}
+    @test codomain_array_type(op) == Array{Float64}
     @test is_thread_safe(op) == true
 
     # Adjoint, opnorm, get_normal_op
@@ -95,6 +94,6 @@ end
 
     for backend in gpu_backends()
         Random.seed!(0)
-        test_eye_mul(backend, false, test_op, to_cpu, norm)
+        test_eye_mul(x -> to_gpu(backend, x), false, test_op, to_cpu, norm)
     end
 end

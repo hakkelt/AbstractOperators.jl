@@ -1,6 +1,5 @@
 @testitem "HadamardProd: basic mul" tags = [:calculus, :HadamardProd] setup = [TestUtils] begin
     using AbstractOperators
-    verb && println(" --- Testing HadamardProd: basic mul --- ")
 
     # Basic square identity factors (Eye.*Eye)
     n = 3
@@ -38,7 +37,6 @@ end
 
 @testitem "HadamardProd: properties" tags = [:calculus, :HadamardProd] setup = [TestUtils] begin
     using AbstractOperators
-    verb && println(" --- Testing HadamardProd: properties --- ")
 
     # Re-create the HCAT-based P for remove_displacement and permute tests
     m, n = 3, 5
@@ -70,8 +68,8 @@ end
     @test_throws Exception HadamardProd(Eye(2, 2, 2), Eye(1, 2, 2))
 
     # Storage type / thread safety accessors
-    _ds = domain_storage_type(P)
-    _cs = codomain_storage_type(P)
+    _ds = domain_array_type(P)
+    _cs = codomain_array_type(P)
     @test _ds !== nothing
     @test _cs !== nothing
     @test is_thread_safe(P) == false
@@ -85,7 +83,6 @@ end
 
 @testitem "HadamardProd: equality and permute" tags = [:calculus, :HadamardProd] setup = [TestUtils] begin
     using AbstractOperators
-    verb && println(" --- Testing HadamardProd: equality and permute --- ")
 
     # Equality / inequality
     n = 3
@@ -102,8 +99,8 @@ end
     @test size(P1) == ((n, n), (n, n))
     @test domain_type(P1) == domain_type(A)
     @test codomain_type(P1) == codomain_type(A)
-    @test domain_storage_type(P1) !== nothing
-    @test codomain_storage_type(P1) !== nothing
+    @test domain_array_type(P1) !== nothing
+    @test codomain_array_type(P1) !== nothing
 
     # fun_name direct
     io = IOBuffer()

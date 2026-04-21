@@ -81,7 +81,7 @@ function BroadCast(
     elseif is_eye(A)
         dim_in = size(A, 2)
         reshaped_dim_in = ntuple(d -> d <= ndims(A, 1) ? size(A, 1)[d] : 1, length(dim_out))
-        return NoOperatorBroadCast(domain_type(A), domain_storage_type(A), dim_in, reshaped_dim_in, dim_out; threaded)
+        return NoOperatorBroadCast(domain_type(A), domain_array_type(A), dim_in, reshaped_dim_in, dim_out; threaded)
     else
         return OperatorBroadCast(A, dim_out; threaded)
     end
@@ -195,12 +195,12 @@ domain_type(R::OperatorBroadCast{T, N, M, true}) where {T, N, M} = domain_type(R
 codomain_type(::NoOperatorBroadCast{T}) where {T} = T
 codomain_type(R::OperatorBroadCast{T, N, M, false}) where {T, N, M} = codomain_type(R.A)
 codomain_type(R::OperatorBroadCast{T, N, M, true}) where {T, N, M} = codomain_type(R.A[1])
-domain_storage_type(::NoOperatorBroadCast{T, N, M, Threaded, S}) where {T, N, M, Threaded, S} = S
-domain_storage_type(R::OperatorBroadCast{T, N, M, false}) where {T, N, M} = domain_storage_type(R.A)
-domain_storage_type(R::OperatorBroadCast{T, N, M, true}) where {T, N, M} = domain_storage_type(R.A[1])
-codomain_storage_type(::NoOperatorBroadCast{T, N, M, Threaded, S}) where {T, N, M, Threaded, S} = S
-codomain_storage_type(R::OperatorBroadCast{T, N, M, false}) where {T, N, M} = codomain_storage_type(R.A)
-codomain_storage_type(R::OperatorBroadCast{T, N, M, true}) where {T, N, M} = codomain_storage_type(R.A[1])
+domain_array_type(::NoOperatorBroadCast{T, N, M, Threaded, S}) where {T, N, M, Threaded, S} = S
+domain_array_type(R::OperatorBroadCast{T, N, M, false}) where {T, N, M} = domain_array_type(R.A)
+domain_array_type(R::OperatorBroadCast{T, N, M, true}) where {T, N, M} = domain_array_type(R.A[1])
+codomain_array_type(::NoOperatorBroadCast{T, N, M, Threaded, S}) where {T, N, M, Threaded, S} = S
+codomain_array_type(R::OperatorBroadCast{T, N, M, false}) where {T, N, M} = codomain_array_type(R.A)
+codomain_array_type(R::OperatorBroadCast{T, N, M, true}) where {T, N, M} = codomain_array_type(R.A[1])
 
 is_thread_safe(::NoOperatorBroadCast) = true
 is_thread_safe(::OperatorBroadCast) = false
@@ -244,19 +244,19 @@ function permute(R::OperatorBroadCast{T, N, M, true}, p::AbstractVector{Int}) wh
 end
 
 function _copy_operator_impl(
-        op::NoOperatorBroadCast{T, N, M, Th, S}; storage_type = nothing, threaded = nothing
+        op::NoOperatorBroadCast{T, N, M, Th, S}; array_type = nothing, threaded = nothing
     ) where {T, N, M, Th, S}
     new_threaded = threaded === nothing ? Th : threaded
-    new_S = storage_type === nothing ? S : storage_type
+    new_S = array_type === nothing ? S : array_type
     return NoOperatorBroadCast(T, new_S, op.dim_in, op.reshaped_dim_in, op.dim_out; threaded = new_threaded)
 end
 
 function _copy_operator_impl(
-        op::OperatorBroadCast{T, N, M, Th}; storage_type = nothing, threaded = nothing
+        op::OperatorBroadCast{T, N, M, Th}; array_type = nothing, threaded = nothing
     ) where {T, N, M, Th}
     new_threaded = threaded === nothing ? Th : threaded
     inner_op = Th ? op.A[1] : op.A
-    new_op = copy_operator(inner_op; storage_type, threaded)
+    new_op = copy_operator(inner_op; array_type, threaded)
     return BroadCast(new_op, op.dim_out; threaded = new_threaded)
 end
 

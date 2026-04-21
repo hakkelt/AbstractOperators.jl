@@ -1,5 +1,5 @@
 # GPU mul! overrides for OperatorWrapper.
-# check(y, A, x) passes because domain_storage_type/codomain_storage_type reflect
+# check(y, A, x) passes because domain_array_type/codomain_array_type reflect
 # the constructor-supplied array_type (e.g. CuArray), not the inner CPU op's type.
 
 # Forward: GPU → CPU → op → CPU → GPU

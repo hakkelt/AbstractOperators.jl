@@ -23,9 +23,8 @@
 end  # @testmodule DiagOpTestHelper
 
 @testitem "DiagOp: mul and constructors" tags = [:linearoperator, :DiagOp] setup = [TestUtils, DiagOpTestHelper] begin
-    using Random, AbstractOperators, JLArrays
+    using Random, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing DiagOp --- ")
 
     test_diagop_mul(identity, verb, test_op, to_cpu, norm)
 
@@ -109,10 +108,10 @@ end
 
     for backend in gpu_backends()
         Random.seed!(0)
-        test_diagop_mul(backend, false, test_op, to_cpu, norm)
+        test_diagop_mul(x -> to_gpu(backend, x), false, test_op, to_cpu, norm)
         x = gpu_randn(backend, 4)
         op = DiagOp(x)
-        @test domain_storage_type(op) <: backend.array_type
-        @test codomain_storage_type(op) <: backend.array_type
+        @test domain_array_type(op) <: backend.array_type
+        @test codomain_array_type(op) <: backend.array_type
     end
 end

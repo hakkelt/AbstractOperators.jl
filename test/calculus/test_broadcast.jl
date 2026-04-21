@@ -1,7 +1,6 @@
 @testitem "BroadCast: basic mul" tags = [:calculus, :BroadCast] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing BroadCast --- ")
 
     m, n = 8, 4
     dim_out = (m, 10)
@@ -59,8 +58,8 @@ end
     @test is_full_row_rank(opR) == false
     @test is_full_column_rank(opR) == false
     @test is_thread_safe(opR) == false
-    @test domain_storage_type(opR) !== nothing
-    @test codomain_storage_type(opR) !== nothing
+    @test domain_array_type(opR) !== nothing
+    @test codomain_array_type(opR) !== nothing
     @test AbstractOperators.has_fast_opnorm(opR) == AbstractOperators.has_fast_opnorm(opA1)
 
     m = 3

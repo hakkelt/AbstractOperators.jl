@@ -44,6 +44,6 @@ size(L::Pow) = (L.dim, L.dim)
 
 domain_type(::Pow{T, N}) where {T, N} = T
 codomain_type(::Pow{T, N}) where {T, N} = T
-domain_storage_type(::Pow{T, N, I, S}) where {T, N, I, S} = S
-codomain_storage_type(::Pow{T, N, I, S}) where {T, N, I, S} = S
+domain_array_type(::Pow{T, N, I, S}) where {T, N, I, S} = S
+codomain_array_type(::Pow{T, N, I, S}) where {T, N, I, S} = S
 is_thread_safe(::Pow) = true

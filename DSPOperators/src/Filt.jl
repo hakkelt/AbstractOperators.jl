@@ -168,8 +168,8 @@ end
 
 domain_type(::AbstractFilt{T}) where {T} = T
 codomain_type(::AbstractFilt{T}) where {T} = T
-domain_storage_type(::AbstractFilt{T, N, S}) where {T, N, S} = S
-codomain_storage_type(::AbstractFilt{T, N, S}) where {T, N, S} = S
+domain_array_type(::AbstractFilt{T, N, S}) where {T, N, S} = S
+codomain_array_type(::AbstractFilt{T, N, S}) where {T, N, S} = S
 is_thread_safe(::AbstractFilt) = false
 
 size(L::AbstractFilt) = L.dim_in, L.dim_in

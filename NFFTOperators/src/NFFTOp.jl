@@ -159,8 +159,8 @@ size(L::NFFTOp) = size(L.ksp_buffer), NFFT.size_in(L.plan)
 fun_name(::NFFTOp) = "𝒩"
 domain_type(::NFFTOp{T}) where {T} = complex(T)
 codomain_type(::NFFTOp{T}) where {T} = complex(T)
-domain_storage_type(op::NFFTOp) = typeof(op.plan.tmpVec)
-codomain_storage_type(op::NFFTOp{T, D, P, K}) where {T, D, P, K} = K
+domain_array_type(op::NFFTOp) = typeof(op.plan.tmpVec)
+codomain_array_type(op::NFFTOp{T, D, P, K}) where {T, D, P, K} = K
 
 # Utility
 

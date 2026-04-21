@@ -26,7 +26,7 @@
 # SOFTWARE.
 
 struct NfftNormalOp{N, T, A <: AbstractArray, F, I} <: AbstractOperators.LinearOperator
-    storage_type::Type{T}
+    array_type::Type{T}
     shape::NTuple{N, Int}
     λ::A
     fftplan::F
@@ -86,7 +86,7 @@ function _get_normal_op(op::NFFTOp)
     mul!(buf, adjoint(p), tmp)
     λ = fftplan * FFTW.fftshift(buf) # create a new array by fftshift and apply in-place FFT
 
-    return NfftNormalOp(domain_storage_type(op), shape, λ, fftplan, inv(fftplan), buf, op.threaded)
+    return NfftNormalOp(domain_array_type(op), shape, λ, fftplan, inv(fftplan), buf, op.threaded)
 end
 
 # properties
@@ -95,7 +95,7 @@ Base.size(op::NfftNormalOp) = op.shape, op.shape
 AbstractOperators.fun_name(::NfftNormalOp) = "(𝒩ᵃ𝒩)"
 domain_type(::NfftNormalOp{N, T}) where {N, T} = eltype(T)
 codomain_type(::NfftNormalOp{N, T}) where {N, T} = eltype(T)
-domain_storage_type(op::NfftNormalOp{N, T}) where {N, T} = op.storage_type
-codomain_storage_type(op::NfftNormalOp{N, T}) where {N, T} = op.storage_type
+domain_array_type(op::NfftNormalOp{N, T}) where {N, T} = op.array_type
+codomain_array_type(op::NfftNormalOp{N, T}) where {N, T} = op.array_type
 is_symmetric(::NfftNormalOp) = true
 AdjointOperator(op::NfftNormalOp) = op

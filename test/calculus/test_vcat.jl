@@ -1,7 +1,6 @@
 @testitem "VCAT: basic mul" tags = [:calculus, :VCAT] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing VCAT --- ")
 
     m1, m2, n = 4, 7, 5
     A1 = randn(m1, n)
@@ -57,8 +56,8 @@ end
     A1 = MatrixOp(randn(m1, n))
     A2 = MatrixOp(randn(m2, n))
     op3 = VCAT(A1, A2)
-    @test domain_storage_type(op3) !== nothing
-    @test codomain_storage_type(op3) !== nothing
+    @test domain_array_type(op3) !== nothing
+    @test codomain_array_type(op3) !== nothing
     @test is_thread_safe(op3) == false
 end
 
@@ -135,7 +134,7 @@ end
         Random.seed!(0)
 
         n = 4
-        opV = VCAT(DiagOp(gpu_ones(backend, Float64, n)), DiagOp(backend(2 .* ones(n))))
+        opV = VCAT(DiagOp(gpu_ones(backend, Float64, n)), DiagOp(2 .* gpu_ones(backend, Float64, n)))
         test_op(opV, gpu_randn(backend, n), ArrayPartition(gpu_randn(backend, n), gpu_randn(backend, n)), false)
 
         m1, m2, n = 4, 7, 5

@@ -257,7 +257,7 @@ end
     return :(_dcat_apply_invperm($natural_expr, H.idxD))
 end
 
-function domain_storage_type(::DCAT{N, L, P1, P2, DS, CS}) where {N, L, P1, P2, DS, CS}
+function domain_array_type(::DCAT{N, L, P1, P2, DS, CS}) where {N, L, P1, P2, DS, CS}
     return DS
 end
 
@@ -277,7 +277,7 @@ end
     return :(_dcat_apply_invperm($natural_expr, H.idxC))
 end
 
-function codomain_storage_type(::DCAT{N, L, P1, P2, DS, CS}) where {N, L, P1, P2, DS, CS}
+function codomain_array_type(::DCAT{N, L, P1, P2, DS, CS}) where {N, L, P1, P2, DS, CS}
     return CS
 end
 is_thread_safe(H::DCAT) = all(is_thread_safe.(H.A))

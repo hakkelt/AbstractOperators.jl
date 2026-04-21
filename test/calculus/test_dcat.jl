@@ -1,7 +1,6 @@
 @testitem "DCAT: basic mul" tags = [:calculus, :DCAT] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing DCAT --- ")
 
     m1, n1, m2, n2, m3, n3 = 4, 7, 5, 2, 5, 5
     A1 = randn(m1, n1)
@@ -39,8 +38,8 @@ end
     A1 = MatrixOp(randn(m1, n1))
     A2 = MatrixOp(randn(m2, n2))
     op = DCAT(A1, A2)
-    @test domain_storage_type(op) !== nothing
-    @test codomain_storage_type(op) !== nothing
+    @test domain_array_type(op) !== nothing
+    @test codomain_array_type(op) !== nothing
     @test remove_displacement(op) == op
     opd = DCAT(AffineAdd(A1, randn(m1)), AffineAdd(A2, randn(m2)))
     opd_removed = remove_displacement(opd)
@@ -92,7 +91,7 @@ end
         Random.seed!(0)
 
         n1, n2 = 3, 4
-        opD = DCAT(DiagOp(gpu_ones(backend, Float64, n1)), DiagOp(backend(2 .* ones(n2))))
+        opD = DCAT(DiagOp(gpu_ones(backend, Float64, n1)), DiagOp(2 .* gpu_ones(backend, Float64, n2)))
         test_op(
             opD,
             ArrayPartition(gpu_randn(backend, n1), gpu_randn(backend, n2)),

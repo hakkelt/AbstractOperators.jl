@@ -95,8 +95,8 @@ fun_name(L::Union{Ax_mul_Bx, Ax_mul_BxJac}) = fun_name(L.A) * "*" * fun_name(L.B
 
 domain_type(L::Union{Ax_mul_Bx, Ax_mul_BxJac}) = domain_type(L.A)
 codomain_type(L::Union{Ax_mul_Bx, Ax_mul_BxJac}) = codomain_type(L.A)
-domain_storage_type(L::Union{Ax_mul_Bx, Ax_mul_BxJac}) = domain_storage_type(L.A)
-codomain_storage_type(L::Union{Ax_mul_Bx, Ax_mul_BxJac}) = codomain_storage_type(L.B)
+domain_array_type(L::Union{Ax_mul_Bx, Ax_mul_BxJac}) = domain_array_type(L.A)
+codomain_array_type(L::Union{Ax_mul_Bx, Ax_mul_BxJac}) = codomain_array_type(L.B)
 
 # utils
 function permute(

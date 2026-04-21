@@ -1,7 +1,6 @@
 @testitem "AdjointOperator" tags = [:calculus, :AdjointOperator] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing AdjointOperator --- ")
 
     m, n = 5, 7
     A1 =
@@ -58,8 +57,8 @@
     @test op2 == opA1
 
     # storage & thread-safety propagation
-    _dst = domain_storage_type(opT)
-    _cst = codomain_storage_type(opT)
+    _dst = domain_array_type(opT)
+    _cst = codomain_array_type(opT)
     @test _dst !== nothing && _cst !== nothing
     @test is_thread_safe(opT) == is_thread_safe(opA1)
 

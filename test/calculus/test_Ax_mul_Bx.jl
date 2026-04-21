@@ -1,7 +1,6 @@
 @testitem "Ax_mul_Bx" tags = [:calculus, :Ax_mul_Bx] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing Ax_mul_Bx --- ")
     n = 3
     A, B = Eye(n, n), Eye(n, n)
     P = Ax_mul_Bx(A, B)

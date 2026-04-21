@@ -1,4 +1,4 @@
-@testitem "GpuExt Quality" tags = [:quality, :gpu] begin
+@testitem "GpuExt Quality" tags = [:gpu, :quality] begin
     using AbstractOperators, JLArrays, LinearAlgebra
 
     # Loading JLArrays triggers GpuExt (GPUArrays is transitive dep)
@@ -22,13 +22,13 @@
     @test_throws ArgumentError mul!(y_cpu, op_gi, x_gpu)
 
     # Storage type and allocation checks for GPU operators
-    @test domain_storage_type(op) <: JLArrays.JLArray
-    @test codomain_storage_type(op) <: JLArrays.JLArray
+    @test domain_array_type(op) <: JLArrays.JLArray
+    @test codomain_array_type(op) <: JLArrays.JLArray
     y_alloc = op * x
     @test y_alloc isa JLArrays.JLArray
 end
 
-@testitem "GpuExt JET" tags = [:jet, :gpu] begin
+@testitem "GpuExt JET" tags = [:gpu, :jet] begin
     using AbstractOperators, JET, JLArrays
 
     # Verify key GPU-dispatched functions are type-stable (no dynamic dispatch)

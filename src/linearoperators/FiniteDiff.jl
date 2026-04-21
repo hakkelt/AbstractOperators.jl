@@ -88,8 +88,8 @@ end
 
 domain_type(::FiniteDiff{<:Any, <:Any, T}) where {T} = T
 codomain_type(::FiniteDiff{<:Any, <:Any, T}) where {T} = T
-domain_storage_type(::FiniteDiff{N, D, T, S}) where {N, D, T, S} = S
-codomain_storage_type(::FiniteDiff{N, D, T, S}) where {N, D, T, S} = S
+domain_array_type(::FiniteDiff{N, D, T, S}) where {N, D, T, S} = S
+codomain_array_type(::FiniteDiff{N, D, T, S}) where {N, D, T, S} = S
 is_thread_safe(::FiniteDiff) = true
 
 function size(L::FiniteDiff{N, D}) where {N, D}

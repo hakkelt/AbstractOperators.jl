@@ -81,10 +81,10 @@ domain_type(::IRDFT{T}) where {T} = Complex{T}
 codomain_type(::IRDFT{T}) where {T} = T
 is_thread_safe(::IRDFT) = true
 
-function domain_storage_type(::IRDFT{T, N, D, T1, T2, T3, S}) where {T, N, D, T1, T2, T3, S}
+function domain_array_type(::IRDFT{T, N, D, T1, T2, T3, S}) where {T, N, D, T1, T2, T3, S}
     return S{Complex{T}}
 end
-function codomain_storage_type(::IRDFT{T, N, D, T1, T2, T3, S}) where {T, N, D, T1, T2, T3, S}
+function codomain_array_type(::IRDFT{T, N, D, T1, T2, T3, S}) where {T, N, D, T1, T2, T3, S}
     return S{T}
 end
 

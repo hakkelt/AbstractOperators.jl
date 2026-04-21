@@ -47,6 +47,6 @@ size(L::Sech) = (L.dim, L.dim)
 
 domain_type(::Sech{T, N}) where {T, N} = T
 codomain_type(::Sech{T, N}) where {T, N} = T
-domain_storage_type(::Sech{T, N, S}) where {T, N, S} = S
-codomain_storage_type(::Sech{T, N, S}) where {T, N, S} = S
+domain_array_type(::Sech{T, N, S}) where {T, N, S} = S
+codomain_array_type(::Sech{T, N, S}) where {T, N, S} = S
 is_thread_safe(::Sech) = true

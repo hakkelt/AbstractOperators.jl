@@ -62,8 +62,8 @@ diag_AAc(::Eye) = 1.0
 
 domain_type(::Eye{T, N}) where {T, N} = T
 codomain_type(::Eye{T, N}) where {T, N} = T
-domain_storage_type(::Eye{T, N, S}) where {T, N, S} = S
-codomain_storage_type(::Eye{T, N, S}) where {T, N, S} = S
+domain_array_type(::Eye{T, N, S}) where {T, N, S} = S
+codomain_array_type(::Eye{T, N, S}) where {T, N, S} = S
 is_thread_safe(::Eye) = true
 
 size(L::Eye) = (L.dim, L.dim)

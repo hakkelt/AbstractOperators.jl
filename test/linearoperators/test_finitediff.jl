@@ -22,7 +22,6 @@ end  # @testmodule FiniteDiffTestHelper
 @testitem "FiniteDiff: basic mul" tags = [:linearoperator, :FiniteDiff] setup = [TestUtils, FiniteDiffTestHelper] begin
     using Random, SparseArrays, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing FiniteDiff --- ")
 
     test_finitediff_mul(identity, verb, test_op)
 
@@ -92,6 +91,6 @@ end
 
     for backend in gpu_backends()
         Random.seed!(0)
-        test_finitediff_mul(backend, false, test_op)
+        test_finitediff_mul(x -> to_gpu(backend, x), false, test_op)
     end
 end

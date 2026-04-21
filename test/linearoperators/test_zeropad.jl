@@ -33,7 +33,6 @@ end  # @testmodule ZeroPadTestHelper
 @testitem "ZeroPad" tags = [:linearoperator, :ZeroPad] setup = [TestUtils, ZeroPadTestHelper] begin
     using Random, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing ZeroPad --- ")
 
     test_zeropad_mul(identity, verb, test_op, to_cpu, norm)
 
@@ -104,6 +103,6 @@ end
 
     for backend in gpu_backends()
         Random.seed!(0)
-        test_zeropad_mul(backend, false, test_op, to_cpu, norm)
+        test_zeropad_mul(x -> to_gpu(backend, x), false, test_op, to_cpu, norm)
     end
 end

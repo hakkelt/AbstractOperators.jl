@@ -111,9 +111,9 @@ function Compose(L1::AbstractOperator, L2::AbstractOperator)
         msg = "cannot compose operators with different domain and codomain types"
         throw(DomainError((domain_type(L1), codomain_type(L2)), msg))
     end
-    if domain_storage_type(L1) != codomain_storage_type(L2)
+    if domain_array_type(L1) != codomain_array_type(L2)
         msg = "cannot compose operators with different input and output storage types"
-        throw(DomainError((domain_storage_type(L1), codomain_storage_type(L2)), msg))
+        throw(DomainError((domain_array_type(L1), codomain_array_type(L2)), msg))
     end
     if L1 isa AdjointOperator && L1.A == L2 && has_optimized_normalop(L2)
         return get_normal_op(L2)
@@ -130,7 +130,7 @@ function Compose(L1::AbstractOperator, L2::AbstractOperator)
     end
     compatible_bufs =
         x ->
-    x isa codomain_storage_type(L1) &&
+    x isa codomain_array_type(L1) &&
         size(x) == size(L2, 1) &&
         eltype(x) == codomain_type(L2)
     new_buf_pos = findfirst(compatible_bufs, available_bufs)
@@ -243,8 +243,8 @@ fun_name(L::Compose) = length(L.A) == 2 ? fun_name(L.A[2]) * "*" * fun_name(L.A[
 
 domain_type(L::Compose) = domain_type(L.A[1])
 codomain_type(L::Compose) = codomain_type(L.A[end])
-domain_storage_type(L::Compose) = domain_storage_type(L.A[1])
-codomain_storage_type(L::Compose) = codomain_storage_type(L.A[end])
+domain_array_type(L::Compose) = domain_array_type(L.A[1])
+codomain_array_type(L::Compose) = codomain_array_type(L.A[end])
 
 is_linear(L::Compose) = all(is_linear.(L.A))
 function is_diagonal(L::Compose)
@@ -303,8 +303,8 @@ remove_displacement(C::Compose) = Compose(remove_displacement.(C.A), C.buf)
 
 get_operators(C::Compose) = C.A
 
-function _copy_operator_impl(op::Compose; storage_type = nothing, threaded = nothing)
-    new_bufs = tuple([_convert_buffer(b, storage_type) for b in op.buf]...)
-    new_ops = tuple([copy_operator(a; storage_type, threaded) for a in op.A]...)
+function _copy_operator_impl(op::Compose; array_type = nothing, threaded = nothing)
+    new_bufs = tuple([_convert_buffer(b, array_type) for b in op.buf]...)
+    new_ops = tuple([copy_operator(a; array_type, threaded) for a in op.A]...)
     return Compose(new_ops, new_bufs)
 end

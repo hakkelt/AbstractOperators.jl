@@ -84,10 +84,10 @@ domain_type(::RDFT{T}) where {T} = T
 codomain_type(::RDFT{T}) where {T} = Complex{T}
 is_thread_safe(::RDFT) = false
 
-function domain_storage_type(L::RDFT{T, N, T1, T2, T3}) where {T, N, T1, T2, T3}
+function domain_array_type(L::RDFT{T, N, T1, T2, T3}) where {T, N, T1, T2, T3}
     return T3.name.wrapper{T}
 end
-function codomain_storage_type(L::RDFT{T, N, T1, T2, T3}) where {T, N, T1, T2, T3}
+function codomain_array_type(L::RDFT{T, N, T1, T2, T3}) where {T, N, T1, T2, T3}
     return T3.name.wrapper{Complex{T}}
 end
 

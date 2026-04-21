@@ -95,8 +95,8 @@ domain_type(A::OperatorWrapper) = domain_type(A.op)
 codomain_type(A::OperatorWrapper) = codomain_type(A.op)
 
 # Outer storage types are fixed at construction via DS/CS type parameters.
-domain_storage_type(::OperatorWrapper{Op, DB, CB, DS, CS}) where {Op, DB, CB, DS, CS} = DS
-codomain_storage_type(::OperatorWrapper{Op, DB, CB, DS, CS}) where {Op, DB, CB, DS, CS} = CS
+domain_array_type(::OperatorWrapper{Op, DB, CB, DS, CS}) where {Op, DB, CB, DS, CS} = DS
+codomain_array_type(::OperatorWrapper{Op, DB, CB, DS, CS}) where {Op, DB, CB, DS, CS} = CS
 
 # Forward all predicates to the wrapped operator.
 import OperatorCore:
@@ -127,9 +127,9 @@ displacement(A::OperatorWrapper) = displacement(A.op)
 remove_displacement(A::OperatorWrapper) = OperatorWrapper(remove_displacement(A.op))
 
 function _copy_operator_impl(
-        A::OperatorWrapper{Op, DB, CB, DS, CS}; storage_type = nothing, threaded = nothing
+        A::OperatorWrapper{Op, DB, CB, DS, CS}; array_type = nothing, threaded = nothing
     ) where {Op, DB, CB, DS, CS}
-    new_op = copy_operator(A.op; storage_type = nothing, threaded)
+    new_op = copy_operator(A.op; array_type = nothing, threaded)
     return OperatorWrapper{typeof(new_op), DB, CB, DS, CS}(
         new_op, similar(A.dom_buf), similar(A.cod_buf)
     )

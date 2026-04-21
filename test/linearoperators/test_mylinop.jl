@@ -1,7 +1,6 @@
 @testitem "MyLinOp basic" tags = [:linearoperator, :MyLinOp] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing MyLinOp --- ")
 
     n, m = 5, 4
     A = randn(n, m)
@@ -9,8 +8,8 @@
     op_array_type = MyLinOp(
         Float64, (m,), (n,), (y, x) -> mul!(y, A, x), (y, x) -> mul!(y, A', x); array_type = Array{ComplexF32, 2}
     )
-    @test domain_storage_type(op_array_type) == Array{Float64}
-    @test codomain_storage_type(op_array_type) == Array{Float64}
+    @test domain_array_type(op_array_type) == Array{Float64}
+    @test codomain_array_type(op_array_type) == Array{Float64}
     x1 = randn(m)
     y1 = test_op(op, x1, randn(n), verb)
     y2 = A * x1
@@ -75,6 +74,6 @@ end
         x = gpu_randn(backend, m)
         y = gpu_randn(backend, n)
         test_op(op, x, y, false)
-        @test domain_storage_type(op) <: AT
+        @test domain_array_type(op) <: AT
     end
 end

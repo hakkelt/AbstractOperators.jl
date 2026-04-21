@@ -47,6 +47,6 @@ size(L::Sin) = (L.dim, L.dim)
 
 domain_type(::Sin{T, N}) where {T, N} = T
 codomain_type(::Sin{T, N}) where {T, N} = T
-domain_storage_type(::Sin{T, N, S}) where {T, N, S} = S
-codomain_storage_type(::Sin{T, N, S}) where {T, N, S} = S
+domain_array_type(::Sin{T, N, S}) where {T, N, S} = S
+codomain_array_type(::Sin{T, N, S}) where {T, N, S} = S
 is_thread_safe(::Sin) = true

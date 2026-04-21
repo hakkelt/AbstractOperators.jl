@@ -1,23 +1,19 @@
 @testitem "LMatrixOp: basic mul" tags = [:linearoperator, :LMatrixOp] setup = [TestUtils] begin
     using Random, AbstractOperators
+
     Random.seed!(0)
-    verb && println(" --- Testing LMatrixOp: basic mul --- ")
 
-    function test_lmatrixop_mul(conv, verb)
-        n, m = 5, 6
-        b = randn(m)
-        op = LMatrixOp(Float64, (n, m), conv(b))
-        test_op(op, conv(randn(n, m)), conv(randn(n)), verb)
-    end
-
-    test_lmatrixop_mul(identity, verb)
+    n, m = 5, 6
+    b = randn(m)
+    op = LMatrixOp(Float64, (n, m), b)
+    test_op(op, randn(n, m), randn(n), verb)
 
     n, m = 5, 6
     b = randn(m)
     op = LMatrixOp(Float64, (n, m), b)
     op_array_type = LMatrixOp(Float64, (n, m), b; array_type = Array{ComplexF32, 2})
-    @test domain_storage_type(op_array_type) == Array{Float64}
-    @test codomain_storage_type(op_array_type) == Array{Float64}
+    @test domain_array_type(op_array_type) == Array{Float64}
+    @test codomain_array_type(op_array_type) == Array{Float64}
     x1 = randn(n, m)
     y1 = test_op(op, x1, randn(n), verb)
     y2 = x1 * b
@@ -58,7 +54,6 @@ end
 @testitem "LMatrixOp: other constructors" tags = [:linearoperator, :LMatrixOp] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing LMatrixOp: other constructors --- ")
 
     n, m, l = 5, 6, 7
 
@@ -100,7 +95,6 @@ end
 @testitem "LMatrixOp: scale and properties" tags = [:linearoperator, :LMatrixOp] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing LMatrixOp: scale and properties --- ")
 
     n, m, l = 5, 6, 7
     bvec = randn(m)
@@ -141,7 +135,7 @@ end
     @test occursin("(⋅)b", s)
 end
 
-@testitem "LMatrixOp (GPU)" tags = [:linearoperator, :LMatrixOp, :gpu] setup = [TestUtils] begin
+@testitem "LMatrixOp (GPU)" tags = [:gpu, :linearoperator, :LMatrixOp] setup = [TestUtils] begin
     using Random, AbstractOperators, GPUEnv
     for backend in gpu_backends()
         Random.seed!(0)

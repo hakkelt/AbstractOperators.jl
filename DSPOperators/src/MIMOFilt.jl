@@ -186,8 +186,8 @@ end
 
 domain_type(::AbstractMIMOFilt{T}) where {T} = T
 codomain_type(::AbstractMIMOFilt{T}) where {T} = T
-domain_storage_type(::AbstractMIMOFilt{T, S}) where {T, S} = S
-codomain_storage_type(::AbstractMIMOFilt{T, S}) where {T, S} = S
+domain_array_type(::AbstractMIMOFilt{T, S}) where {T, S} = S
+codomain_array_type(::AbstractMIMOFilt{T, S}) where {T, S} = S
 is_thread_safe(::AbstractMIMOFilt) = false
 
 size(L::AbstractMIMOFilt) = L.dim_out, L.dim_in

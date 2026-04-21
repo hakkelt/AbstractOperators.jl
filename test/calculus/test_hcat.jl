@@ -1,7 +1,6 @@
 @testitem "HCAT: basic mul" tags = [:calculus, :HCAT] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing HCAT --- ")
 
     m, n1, n2 = 4, 7, 5
     A1 = randn(m, n1)
@@ -73,8 +72,8 @@ end
     A1 = MatrixOp(randn(m, n1))
     A2 = MatrixOp(randn(m, n2))
     op3 = HCAT(A1, A2)
-    @test domain_storage_type(op3) !== nothing
-    @test codomain_storage_type(op3) !== nothing
+    @test domain_array_type(op3) !== nothing
+    @test codomain_array_type(op3) !== nothing
     @test is_thread_safe(op3) == false
 end
 
@@ -227,7 +226,7 @@ end
         Random.seed!(0)
 
         n = 4
-        opH = HCAT(DiagOp(gpu_ones(backend, Float64, n)), DiagOp(backend(2 .* ones(n))))
+        opH = HCAT(DiagOp(gpu_ones(backend, Float64, n)), DiagOp(2 .* gpu_ones(backend, Float64, n)))
         test_op(opH, ArrayPartition(gpu_randn(backend, n), gpu_randn(backend, n)), gpu_randn(backend, n), false)
 
         m, n1, n2 = 4, 7, 5

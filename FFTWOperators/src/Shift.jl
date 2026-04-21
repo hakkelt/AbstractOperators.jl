@@ -180,16 +180,16 @@ end
 
 domain_type(::FFTShift{T}) where {T} = T
 codomain_type(::FFTShift{T}) where {T} = T
-domain_storage_type(::FFTShift{T, N, M, S}) where {T, N, M, S} = S
-codomain_storage_type(::FFTShift{T, N, M, S}) where {T, N, M, S} = S
+domain_array_type(::FFTShift{T, N, M, S}) where {T, N, M, S} = S
+codomain_array_type(::FFTShift{T, N, M, S}) where {T, N, M, S} = S
 domain_type(::IFFTShift{T}) where {T} = T
 codomain_type(::IFFTShift{T}) where {T} = T
-domain_storage_type(::IFFTShift{T, N, M, S}) where {T, N, M, S} = S
-codomain_storage_type(::IFFTShift{T, N, M, S}) where {T, N, M, S} = S
+domain_array_type(::IFFTShift{T, N, M, S}) where {T, N, M, S} = S
+codomain_array_type(::IFFTShift{T, N, M, S}) where {T, N, M, S} = S
 domain_type(::SignAlternation{T}) where {T} = T
 codomain_type(::SignAlternation{T}) where {T} = T
-domain_storage_type(::SignAlternation{T, N, M, Th, S}) where {T, N, M, Th, S} = S
-codomain_storage_type(::SignAlternation{T, N, M, Th, S}) where {T, N, M, Th, S} = S
+domain_array_type(::SignAlternation{T, N, M, Th, S}) where {T, N, M, Th, S} = S
+codomain_array_type(::SignAlternation{T, N, M, Th, S}) where {T, N, M, Th, S} = S
 
 size(L::FFTShift) = (L.dim_in, L.dim_in)
 size(L::IFFTShift) = (L.dim_in, L.dim_in)
@@ -409,7 +409,7 @@ end
 
 has_optimized_normalop(::Union{FFTShift, IFFTShift, SignAlternation}) = true
 function get_normal_op(L::Union{FFTShift, IFFTShift, SignAlternation})
-    return Eye(domain_type(L), size(L, 1); array_type = domain_storage_type(L))
+    return Eye(domain_type(L), size(L, 1); array_type = domain_array_type(L))
 end
 
 LinearAlgebra.adjoint(L::SignAlternation) = L
@@ -459,10 +459,10 @@ function _shift_op(
         _check_shift_dirs(size(op, 2), domain_shifts)
         shifted_domain_dims_shape = size(op, 2)[collect(domain_shifts)]
         if all(iseven, shifted_domain_dims_shape) && _is_dft_op(op, :domain)
-            domain_op = SignAlternation(codomain_type(op), size(op, 1), domain_shifts; array_type = codomain_storage_type(op))
+            domain_op = SignAlternation(codomain_type(op), size(op, 1), domain_shifts; array_type = codomain_array_type(op))
             op = domain_op * op
         else
-            domain_op = shift_op_type(domain_type(op), size(op, 2), domain_shifts; array_type = domain_storage_type(op))
+            domain_op = shift_op_type(domain_type(op), size(op, 2), domain_shifts; array_type = domain_array_type(op))
             op = op * domain_op
         end
     end
@@ -470,10 +470,10 @@ function _shift_op(
         _check_shift_dirs(size(op, 1), codomain_shifts)
         shifted_codomain_dims_shape = size(op, 1)[collect(codomain_shifts)]
         if all(iseven, shifted_codomain_dims_shape) && _is_dft_op(op, :codomain)
-            codomain_op = SignAlternation(domain_type(op), size(op, 2), codomain_shifts; array_type = domain_storage_type(op))
+            codomain_op = SignAlternation(domain_type(op), size(op, 2), codomain_shifts; array_type = domain_array_type(op))
             op = op * codomain_op
         else
-            codomain_op = shift_op_type(codomain_type(op), size(op, 1), codomain_shifts; array_type = codomain_storage_type(op))
+            codomain_op = shift_op_type(codomain_type(op), size(op, 1), codomain_shifts; array_type = codomain_array_type(op))
             op = codomain_op * op
         end
     end

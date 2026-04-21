@@ -238,10 +238,10 @@ fun_name(L::SimpleBatchOpMultiThreaded) = "⟳" * fun_name(L.operator[1])
 
 size(L::SimpleBatchOp) = L.codomain_size, L.domain_size
 
-domain_storage_type(L::SimpleBatchOpSingleThreaded) = domain_storage_type(L.operator)
-domain_storage_type(L::SimpleBatchOpMultiThreaded) = domain_storage_type(L.operator[1])
-codomain_storage_type(L::SimpleBatchOpSingleThreaded) = codomain_storage_type(L.operator)
-codomain_storage_type(L::SimpleBatchOpMultiThreaded) = codomain_storage_type(L.operator[1])
+domain_array_type(L::SimpleBatchOpSingleThreaded) = domain_array_type(L.operator)
+domain_array_type(L::SimpleBatchOpMultiThreaded) = domain_array_type(L.operator[1])
+codomain_array_type(L::SimpleBatchOpSingleThreaded) = codomain_array_type(L.operator)
+codomain_array_type(L::SimpleBatchOpMultiThreaded) = codomain_array_type(L.operator[1])
 
 is_linear(L::SimpleBatchOpSingleThreaded) = is_linear(L.operator)
 is_linear(L::SimpleBatchOpMultiThreaded) = is_linear(L.operator[1])

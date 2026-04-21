@@ -100,8 +100,8 @@ end
 
 # Properties
 
-domain_storage_type(::DiagOp{<:Any, <:Any, <:Any, <:Any, dS}) where {dS} = dS
-codomain_storage_type(::DiagOp{<:Any, <:Any, <:Any, <:Any, <:Any, cS}) where {cS} = cS
+domain_array_type(::DiagOp{<:Any, <:Any, <:Any, <:Any, dS}) where {dS} = dS
+codomain_array_type(::DiagOp{<:Any, <:Any, <:Any, <:Any, <:Any, cS}) where {cS} = cS
 
 diag(L::DiagOp) = L.d
 diag_AAc(L::DiagOp{B}) where {B} = @.. thread = B L.d * conj(L.d)
@@ -111,10 +111,10 @@ domain_type(::DiagOp{<:Any, D}) where {D} = D
 codomain_type(::DiagOp{<:Any, <:Any, C}) where {C} = C
 is_thread_safe(::DiagOp) = true
 
-function _copy_operator_impl(op::DiagOp{B}; storage_type = nothing, threaded = nothing) where {B}
+function _copy_operator_impl(op::DiagOp{B}; array_type = nothing, threaded = nothing) where {B}
     new_threaded = threaded === nothing ? (B == FastBroadcast.True()) : threaded
-    new_d = storage_type === nothing ? op.d : _convert_buffer(op.d, storage_type)
-    new_at = storage_type === nothing ? _array_wrapper(op.d) : storage_type
+    new_d = array_type === nothing ? op.d : _convert_buffer(op.d, array_type)
+    new_at = array_type === nothing ? _array_wrapper(op.d) : array_type
     return DiagOp(domain_type(op), op.dim_in, new_d; threaded = new_threaded, array_type = new_at)
 end
 

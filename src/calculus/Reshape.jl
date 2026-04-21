@@ -64,8 +64,8 @@ size(R::Reshape) = (R.dim_out, size(R.A, 2))
 
 domain_type(R::Reshape) = domain_type(R.A)
 codomain_type(R::Reshape) = codomain_type(R.A)
-domain_storage_type(R::Reshape) = domain_storage_type(R.A)
-codomain_storage_type(R::Reshape) = codomain_storage_type(R.A)
+domain_array_type(R::Reshape) = domain_array_type(R.A)
+codomain_array_type(R::Reshape) = codomain_array_type(R.A)
 is_thread_safe(R::Reshape) = is_thread_safe(R.A)
 
 is_linear(R::Reshape) = is_linear(R.A)

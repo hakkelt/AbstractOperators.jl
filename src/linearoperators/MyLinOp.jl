@@ -72,7 +72,7 @@ size(L::MyLinOp) = (L.dim_out, L.dim_in)
 
 codomain_type(::MyLinOp{N, M, C}) where {N, M, C} = C
 domain_type(::MyLinOp{N, M, C, D}) where {N, M, C, D} = D
-domain_storage_type(::MyLinOp{N, M, C, D, F, G, dS}) where {N, M, C, D, F, G, dS} = dS
-codomain_storage_type(::MyLinOp{N, M, C, D, F, G, dS, cS}) where {N, M, C, D, F, G, dS, cS} = cS
+domain_array_type(::MyLinOp{N, M, C, D, F, G, dS}) where {N, M, C, D, F, G, dS} = dS
+codomain_array_type(::MyLinOp{N, M, C, D, F, G, dS, cS}) where {N, M, C, D, F, G, dS, cS} = cS
 
 fun_name(L::MyLinOp) = "A"

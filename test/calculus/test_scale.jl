@@ -1,7 +1,6 @@
 @testitem "Scale" tags = [:calculus, :Scale] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing Scale --- ")
 
     m, n = 8, 4
     coeff = pi
@@ -219,8 +218,8 @@ end
     S = Scale(α, A)
     @test domain_type(S) == domain_type(A)
     @test codomain_type(S) == codomain_type(A)
-    @test domain_storage_type(S) == domain_storage_type(A)
-    @test codomain_storage_type(S) == codomain_storage_type(A)
+    @test domain_array_type(S) == domain_array_type(A)
+    @test codomain_array_type(S) == codomain_array_type(A)
     @test is_thread_safe(S) == is_thread_safe(A)
     @test is_linear(S) && !is_null(S)
     @test is_diagonal(S) == is_diagonal(A)

@@ -78,11 +78,11 @@ _is_storage_compatible(a, ::Type{T}) where {T} = _storage_parent(a) isa T
 end
 
 function _check_domain_storage(domain_array, op)
-    if !_is_storage_compatible(domain_array, domain_storage_type(op))
+    if !_is_storage_compatible(domain_array, domain_array_type(op))
         throw(
             ArgumentError(
                 "Input storage type $(typeof(domain_array)) is not compatible with " *
-                    "operator's expected domain storage $(domain_storage_type(op))",
+                    "operator's expected domain storage $(domain_array_type(op))",
             ),
         )
     end
@@ -90,11 +90,11 @@ function _check_domain_storage(domain_array, op)
 end
 
 function _check_codomain_storage(codomain_array, op)
-    if !_is_storage_compatible(codomain_array, codomain_storage_type(op))
+    if !_is_storage_compatible(codomain_array, codomain_array_type(op))
         throw(
             ArgumentError(
                 "Output storage type $(typeof(codomain_array)) is not compatible with " *
-                    "operator's expected codomain storage $(codomain_storage_type(op))",
+                    "operator's expected codomain storage $(codomain_array_type(op))",
             ),
         )
     end

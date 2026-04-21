@@ -316,8 +316,8 @@ end
     return :(_hcat_apply_invperm($natural_expr, H.idxs))
 end
 codomain_type(L::HCAT) = codomain_type.(Ref(L.A[1]))
-domain_storage_type(::HCAT{N, L, P, C, DS}) where {N, L, P, C, DS} = DS
-codomain_storage_type(L::HCAT) = codomain_storage_type.(Ref(L.A[1]))
+domain_array_type(::HCAT{N, L, P, C, DS}) where {N, L, P, C, DS} = DS
+codomain_array_type(L::HCAT) = codomain_array_type.(Ref(L.A[1]))
 
 is_linear(L::HCAT) = all(is_linear.(L.A))
 is_AAc_diagonal(L::HCAT) = all(is_AAc_diagonal.(L.A))
@@ -364,8 +364,8 @@ end
 
 remove_displacement(H::HCAT) = HCAT(remove_displacement.(H.A), H.idxs, H.buf)
 
-function _copy_operator_impl(op::HCAT; storage_type = nothing, threaded = nothing)
-    new_buf = _convert_buffer(op.buf, storage_type)
-    new_ops = tuple([copy_operator(a; storage_type, threaded) for a in op.A]...)
+function _copy_operator_impl(op::HCAT; array_type = nothing, threaded = nothing)
+    new_buf = _convert_buffer(op.buf, array_type)
+    new_ops = tuple([copy_operator(a; array_type, threaded) for a in op.A]...)
     return HCAT(new_ops, op.idxs, new_buf)
 end

@@ -140,8 +140,8 @@ end
 
 domain_type(::Xcorr{T}) where {T} = T
 codomain_type(::Xcorr{T}) where {T} = T
-domain_storage_type(::Xcorr{T, H}) where {T, H} = H
-codomain_storage_type(::Xcorr{T, H}) where {T, H} = H
+domain_array_type(::Xcorr{T, H}) where {T, H} = H
+codomain_array_type(::Xcorr{T, H}) where {T, H} = H
 is_thread_safe(::Xcorr) = false
 
 is_full_row_rank(L::Xcorr) = true

@@ -183,12 +183,12 @@ end
 # Properties
 domain_type(::GetIndex{I, N, M, T}) where {I, N, M, T} = T
 domain_type(::NormalGetIndex{I, N, T}) where {I, N, T} = T
-domain_storage_type(::GetIndex{I, N, M, T, S}) where {I, N, M, T, S} = S
-domain_storage_type(::NormalGetIndex{I, N, T, S}) where {I, N, T, S} = S
+domain_array_type(::GetIndex{I, N, M, T, S}) where {I, N, M, T, S} = S
+domain_array_type(::NormalGetIndex{I, N, T, S}) where {I, N, T, S} = S
 codomain_type(::GetIndex{I, N, M, T}) where {I, N, M, T} = T
 codomain_type(::NormalGetIndex{I, N, T}) where {I, N, T} = T
-codomain_storage_type(::GetIndex{I, N, M, T, S}) where {I, N, M, T, S} = S
-codomain_storage_type(::NormalGetIndex{I, N, T, S}) where {I, N, T, S} = S
+codomain_array_type(::GetIndex{I, N, M, T, S}) where {I, N, M, T, S} = S
+codomain_array_type(::NormalGetIndex{I, N, T, S}) where {I, N, T, S} = S
 is_thread_safe(L::GetIndex) = true
 is_thread_safe(L::NormalGetIndex) = true
 

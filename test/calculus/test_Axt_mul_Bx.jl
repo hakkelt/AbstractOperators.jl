@@ -1,7 +1,6 @@
 @testitem "Axt_mul_Bx: basic mul" tags = [:calculus, :Axt_mul_Bx] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing Axt_mul_Bx: basic mul --- ")
 
     n = 10
     A, B = Eye(n), Sin(n)
@@ -41,7 +40,6 @@ end
 @testitem "Axt_mul_Bx: HCAT and permute" tags = [:calculus, :Axt_mul_Bx] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing Axt_mul_Bx: HCAT and permute --- ")
 
     # testing with HCAT
     m, n = 3, 5
@@ -76,7 +74,6 @@ end
 @testitem "Axt_mul_Bx: error paths and equality" tags = [:calculus, :Axt_mul_Bx] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing Axt_mul_Bx: error paths and equality --- ")
 
     # ndims==2 branch with mismatched first codomain dimension
     struct AxtDummy2D <: AbstractOperator
@@ -86,8 +83,8 @@ end
     Base.size(op::AxtDummy2D) = (op.dim_out, op.dim_in)
     AbstractOperators.domain_type(::AxtDummy2D) = Float64
     AbstractOperators.codomain_type(::AxtDummy2D) = Float64
-    AbstractOperators.domain_storage_type(::AxtDummy2D) = Array{Float64}
-    AbstractOperators.codomain_storage_type(::AxtDummy2D) = Array{Float64}
+    AbstractOperators.domain_array_type(::AxtDummy2D) = Array{Float64}
+    AbstractOperators.codomain_array_type(::AxtDummy2D) = Array{Float64}
 
     struct AxtDummyMixed <: AbstractOperator
         dim_out::Tuple{Int}
@@ -96,8 +93,8 @@ end
     Base.size(op::AxtDummyMixed) = (op.dim_out, op.dim_in)
     AbstractOperators.domain_type(::AxtDummyMixed) = Float64
     AbstractOperators.codomain_type(::AxtDummyMixed) = Float64
-    AbstractOperators.domain_storage_type(::AxtDummyMixed) = Array{Float64}
-    AbstractOperators.codomain_storage_type(::AxtDummyMixed) = Array{Float64}
+    AbstractOperators.domain_array_type(::AxtDummyMixed) = Array{Float64}
+    AbstractOperators.codomain_array_type(::AxtDummyMixed) = Array{Float64}
 
     A2d = AxtDummy2D((2, 3), (4, 3))
     B2d_bad = AxtDummy2D((3, 3), (4, 3))

@@ -57,6 +57,6 @@ size(L::Sigmoid) = (L.dim, L.dim)
 
 domain_type(::Sigmoid{T, N, D}) where {T, N, D} = T
 codomain_type(::Sigmoid{T, N, D}) where {T, N, D} = T
-domain_storage_type(::Sigmoid{T, N, D, S}) where {T, N, D, S} = S
-codomain_storage_type(::Sigmoid{T, N, D, S}) where {T, N, D, S} = S
+domain_array_type(::Sigmoid{T, N, D, S}) where {T, N, D, S} = S
+codomain_array_type(::Sigmoid{T, N, D, S}) where {T, N, D, S} = S
 is_thread_safe(::Sigmoid) = true

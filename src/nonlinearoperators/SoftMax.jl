@@ -55,6 +55,6 @@ size(L::SoftMax) = (L.dim, L.dim)
 
 domain_type(::SoftMax{T}) where {T} = T
 codomain_type(::SoftMax{T}) where {T} = T
-domain_storage_type(::SoftMax{T, N, B}) where {T, N, B} = _array_wrapper_type(B){T}
-codomain_storage_type(::SoftMax{T, N, B}) where {T, N, B} = _array_wrapper_type(B){T}
+domain_array_type(::SoftMax{T, N, B}) where {T, N, B} = _array_wrapper_type(B){T}
+codomain_array_type(::SoftMax{T, N, B}) where {T, N, B} = _array_wrapper_type(B){T}
 is_thread_safe(::SoftMax) = false

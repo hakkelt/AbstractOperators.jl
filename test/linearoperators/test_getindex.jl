@@ -1,7 +1,6 @@
 @testitem "GetIndex: basic mul" tags = [:linearoperator, :GetIndex] setup = [TestUtils] begin
     using Random, LinearAlgebra, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing GetIndex --- ")
 
     n, k = 5, 3
     test_op(GetIndex(zeros(Float64, n), (1:k,)), randn(n), randn(k), verb)
@@ -10,8 +9,8 @@
     test_op(GetIndex(zeros(Float64, n, m), (1:k, :)), randn(n, m), randn(k, m), verb)
 
     op = GetIndex(Float64, (n,), (1:k,); array_type = Array{ComplexF32, 2})
-    @test domain_storage_type(op) == Array{Float64}
-    @test codomain_storage_type(op) == Array{Float64}
+    @test domain_array_type(op) == Array{Float64}
+    @test codomain_array_type(op) == Array{Float64}
 
     op2d = GetIndex(Float64, (n, m), (:, 2))
     x1 = randn(n, m)
@@ -108,7 +107,7 @@ end
     @test occursin("↓", String(take!(io)))
 end
 
-@testitem "GetIndex (GPU)" tags = [:linearoperator, :GetIndex, :gpu] setup = [TestUtils] begin
+@testitem "GetIndex (GPU)" tags = [:gpu, :linearoperator, :GetIndex] setup = [TestUtils] begin
     using Random, AbstractOperators, GPUEnv
 
     for backend in gpu_backends()
@@ -211,7 +210,7 @@ end
     N1 = AbstractOperators.NormalGetIndex(Float64, Array{Float64}, (n,), 3:3)
     @test size(N1) == ((n,), (n,))
     @test AbstractOperators.domain_type(N1) == Float64
-    @test AbstractOperators.domain_storage_type(N1) == Array{Float64}
+    @test AbstractOperators.domain_array_type(N1) == Array{Float64}
     expected = zeros(n)
     expected[3] = 1
     @test AbstractOperators.diag(N1) == expected
@@ -269,7 +268,7 @@ end
     Random.seed!(0)
     N = AbstractOperators.NormalGetIndex(Float64, Array{Float64}, (5,), 2:3)
     @test AbstractOperators.AdjointOperator(N) === N
-    @test AbstractOperators.codomain_storage_type(N) == Array{Float64}
+    @test AbstractOperators.codomain_array_type(N) == Array{Float64}
 end
 
 @testitem "GetIndex vector of CartesianIndex via tuple" tags = [:linearoperator, :GetIndex] setup = [TestUtils] begin

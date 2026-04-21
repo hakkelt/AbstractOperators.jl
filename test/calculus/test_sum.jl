@@ -1,7 +1,6 @@
 @testitem "Sum: basic mul" tags = [:calculus, :Sum] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing Sum --- ")
 
     m, n = 5, 7
     A1 = randn(m, n)
@@ -62,8 +61,8 @@ end
     @test is_diagonal(op) == true
     @test norm(diag(op) - (d .- 3.1)) < 1.0e-12
 
-    @test domain_storage_type(S1) !== nothing
-    @test codomain_storage_type(S1) !== nothing
+    @test domain_array_type(S1) !== nothing
+    @test codomain_array_type(S1) !== nothing
     @test is_thread_safe(S1) == false
 end
 
@@ -88,7 +87,8 @@ end
         Random.seed!(0)
 
         n = 5
-        opS = Sum(DiagOp(gpu_ones(backend, Float64, n)), DiagOp(backend(2 .* ones(n))))
+        x = gpu_ones(backend, Float64, n)
+        opS = Sum(Eye(x), Scale(2.0, Eye(x)))
         test_op(opS, gpu_randn(backend, n), gpu_randn(backend, n), false)
 
         m, n2 = 5, 7

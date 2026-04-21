@@ -109,5 +109,5 @@ size(L::Jacobian) = size(L.A, 1), size(L.A, 2)
 
 domain_type(L::Jacobian) = domain_type(L.A)
 codomain_type(L::Jacobian) = codomain_type(L.A)
-domain_storage_type(L::Jacobian) = domain_storage_type(L.A)
-codomain_storage_type(L::Jacobian) = codomain_storage_type(L.A)
+domain_array_type(L::Jacobian) = domain_array_type(L.A)
+codomain_array_type(L::Jacobian) = codomain_array_type(L.A)

@@ -217,8 +217,8 @@ domain_type(L::VCAT) = domain_type.(Ref(L.A[1]))
     natural_expr = Expr(:tuple, exprs...)
     return :(_vcat_apply_invperm($natural_expr, H.idxs))
 end
-domain_storage_type(L::VCAT) = domain_storage_type.(Ref(L.A[1]))
-codomain_storage_type(::VCAT{N, L, P, C, CS}) where {N, L, P, C, CS} = CS
+domain_array_type(L::VCAT) = domain_array_type.(Ref(L.A[1]))
+codomain_array_type(::VCAT{N, L, P, C, CS}) where {N, L, P, C, CS} = CS
 
 is_linear(L::VCAT) = all(is_linear.(L.A))
 is_AcA_diagonal(L::VCAT) = all(is_AcA_diagonal.(L.A))
@@ -284,8 +284,8 @@ end
 
 remove_displacement(V::VCAT) = VCAT(remove_displacement.(V.A), V.idxs, V.buf)
 
-function _copy_operator_impl(op::VCAT; storage_type = nothing, threaded = nothing)
-    new_buf = _convert_buffer(op.buf, storage_type)
-    new_ops = tuple([copy_operator(a; storage_type, threaded) for a in op.A]...)
+function _copy_operator_impl(op::VCAT; array_type = nothing, threaded = nothing)
+    new_buf = _convert_buffer(op.buf, array_type)
+    new_ops = tuple([copy_operator(a; array_type, threaded) for a in op.A]...)
     return VCAT(new_ops, op.idxs, new_buf)
 end

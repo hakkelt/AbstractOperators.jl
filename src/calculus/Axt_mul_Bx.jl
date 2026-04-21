@@ -137,8 +137,8 @@ fun_name(L::Union{Axt_mul_Bx, Axt_mul_BxJac}) = fun_name(L.A) * "*" * fun_name(L
 
 domain_type(L::Union{Axt_mul_Bx, Axt_mul_BxJac}) = domain_type(L.A)
 codomain_type(L::Union{Axt_mul_Bx, Axt_mul_BxJac}) = codomain_type(L.A)
-domain_storage_type(L::Union{Axt_mul_Bx, Axt_mul_BxJac}) = domain_storage_type(L.A)
-codomain_storage_type(L::Union{Axt_mul_Bx, Axt_mul_BxJac}) = codomain_storage_type(L.B)
+domain_array_type(L::Union{Axt_mul_Bx, Axt_mul_BxJac}) = domain_array_type(L.A)
+codomain_array_type(L::Union{Axt_mul_Bx, Axt_mul_BxJac}) = codomain_array_type(L.B)
 is_thread_safe(::Axt_mul_Bx) = false
 
 # utils

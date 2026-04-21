@@ -1,5 +1,5 @@
 @testmodule SimpleBatchOpHelpers begin
-    using Random, BenchmarkTools, LinearAlgebra, AbstractOperators, JLArrays, Test
+    using Random, BenchmarkTools, LinearAlgebra, AbstractOperators, Test
 
     function test_simple_batchop(op, batch_op, x, y, z, threaded)
         if threaded && Threads.nthreads() > 1
@@ -74,8 +74,8 @@
         batch_op_copy = AbstractOperators.copy_operator(batch_op)
         @test batch_op == batch_op_copy
         @test isequal(batch_op, batch_op_copy)
-        @test domain_storage_type(batch_op) == domain_storage_type(op)
-        @test codomain_storage_type(batch_op) == codomain_storage_type(op)
+        @test domain_array_type(batch_op) == domain_array_type(op)
+        @test codomain_array_type(batch_op) == codomain_array_type(op)
         @test is_linear(batch_op) == is_linear(op)
         @test is_eye(batch_op) == is_eye(op)
         @test is_null(batch_op) == is_null(op)
@@ -188,7 +188,7 @@ end
         Random.seed!(0)
         op = DiagOp(to_gpu(backend, [1.0, 2.0]))
         batch_op = BatchOp(op, (3, 4), (:_, :b, :b))
-        x = gpu_ones(backend, 2, 3, 4)
+        x = gpu_ones(backend, Float64, 2, 3, 4)
         y_gpu = batch_op * x
         @test size(Array(y_gpu)) == (2, 3, 4)
         @test all(Array(y_gpu)[1, :, :] .≈ 1.0)

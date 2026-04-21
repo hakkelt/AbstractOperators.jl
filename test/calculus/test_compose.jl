@@ -1,7 +1,6 @@
 @testitem "Compose: basic mul" tags = [:calculus, :Compose] setup = [TestUtils] begin
     using Random, LinearAlgebra, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing Compose --- ")
 
     m1, m2 = 4, 7
     A1 = randn(m2, m1)

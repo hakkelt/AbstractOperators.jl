@@ -65,8 +65,8 @@ end
 # Properties
 domain_type(::LMatrixOp{T}) where {T} = T
 codomain_type(::LMatrixOp{T}) where {T} = T
-domain_storage_type(::LMatrixOp{T, A, B, dS}) where {T, A, B, dS} = dS
-codomain_storage_type(::LMatrixOp{T, A, B, dS, cS}) where {T, A, B, dS, cS} = cS
+domain_array_type(::LMatrixOp{T, A, B, dS}) where {T, A, B, dS} = dS
+codomain_array_type(::LMatrixOp{T, A, B, dS, cS}) where {T, A, B, dS, cS} = cS
 is_thread_safe(::LMatrixOp) = true
 
 fun_name(L::LMatrixOp) = "(⋅)b"

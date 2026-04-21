@@ -1,7 +1,6 @@
 @testitem "MatrixOp: basic mul" tags = [:linearoperator, :MatrixOp] setup = [TestUtils] begin
     using Random, SparseArrays, LinearAlgebra, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing MatrixOp --- ")
 
     n, m = 5, 4
     A = randn(n, m)
@@ -15,8 +14,8 @@
     # array_type keyword is ignored for element-type selection
     A = randn(n, m)
     op = MatrixOp(Float64, (m,), A; array_type = Array{ComplexF32, 2})
-    @test domain_storage_type(op) == Array{Float64}
-    @test codomain_storage_type(op) == Array{Float64}
+    @test domain_array_type(op) == Array{Float64}
+    @test codomain_array_type(op) == Array{Float64}
 
     # complex matrix, real matrix input
     A = randn(n, m) + im * randn(n, m)
@@ -115,11 +114,11 @@ end
     for backend in gpu_backends()
         Random.seed!(0)
         n, m = 5, 4
-        A = randn(n, m)
-        test_op(MatrixOp(to_gpu(backend, A)), gpu_randn(backend, m), gpu_randn(backend, n), false)
-        Ac = randn(n, m) + im * randn(n, m)
+        A = gpu_randn(backend, n, m)
+        test_op(MatrixOp(A), gpu_randn(backend, m), gpu_randn(backend, n), false)
+        Ac = gpu_randn(backend, ComplexF64, n, m)
         test_op(
-            MatrixOp(to_gpu(backend, Ac)),
+            MatrixOp(Ac),
             gpu_randn(backend, ComplexF64, m),
             gpu_randn(backend, ComplexF64, n),
             false,

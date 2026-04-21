@@ -136,10 +136,10 @@ fun_name(A::IDCT) = "ℱc⁻¹"
 
 domain_type(::CosineTransform{N, C}) where {N, C} = C
 codomain_type(::CosineTransform{N, C}) where {N, C} = C
-domain_storage_type(::DCT{N, C, T1, T2, B}) where {N, C, T1, T2, B} = Base.typename(B).wrapper{C}
-domain_storage_type(::IDCT{N, C, T1, T2, B}) where {N, C, T1, T2, B} = Base.typename(B).wrapper{C}
-codomain_storage_type(::DCT{N, C, T1, T2, B}) where {N, C, T1, T2, B} = Base.typename(B).wrapper{C}
-codomain_storage_type(::IDCT{N, C, T1, T2, B}) where {N, C, T1, T2, B} = Base.typename(B).wrapper{C}
+domain_array_type(::DCT{N, C, T1, T2, B}) where {N, C, T1, T2, B} = Base.typename(B).wrapper{C}
+domain_array_type(::IDCT{N, C, T1, T2, B}) where {N, C, T1, T2, B} = Base.typename(B).wrapper{C}
+codomain_array_type(::DCT{N, C, T1, T2, B}) where {N, C, T1, T2, B} = Base.typename(B).wrapper{C}
+codomain_array_type(::IDCT{N, C, T1, T2, B}) where {N, C, T1, T2, B} = Base.typename(B).wrapper{C}
 is_thread_safe(::CosineTransform) = false
 
 is_AcA_diagonal(L::CosineTransform) = true

@@ -1,18 +1,12 @@
 @testitem "Zeros" tags = [:linearoperator, :Zeros] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing Zeros --- ")
 
-    function test_zeros_mul(conv, verb)
-        n = (3, 4)
-        m = (5, 2)
-        ST = Base.typename(typeof(conv(zeros(Float64, 1)))).wrapper
-        op = Zeros(Float64, n, Float64, m; array_type = ST)
-        y1 = test_op(op, conv(randn(n)), conv(randn(m)), verb)
-        @test to_cpu(y1) == zeros(Float64, m)
-    end
-
-    test_zeros_mul(identity, verb)
+    n = (3, 4)
+    m = (5, 2)
+    op = Zeros(Float64, n, Float64, m)
+    y1 = test_op(op, randn(n), randn(m), verb)
+    @test y1 == zeros(Float64, m)
 
     n = (3, 4)
     D = Float64
@@ -20,8 +14,8 @@
     C = Complex{Float64}
     op = Zeros(D, n, C, m)
     op_array_type = Zeros(D, n, C, m; array_type = Array{ComplexF32, 2})
-    @test domain_storage_type(op_array_type) == Array{Float64}
-    @test codomain_storage_type(op_array_type) == Array{ComplexF64}
+    @test domain_array_type(op_array_type) == Array{Float64}
+    @test codomain_array_type(op_array_type) == Array{ComplexF64}
     x1 = randn(n)
     y1 = test_op(op, x1, randn(m) + im * randn(m), verb)
     @test y1 == zeros(eltype(y1), m)

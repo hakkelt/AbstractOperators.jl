@@ -1,7 +1,6 @@
 @testitem "L-BFGS: construction and basic mul" tags = [:linearoperator, :LBFGS] setup = [TestUtils] begin
     using AbstractOperators
     using AbstractOperators: LBFGS, update!, mul!, reset!
-    verb && println(" --- Testing L-BFGS: construction and basic mul --- ")
 
     mem = 3
     x = zeros(10)
@@ -26,7 +25,6 @@ end
 @testitem "L-BFGS: update and two-loop recursion" tags = [:linearoperator, :LBFGS] setup = [TestUtils] begin
     using AbstractOperators
     using AbstractOperators: LBFGS, update!, mul!, reset!
-    verb && println(" --- Testing L-BFGS: update and two-loop recursion --- ")
 
     Q = [
         32.0 13.1 -4.9 -3.0 6.0 2.2 2.6 3.4 -1.9 -7.5
@@ -132,7 +130,6 @@ end
 @testitem "L-BFGS: memory limit and reset" tags = [:linearoperator, :LBFGS] setup = [TestUtils] begin
     using AbstractOperators
     using AbstractOperators: LBFGS, update!, mul!, reset!
-    verb && println(" --- Testing L-BFGS: memory limit and reset --- ")
 
     Q = [
         32.0 13.1 -4.9 -3.0 6.0 2.2 2.6 3.4 -1.9 -7.5
@@ -225,8 +222,8 @@ end
         x_prev = gpu_randn(backend, Float32, n)
         grad_prev = gpu_randn(backend, Float32, n)
         H = LBFGS(x_prev, mem)
-        @test domain_storage_type(H) <: backend.array_type
-        @test codomain_storage_type(H) <: backend.array_type
+        @test domain_array_type(H) <: backend.array_type
+        @test codomain_array_type(H) <: backend.array_type
 
         x = gpu_randn(backend, Float32, n)
         grad = gpu_randn(backend, Float32, n)
@@ -247,8 +244,8 @@ end
         xp = ArrayPartition(gpu_randn(backend, Float32, n), gpu_randn(backend, Float32, n))
         gp = ArrayPartition(gpu_randn(backend, Float32, n), gpu_randn(backend, Float32, n))
         Hp = LBFGS(xp, mem)
-        @test domain_storage_type(Hp) == typeof(xp)
-        @test codomain_storage_type(Hp) == typeof(xp)
+        @test domain_array_type(Hp) == typeof(xp)
+        @test codomain_array_type(Hp) == typeof(xp)
         yp = Hp * gp
         @test yp isa typeof(xp)
     end
