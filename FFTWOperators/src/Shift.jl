@@ -25,7 +25,7 @@ julia> A * x
 julia> B = IFFTShift((4,)); B * (A * x) == x
 true
 
-julia> A2 = FFTShift((2,2), (1,2)); A2 * reshape(1.0:4.0, 2, 2)
+julia> A2 = FFTShift((2,2), (1,2)); A2 * collect(reshape(1.0:4.0, 2, 2))
 2×2 Matrix{Float64}:
  4.0  2.0
  3.0  1.0

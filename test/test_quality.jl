@@ -15,5 +15,5 @@ end
 @testitem "Aqua" tags = [:quality] begin
     using Aqua, AbstractOperators
 
-    Aqua.test_all(AbstractOperators)
+    Aqua.test_all(AbstractOperators, persistent_tasks = VERSION >= v"1.11")
 end

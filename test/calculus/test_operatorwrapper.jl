@@ -26,8 +26,8 @@
     @test domain_type(wrapper) == domain_type(cpu_op)
     @test codomain_type(wrapper) == codomain_type(cpu_op)
     @test is_linear(wrapper) == is_linear(cpu_op)
-    @test domain_array_type(wrapper) == Array{Float64, 1}
-    @test codomain_array_type(wrapper) == Array{Float64, 1}
+    @test domain_array_type(wrapper) == Array{Float64}
+    @test codomain_array_type(wrapper) == Array{Float64}
 
     io = IOBuffer()
     show(io, wrapper)
