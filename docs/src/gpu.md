@@ -1,13 +1,19 @@
 # GPU Support
 
-AbstractOperators.jl provides GPU compatibility through a lightweight extension model. All major operators work transparently with GPU arrays — no code changes are needed for most use cases.
+AbstractOperators.jl provides GPU compatibility through a lightweight extension model. Most operators work transparently with GPU arrays on any of the four supported backends: CUDA.jl, AMDGPU.jl, oneAPI.jl, and OpenCL.jl.
+
+The main exceptions are:
+
+- `NFFTOperators.jl`, which currently supports GPU execution only with CUDA.jl
+- `WaveletOperators.jl`, which currently works on CPU only
+- `DCT` and `IDCT` (in FFTWOperators.jl) needs explicit loading of `AcceleratedDCTs` to activate GPU support
 
 ## Using GPU Arrays
 
 Simply pass a GPU array to the `mul!` function or the `*` operator:
 
 ```julia
-using AbstractOperators, CUDA  # or any GPU backend
+using AbstractOperators, CUDA  # or AMDGPU, oneAPI, or OpenCL
 
 x_gpu = CuArray(randn(Float32, 10))
 y_gpu = CuArray(zeros(Float32, 9))
@@ -84,14 +90,11 @@ julia --project=test -e '
 '
 ```
 
-## Limitations
+## Backend-Specific Notes
 
-- **`Axt_mul_Bx`**: The forward `mul!` uses scalar GPU indexing (`y[1] = dot(...)`) — not GPU-compatible.
-- **Boolean mask indexing**: `GetIndex` with a boolean CPU mask on a GPU array is backend-specific (e.g., works with CUDA.jl but not JLArrays). Use integer-vector indices instead.
-- **DCT/IDCT** (FFTWOperators): Use CPU FFTW plans — not GPU-compatible. Use `DFT`/`RDFT` for GPU (via `AbstractFFTs` interface).
-- **Batching operators**: `SimpleBatchOp` and `SpreadingBatchOp` are not yet tested with GPU arrays.
+Most operators in AbstractOperators.jl, DSPOperators.jl, and the GPU-compatible parts of FFTWOperators.jl follow the same generic GPU-array execution model and therefore work with CUDA.jl, AMDGPU.jl, oneAPI.jl, and OpenCL.jl.
 
-## NFFTOperators GPU Support (CUDA)
+### NFFTOperators GPU Support (CUDA only)
 
 NFFTOperators.jl supports GPU via the `array_type` keyword argument. This requires loading CUDA.jl (or any package that loads GPUArrays + Adapt):
 
@@ -114,6 +117,37 @@ img_rec = op_gpu' * y_gpu      # adjoint: k-space → image (on GPU)
 
 The trajectory `k` is kept on CPU (as required by NFFT.jl's GPU plan); only the computation buffers (`ksp_buffer`, `dcf`) and input/output arrays are on GPU.
 
+### FFTWOperators DCT/IDCT (AcceleratedDCTs)
+
+`DCT` and `IDCT` are CPU-only unless `AcceleratedDCTs` is loaded. When `AcceleratedDCTs` is available and imported, the package activates GPU support for those operators through its extension:
+
+```julia
+using AbstractOperators, FFTWOperators, CUDA
+import AcceleratedDCTs # explicitly import to activate GPU support for DCT/IDCT
+
+x_gpu = CUDA.randn(Float32, 64)
+dct_op = DCT(x_gpu)
+y_gpu = dct_op * x_gpu
+
+idct_op = IDCT(x_gpu)
+x_rec_gpu = idct_op * y_gpu
+```
+
+If `AcceleratedDCTs` is not imported, `DCT` and `IDCT` continue to use the CPU FFTW implementation,
+and will not work with GPU arrays. In that case, wrap them with `CpuOperatorWrapper` to use in GPU pipelines:
+
+```julia
+using AbstractOperators, FFTWOperators, CUDA
+
+x_gpu = CUDA.randn(Float32, 64)
+dct_op = CpuOperatorWrapper(DCT(Float32, (64,)); array_type = CuArray{Float32})  # CPU operator wrapped for GPU use
+y_gpu = dct_op * x_gpu  # GPU in → CPU DCT → GPU out
+```
+
+### WaveletOperators CPU-only status
+
+WaveletOperators.jl currently relies on CPU execution. Its operators do not yet support GPU arrays, so wavelet transforms should remain on CPU or be wrapped explicitly as CPU operators when building mixed CPU/GPU pipelines.
+
 ## CpuOperatorWrapper
 
 For operators that do not natively support GPU arrays (e.g., FFTWOperators DCT, custom CPU-only operators), use `CpuOperatorWrapper`:
@@ -125,17 +159,11 @@ using AbstractOperators, CUDA
 op = FiniteDiff(Float32, (64,))  # or any FFTWOperators, etc.
 
 # Wrap it — preallocates CPU buffers for domain and codomain
-wrapper = CpuOperatorWrapper(op)
+wrapper = CpuOperatorWrapper(op; array_type = CuArray{Float32})  # specify GPU array type for buffers
 
 x_gpu = CUDA.randn(Float32, 64)
 y_gpu = similar(x_gpu, 63)
 
 mul!(y_gpu, wrapper, x_gpu)   # GPU in → CPU compute → GPU out
 mul!(x_gpu, wrapper', y_gpu)  # GPU in → CPU adjoint → GPU out
-```
-
-The wrapper preallocates CPU buffers (`dom_buf`, `cod_buf`) to avoid allocations during `mul!`. For parallel use, create independent copies per thread:
-
-```julia
-wrappers = [CpuOperatorWrapper(op) for _ in 1:Threads.nthreads()]
 ```

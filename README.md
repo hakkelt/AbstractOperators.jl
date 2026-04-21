@@ -123,6 +123,16 @@ A list of the available `AbstractOperators` and calculus rules can be found in t
 
 `AbstractOperators.jl` is distinguished by its support for multi-dimensional array domains and codomains, efficient in-place implementations of both linear and nonlinear operators, and seamless integration with optimization algorithms in related packages: [ProximalOperators.jl](https://github.com/kul-forbes/ProximalOperators.jl), [ProximalAlgorithms.jl](https://github.com/kul-forbes/ProximalAlgorithms.jl), and [StructuredOptimization.jl](https://github.com/kul-forbes/StructuredOptimization.jl). It has built-in threading support for many operators, and partial (and extending) GPU support.
 
+## GPU Support
+
+Most operators in the AbstractOperators.jl ecosystem work with GPU arrays on CUDA.jl, AMDGPU.jl, oneAPI.jl, and OpenCL.jl.
+
+Subpackage-specific exceptions are:
+
+- `NFFTOperators.jl` supports GPU execution only with CUDA.jl
+- `WaveletOperators.jl` currently works on CPU only
+- `DCT` and `IDCT` (in FFTWOperators.jl) use CPU FFTW plans by default, but load `AcceleratedDCTs` to activate GPU support for those operators
+
 ## Credits
 
 AbstractOperators.jl is developed by

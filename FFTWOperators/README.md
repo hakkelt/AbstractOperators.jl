@@ -19,6 +19,13 @@ FFTWOperators.jl is a **subpackage** of the AbstractOperators.jl ecosystem. Whil
 pkg> add FFTWOperators
 ```
 
+## GPU Support
+
+FFTWOperators.jl has mixed GPU support:
+
+- All operators except `DCT` and `IDCT` work with GPU arrays on CUDA.jl, AMDGPU.jl, oneAPI.jl, and OpenCL.jl.
+- `DCT` and `IDCT` use FFTW CPU plans by default, but loading `AcceleratedDCTs` activates GPU support for those operators. If `AcceleratedDCTs` is not imported, these operators will not work with GPU arrays and should be wrapped with `CpuOperatorWrapper` for use in GPU pipelines.
+
 ## Usage Example
 
 ```julia
@@ -119,6 +126,32 @@ dct_complex = DCT(Complex{Float64}, (8, 8))
 
 # Inverse DCT
 idct_op = IDCT(Float64, (10, 10))
+```
+
+#### GPU Support for DCT/IDCT
+
+To use `DCT` and `IDCT` on GPU arrays, load `AcceleratedDCTs` before constructing the operator:
+
+```julia
+using FFTWOperators, CUDA
+import AcceleratedDCTs # explicitly import to activate GPU support for DCT/IDCT
+
+x_gpu = CUDA.randn(Float32, 10, 10)
+dct_gpu = DCT(x_gpu)
+y_gpu = dct_gpu * x_gpu
+
+idct_gpu = IDCT(x_gpu)
+x_rec_gpu = idct_gpu * y_gpu
+```
+
+If `AcceleratedDCTs` is not imported, `DCT` and `IDCT` will use CPU FFTW plans and will not work with GPU arrays. In that case, wrap them with `CpuOperatorWrapper` for use in GPU pipelines:
+
+```julia
+using FFTWOperators, CUDA
+
+x_gpu = CUDA.randn(Float32, 10, 10)
+dct_gpu = CpuOperatorWrapper(DCT(Float32, (10, 10)); array_type = CuArray{Float32})  # CPU operator wrapped for GPU use
+y_gpu = dct_gpu * x_gpu  # GPU in → CPU DCT → GPU out
 ```
 
 ### 5. **Shift** - Frequency Shift Operator
