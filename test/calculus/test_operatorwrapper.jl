@@ -59,83 +59,28 @@ end
     test_op(wrapper, randn(n), randn(n), verb)
 end
 
-@testitem "OperatorWrapper (JLArray)" tags = [:gpu, :jlarray, :calculus, :OperatorWrapper] setup = [TestUtils, GpuTestUtils] begin
-    using Random, AbstractOperators, JLArrays
-    Random.seed!(42)
-    n = 32
-    op = FiniteDiff(Float32, (n,), 1)
-    wrapper = OperatorWrapper(op; array_type = JLArray{Float32})
-    @test domain_storage_type(wrapper) == JLArray{Float32, 1}
-    @test codomain_storage_type(wrapper) == JLArray{Float32, 1}
+@testitem "OperatorWrapper (GPU)" tags = [:gpu, :calculus, :OperatorWrapper] setup = [TestUtils] begin
+    using Random, AbstractOperators, GPUEnv
 
-    x = jl(randn(Float32, n))
-    y = jl(zeros(Float32, n - 1))
-    mul!(y, wrapper, x)
-    @test y isa JLArray
-    @test Array(y) ≈ op * Array(x)
-
-    r = jl(randn(Float32, n - 1))
-    z = jl(zeros(Float32, n))
-    mul!(z, wrapper', r)
-    @test z isa JLArray
-    ref = zeros(Float32, n)
-    mul!(ref, op', Array(r))
-    @test Array(z) ≈ ref
-end
-
-@testitem "OperatorWrapper (CUDA)" tags = [:gpu, :cuda, :calculus, :OperatorWrapper] setup = [
-    TestUtils,
-] begin
-    using Random, AbstractOperators
-    using CUDA
-    if CUDA.functional()
+    for backend in gpu_backends()
         Random.seed!(42)
-
         n = 32
         op = FiniteDiff(Float32, (n,), 1)
-        wrapper = OperatorWrapper(op; array_type = CuArray{Float32})
-        @test domain_storage_type(wrapper) == CuArray{Float32, 1}
-        @test codomain_storage_type(wrapper) == CuArray{Float32, 1}
+        storage_type = gpu_wrapper(backend, Float32, n)
+        wrapper = OperatorWrapper(op; array_type = storage_type)
+        @test domain_storage_type(wrapper) <: backend.array_type
+        @test codomain_storage_type(wrapper) <: backend.array_type
 
-        x = CUDA.randn(Float32, n)
-        y = CUDA.zeros(Float32, n - 1)
+        x = gpu_randn(backend, Float32, n)
+        y = gpu_zeros(backend, Float32, n - 1)
         mul!(y, wrapper, x)
-        @test y isa CUDA.CuArray
+        @test y isa storage_type
         @test collect(y) ≈ op * collect(x)
 
-        r = CUDA.randn(Float32, n - 1)
-        z = CUDA.zeros(Float32, n)
+        r = gpu_randn(backend, Float32, n - 1)
+        z = gpu_zeros(backend, Float32, n)
         mul!(z, wrapper', r)
-        @test z isa CUDA.CuArray
-        ref = zeros(Float32, n)
-        mul!(ref, op', collect(r))
-        @test collect(z) ≈ ref
-    end
-end
-
-@testitem "OperatorWrapper (AMDGPU)" tags = [:gpu, :amdgpu, :calculus, :OperatorWrapper] setup = [
-    TestUtils,
-] begin
-    using Random, AbstractOperators
-    using AMDGPU
-    if AMDGPU.functional()
-        Random.seed!(42)
-
-        n = 32
-        op = FiniteDiff(Float32, (n,), 1)
-        wrapper = OperatorWrapper(op; array_type = AMDGPU.ROCArray{Float32})
-        @test domain_storage_type(wrapper) == AMDGPU.ROCArray{Float32, 1}
-
-        x = AMDGPU.ROCArray(randn(Float32, n))
-        y = AMDGPU.zeros(Float32, n - 1)
-        mul!(y, wrapper, x)
-        @test y isa AMDGPU.ROCArray
-        @test collect(y) ≈ op * collect(x)
-
-        r = AMDGPU.ROCArray(randn(Float32, n - 1))
-        z = AMDGPU.zeros(Float32, n)
-        mul!(z, wrapper', r)
-        @test z isa AMDGPU.ROCArray
+        @test z isa storage_type
         ref = zeros(Float32, n)
         mul!(ref, op', collect(r))
         @test collect(z) ≈ ref

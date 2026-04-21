@@ -241,54 +241,20 @@ end
     @test norm(Y - y) < 1.0e-8
 end
 
-@testitem "Reshape (GPU)" tags = [:gpu, :calculus, :Reshape] setup = [TestUtils, GpuTestUtils] begin
-    using Random, AbstractOperators, JLArrays
-    Random.seed!(0)
+@testitem "Reshape (GPU)" tags = [:gpu, :calculus, :Reshape] setup = [TestUtils] begin
+    using Random, AbstractOperators, GPUEnv
 
-    m, n = 8, 4
-    dim_out = (2, 2, 2)
-    A1 = jl(randn(m, n))
-    opR = Reshape(MatrixOp(A1), dim_out)
-    test_op(opR, jl(randn(n)), jl(randn(dim_out)), false)
-
-    # Reshape of DiagOp
-    n2 = 6
-    opR2 = Reshape(DiagOp(jl(randn(n2))), (2, 3))
-    test_op(opR2, jl(randn(n2)), jl(randn(2, 3)), false)
-end
-
-@testitem "Reshape (CUDA)" tags = [:gpu, :cuda, :calculus, :Reshape] setup = [TestUtils] begin
-    using Random, AbstractOperators
-    using CUDA
-    if CUDA.functional()
+    for backend in gpu_backends()
         Random.seed!(0)
 
         m, n = 8, 4
         dim_out = (2, 2, 2)
-        A1 = CuArray(randn(m, n))
+        A1 = gpu_randn(backend, m, n)
         opR = Reshape(MatrixOp(A1), dim_out)
-        test_op(opR, CuArray(randn(n)), CuArray(randn(dim_out)), false)
+        test_op(opR, gpu_randn(backend, n), gpu_randn(backend, dim_out...), false)
 
         n2 = 6
-        opR2 = Reshape(DiagOp(CuArray(randn(n2))), (2, 3))
-        test_op(opR2, CuArray(randn(n2)), CuArray(randn(2, 3)), false)
-    end
-end
-
-@testitem "Reshape (AMDGPU)" tags = [:gpu, :amdgpu, :calculus, :Reshape] setup = [TestUtils] begin
-    using Random, AbstractOperators
-    using AMDGPU
-    if AMDGPU.functional()
-        Random.seed!(0)
-
-        m, n = 8, 4
-        dim_out = (2, 2, 2)
-        A1 = AMDGPU.ROCArray(randn(m, n))
-        opR = Reshape(MatrixOp(A1), dim_out)
-        test_op(opR, AMDGPU.ROCArray(randn(n)), AMDGPU.ROCArray(randn(dim_out)), false)
-
-        n2 = 6
-        opR2 = Reshape(DiagOp(AMDGPU.ROCArray(randn(n2))), (2, 3))
-        test_op(opR2, AMDGPU.ROCArray(randn(n2)), AMDGPU.ROCArray(randn(2, 3)), false)
+        opR2 = Reshape(DiagOp(gpu_randn(backend, n2)), (2, 3))
+        test_op(opR2, gpu_randn(backend, n2), gpu_randn(backend, 2, 3), false)
     end
 end

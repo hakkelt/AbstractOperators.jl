@@ -187,39 +187,39 @@ end
     @test (c5 * X) ≈ ((dft2 * sh2) * X)
 end
 
-@testitem "FFTShift/IFFTShift (GPU)" tags = [:gpu, :fftw, :FFTShift] setup = [TestUtils, GpuTestUtils] begin
-    using LinearAlgebra, FFTWOperators, JLArrays
+@testitem "FFTShift/IFFTShift (GPU)" tags = [:gpu, :fftw, :FFTShift] setup = [TestUtils] begin
+    using FFTWOperators, GPUEnv, LinearAlgebra
 
-    n = 4
-    x = jl(collect(1.0:n))
-    A = FFTShift((n,), (1,); array_type = typeof(x))
-    y = A * x
-    @test collect(y) == [3.0, 4.0, 1.0, 2.0]
-    # adjoint roundtrip
-    @test collect(A' * y) ≈ collect(x)
+    for backend in gpu_backends()
+        n = 4
+        x = to_gpu(backend, collect(1.0:n))
+        A = FFTShift((n,), (1,); array_type = typeof(x))
+        y = A * x
+        @test collect(y) == [3.0, 4.0, 1.0, 2.0]
+        @test collect(A' * y) ≈ collect(x)
 
-    # 2D
-    n2, m2 = 2, 4
-    X = jl(ones(n2, m2))
-    A2 = FFTShift((n2, m2), (1, 2); array_type = typeof(X))
-    Y = A2 * X
-    @test collect(Y) ≈ ones(n2, m2)  # shifting all-ones stays all-ones
+        n2, m2 = 2, 4
+        X = gpu_ones(backend, Float64, n2, m2)
+        A2 = FFTShift((n2, m2), (1, 2); array_type = typeof(X))
+        Y = A2 * X
+        @test collect(Y) ≈ ones(n2, m2)
+    end
 end
 
-@testitem "SignAlternation (JLArray)" tags = [:gpu, :jlarray, :fftw, :SignAlternation] setup = [TestUtils, GpuTestUtils] begin
-    using LinearAlgebra, FFTWOperators, JLArrays
+@testitem "SignAlternation (GPU)" tags = [:gpu, :fftw, :SignAlternation] setup = [TestUtils] begin
+    using FFTWOperators, GPUEnv, LinearAlgebra
 
-    n = 6
-    x = jl(ones(n))
-    S = SignAlternation((n,), (1,); array_type = typeof(x))
-    y = S * x
-    @test collect(y) == [1.0, -1.0, 1.0, -1.0, 1.0, -1.0]
-    # SignAlternation is involutory: S*S*x == x
-    @test collect(S * y) ≈ collect(x)
+    for backend in gpu_backends()
+        n = 6
+        x = gpu_ones(backend, Float64, n)
+        S = SignAlternation((n,), (1,); array_type = typeof(x))
+        y = S * x
+        @test collect(y) == [1.0, -1.0, 1.0, -1.0, 1.0, -1.0]
+        @test collect(S * y) ≈ collect(x)
 
-    # 2D
-    X2 = jl(ones(2, 2))
-    S2 = SignAlternation((2, 2), (1, 2); array_type = typeof(X2))
-    Y2 = S2 * X2
-    @test collect(Y2) == [1.0 -1.0; -1.0 1.0]
+        X2 = gpu_ones(backend, Float64, 2, 2)
+        S2 = SignAlternation((2, 2), (1, 2); array_type = typeof(X2))
+        Y2 = S2 * X2
+        @test collect(Y2) == [1.0 -1.0; -1.0 1.0]
+    end
 end

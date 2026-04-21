@@ -220,63 +220,20 @@ end
     @test H_single === A
 end
 
-@testitem "HCAT (GPU)" tags = [:gpu, :calculus, :HCAT] setup = [TestUtils, GpuTestUtils] begin
-    using Random, AbstractOperators, JLArrays
-    Random.seed!(0)
+@testitem "HCAT (GPU)" tags = [:gpu, :calculus, :HCAT] setup = [TestUtils] begin
+    using Random, AbstractOperators, GPUEnv
 
-    n = 4
-    opH = HCAT(DiagOp(jl(ones(n))), DiagOp(jl(2 * ones(n))))
-    test_op(opH, ArrayPartition(jl(randn(n)), jl(randn(n))), jl(randn(n)), false)
-
-    m, n1, n2 = 4, 7, 5
-    A1 = jl(randn(m, n1))
-    A2 = jl(randn(m, n2))
-    opH2 = HCAT(MatrixOp(A1), MatrixOp(A2))
-    test_op(opH2, ArrayPartition(jl(randn(n1)), jl(randn(n2))), jl(randn(m)), false)
-end
-
-@testitem "HCAT (CUDA)" tags = [:gpu, :cuda, :calculus, :HCAT] setup = [TestUtils] begin
-    using Random, AbstractOperators
-    using CUDA
-    if CUDA.functional()
+    for backend in gpu_backends()
         Random.seed!(0)
 
         n = 4
-        opH = HCAT(DiagOp(CuArray(ones(n))), DiagOp(CuArray(2 * ones(n))))
-        test_op(opH, ArrayPartition(CuArray(randn(n)), CuArray(randn(n))), CuArray(randn(n)), false)
+        opH = HCAT(DiagOp(gpu_ones(backend, Float64, n)), DiagOp(backend(2 .* ones(n))))
+        test_op(opH, ArrayPartition(gpu_randn(backend, n), gpu_randn(backend, n)), gpu_randn(backend, n), false)
 
         m, n1, n2 = 4, 7, 5
-        A1 = CuArray(randn(m, n1))
-        A2 = CuArray(randn(m, n2))
+        A1 = gpu_randn(backend, m, n1)
+        A2 = gpu_randn(backend, m, n2)
         opH2 = HCAT(MatrixOp(A1), MatrixOp(A2))
-        test_op(opH2, ArrayPartition(CuArray(randn(n1)), CuArray(randn(n2))), CuArray(randn(m)), false)
-    end
-end
-
-@testitem "HCAT (AMDGPU)" tags = [:gpu, :amdgpu, :calculus, :HCAT] setup = [TestUtils] begin
-    using Random, AbstractOperators
-    using AMDGPU
-    if AMDGPU.functional()
-        Random.seed!(0)
-
-        n = 4
-        opH = HCAT(DiagOp(AMDGPU.ROCArray(ones(n))), DiagOp(AMDGPU.ROCArray(2 * ones(n))))
-        test_op(
-            opH,
-            ArrayPartition(AMDGPU.ROCArray(randn(n)), AMDGPU.ROCArray(randn(n))),
-            AMDGPU.ROCArray(randn(n)),
-            false,
-        )
-
-        m, n1, n2 = 4, 7, 5
-        A1 = AMDGPU.ROCArray(randn(m, n1))
-        A2 = AMDGPU.ROCArray(randn(m, n2))
-        opH2 = HCAT(MatrixOp(A1), MatrixOp(A2))
-        test_op(
-            opH2,
-            ArrayPartition(AMDGPU.ROCArray(randn(n1)), AMDGPU.ROCArray(randn(n2))),
-            AMDGPU.ROCArray(randn(m)),
-            false,
-        )
+        test_op(opH2, ArrayPartition(gpu_randn(backend, n1), gpu_randn(backend, n2)), gpu_randn(backend, m), false)
     end
 end

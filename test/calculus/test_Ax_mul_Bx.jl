@@ -102,66 +102,25 @@
     @test Jacobian(Ax_mul_Bx(A, B), x) == Jacobian(Ax_mul_Bx(A, B), x)
 end
 
-@testitem "Ax_mul_Bx (GPU)" tags = [:gpu, :calculus, :Ax_mul_Bx] setup = [TestUtils, GpuTestUtils] begin
-    using Random, AbstractOperators, JLArrays
-    Random.seed!(0)
+@testitem "Ax_mul_Bx (GPU)" tags = [:gpu, :calculus, :Ax_mul_Bx] setup = [TestUtils] begin
+    using Random, AbstractOperators, GPUEnv
 
-    # Use GPU-typed Eye so forward output is GPU
-    n = 3
-    P = Ax_mul_Bx(Eye(Float64, (n, n); array_type = JLArray{Float64}), Eye(Float64, (n, n); array_type = JLArray{Float64}))
-    x = jl(randn(n, n))
-    r = jl(randn(n, n))
-    test_NLop_gpu(P, x, r, false)
-
-    n2 = 3
-    P2 = Ax_mul_Bx(Sin(jl(zeros(n2, n2))), Cos(jl(zeros(n2, n2))))
-    x2 = jl(randn(n2, n2))
-    r2 = jl(randn(n2, n2))
-    test_NLop_gpu(P2, x2, r2, false)
-end
-
-@testitem "Ax_mul_Bx (CUDA)" tags = [:gpu, :cuda, :calculus, :Ax_mul_Bx] setup = [TestUtils] begin
-    using Random, AbstractOperators
-    using CUDA
-    if CUDA.functional()
+    for backend in gpu_backends()
         Random.seed!(0)
 
         n = 3
         P = Ax_mul_Bx(
-            Eye(Float64, (n, n); array_type = CUDA.CuArray{Float64, 2}),
-            Eye(Float64, (n, n); array_type = CUDA.CuArray{Float64, 2}),
+            Eye(Float64, (n, n); array_type = gpu_wrapper(backend, Float64, n, n)),
+            Eye(Float64, (n, n); array_type = gpu_wrapper(backend, Float64, n, n)),
         )
-        x = CuArray(randn(n, n))
-        r = CuArray(randn(n, n))
+        x = gpu_randn(backend, n, n)
+        r = gpu_randn(backend, n, n)
         test_NLop_gpu(P, x, r, false)
 
         n2 = 3
-        P2 = Ax_mul_Bx(Sin(CUDA.zeros(Float64, n2, n2)), Cos(CUDA.zeros(Float64, n2, n2)))
-        x2 = CuArray(randn(n2, n2))
-        r2 = CuArray(randn(n2, n2))
-        test_NLop_gpu(P2, x2, r2, false)
-    end
-end
-
-@testitem "Ax_mul_Bx (AMDGPU)" tags = [:gpu, :amdgpu, :calculus, :Ax_mul_Bx] setup = [TestUtils] begin
-    using Random, AbstractOperators
-    using AMDGPU
-    if AMDGPU.functional()
-        Random.seed!(0)
-
-        n = 3
-        P = Ax_mul_Bx(
-            Eye(Float64, (n, n); array_type = AMDGPU.ROCArray{Float64, 2}),
-            Eye(Float64, (n, n); array_type = AMDGPU.ROCArray{Float64, 2}),
-        )
-        x = AMDGPU.ROCArray(randn(n, n))
-        r = AMDGPU.ROCArray(randn(n, n))
-        test_NLop_gpu(P, x, r, false)
-
-        n2 = 3
-        P2 = Ax_mul_Bx(Sin(AMDGPU.zeros(Float64, n2, n2)), Cos(AMDGPU.zeros(Float64, n2, n2)))
-        x2 = AMDGPU.ROCArray(randn(n2, n2))
-        r2 = AMDGPU.ROCArray(randn(n2, n2))
+        P2 = Ax_mul_Bx(Sin(gpu_zeros(backend, Float64, n2, n2)), Cos(gpu_zeros(backend, Float64, n2, n2)))
+        x2 = gpu_randn(backend, n2, n2)
+        r2 = gpu_randn(backend, n2, n2)
         test_NLop_gpu(P2, x2, r2, false)
     end
 end

@@ -306,13 +306,16 @@ end
     @test diag_AAc(bop) == scale_val^2
 end
 
-@testitem "SpreadingBatchOp GPU (JLArray)" tags = [:batching, :SpreadingBatchOp] setup = [TestUtils, GpuTestUtils, SpreadingBatchOpHelpers] begin
-    using Random, AbstractOperators, JLArrays
-    Random.seed!(0)
-    ops = [DiagOp(jl([1.0, 2.0])) for _ in 1:4]
-    bop = BatchOp(ops, 3, (:_, :s, :b))
-    y_gpu = bop * jl(ones(2, 4, 3))
-    @test size(Array(y_gpu)) == (2, 4, 3)
-    @test all(Array(y_gpu)[1, :, :] .≈ 1.0)
-    @test all(Array(y_gpu)[2, :, :] .≈ 2.0)
+@testitem "SpreadingBatchOp (GPU)" tags = [:gpu, :batching, :SpreadingBatchOp] setup = [TestUtils, SpreadingBatchOpHelpers] begin
+    using Random, AbstractOperators, GPUEnv
+
+    for backend in gpu_backends()
+        Random.seed!(0)
+        ops = [DiagOp(to_gpu(backend, [1.0, 2.0])) for _ in 1:4]
+        bop = BatchOp(ops, 3, (:_, :s, :b))
+        y_gpu = bop * gpu_ones(backend, 2, 4, 3)
+        @test size(Array(y_gpu)) == (2, 4, 3)
+        @test all(Array(y_gpu)[1, :, :] .≈ 1.0)
+        @test all(Array(y_gpu)[2, :, :] .≈ 2.0)
+    end
 end

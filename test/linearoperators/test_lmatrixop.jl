@@ -141,37 +141,13 @@ end
     @test occursin("(⋅)b", s)
 end
 
-@testitem "LMatrixOp (JLArray)" tags = [:linearoperator, :LMatrixOp, :gpu, :jlarray] setup = [TestUtils, GpuTestUtils] begin
-    using Random, AbstractOperators
-    Random.seed!(0)
-    n, m = 5, 6
-    b = jl(randn(m))
-    op = LMatrixOp(Float64, (n, m), b)
-    test_op(op, jl(randn(n, m)), jl(randn(n)), false)
-end
-
-@testitem "LMatrixOp (CUDA)" tags = [:gpu, :cuda, :linearoperator, :LMatrixOp] setup = [TestUtils] begin
-    using Random, AbstractOperators
-    using CUDA
-    if CUDA.functional()
+@testitem "LMatrixOp (GPU)" tags = [:linearoperator, :LMatrixOp, :gpu] setup = [TestUtils] begin
+    using Random, AbstractOperators, GPUEnv
+    for backend in gpu_backends()
         Random.seed!(0)
         n, m = 5, 6
-        b = CuArray(randn(m))
+        b = gpu_randn(backend, m)
         op = LMatrixOp(Float64, (n, m), b)
-        test_op(op, CuArray(randn(n, m)), CuArray(randn(n)), false)
-    end
-end
-
-@testitem "LMatrixOp (AMDGPU)" tags = [:gpu, :amdgpu, :linearoperator, :LMatrixOp] setup = [
-    TestUtils,
-] begin
-    using Random, AbstractOperators
-    using AMDGPU
-    if AMDGPU.functional()
-        Random.seed!(0)
-        n, m = 5, 6
-        b = AMDGPU.ROCArray(randn(m))
-        op = LMatrixOp(Float64, (n, m), b)
-        test_op(op, AMDGPU.ROCArray(randn(n, m)), AMDGPU.ROCArray(randn(n)), false)
+        test_op(op, gpu_randn(backend, n, m), gpu_randn(backend, n), false)
     end
 end

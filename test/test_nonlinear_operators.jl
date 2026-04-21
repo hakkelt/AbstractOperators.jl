@@ -138,97 +138,126 @@ end
 
 # ─── GPU test items for nonlinear operators ───────────────────────────────────
 
-@testitem "NonlinearOp: Sigmoid (GPU)" tags = [:gpu, :nonlinearoperator, :Sigmoid] setup = [TestUtils, GpuTestUtils] begin
-    using Random, AbstractOperators, JLArrays
-    Random.seed!(0)
-    n = 4
-    x = jl(randn(n))
-    # Construct from GPU array to get GPU storage type
-    op = Sigmoid(x; gamma = 2.0)
-    test_NLop_gpu(op, x, jl(randn(n)), false)
+@testitem "NonlinearOp: Sigmoid (GPU)" tags = [:gpu, :nonlinearoperator, :Sigmoid] setup = [TestUtils] begin
+    using GPUEnv, Random, AbstractOperators
+
+    for backend in gpu_backends()
+        Random.seed!(0)
+        n = 4
+        x = gpu_randn(backend, n)
+        op = Sigmoid(x; gamma = 2.0)  # construct from GPU array to get GPU storage type
+        test_NLop_gpu(op, x, gpu_randn(backend, n), false)
+    end
 end
 
-@testitem "NonlinearOp: SoftMax (GPU)" tags = [:gpu, :nonlinearoperator, :SoftMax] setup = [TestUtils, GpuTestUtils] begin
-    using Random, AbstractOperators, JLArrays
-    Random.seed!(0)
-    n = 10
-    x = jl(randn(n))
-    op = SoftMax(x)  # construct from GPU array so buffer is GPU-typed
-    test_NLop_gpu(op, x, jl(randn(n)), false)
+@testitem "NonlinearOp: SoftMax (GPU)" tags = [:gpu, :nonlinearoperator, :SoftMax] setup = [TestUtils] begin
+    using GPUEnv, Random, AbstractOperators
+
+    for backend in gpu_backends()
+        Random.seed!(0)
+        n = 10
+        x = gpu_randn(backend, n)
+        op = SoftMax(x)  # construct from GPU array so buffer is GPU-typed
+        test_NLop_gpu(op, x, gpu_randn(backend, n), false)
+    end
 end
 
-@testitem "NonlinearOp: SoftPlus (GPU)" tags = [:gpu, :nonlinearoperator, :SoftPlus] setup = [TestUtils, GpuTestUtils] begin
-    using Random, AbstractOperators, JLArrays
-    Random.seed!(0)
-    n = 10
-    x = jl(randn(n))
-    op = SoftPlus(x)
-    test_NLop_gpu(op, x, jl(randn(n)), false)
+@testitem "NonlinearOp: SoftPlus (GPU)" tags = [:gpu, :nonlinearoperator, :SoftPlus] setup = [TestUtils] begin
+    using GPUEnv, Random, AbstractOperators
+
+    for backend in gpu_backends()
+        Random.seed!(0)
+        n = 10
+        x = gpu_randn(backend, n)
+        op = SoftPlus(x)
+        test_NLop_gpu(op, x, gpu_randn(backend, n), false)
+    end
 end
 
-@testitem "NonlinearOp: Exp (GPU)" tags = [:gpu, :nonlinearoperator, :Exp] setup = [TestUtils, GpuTestUtils] begin
-    using Random, AbstractOperators, JLArrays
-    Random.seed!(0)
-    n, m = 4, 5
-    x = jl(randn(n, m))
-    op = Exp(x)
-    test_NLop_gpu(op, x, jl(randn(n, m)), false)
+@testitem "NonlinearOp: Exp (GPU)" tags = [:gpu, :nonlinearoperator, :Exp] setup = [TestUtils] begin
+    using GPUEnv, Random, AbstractOperators
+
+    for backend in gpu_backends()
+        Random.seed!(0)
+        n, m = 4, 5
+        x = gpu_randn(backend, n, m)
+        op = Exp(x)
+        test_NLop_gpu(op, x, gpu_randn(backend, n, m), false)
+    end
 end
 
-@testitem "NonlinearOp: Sin (GPU)" tags = [:gpu, :nonlinearoperator, :Sin] setup = [TestUtils, GpuTestUtils] begin
-    using Random, AbstractOperators, JLArrays
-    Random.seed!(0)
-    n, m = 4, 5
-    x = jl(randn(n, m))
-    op = Sin(x)
-    test_NLop_gpu(op, x, jl(randn(n, m)), false)
+@testitem "NonlinearOp: Sin (GPU)" tags = [:gpu, :nonlinearoperator, :Sin] setup = [TestUtils] begin
+    using GPUEnv, Random, AbstractOperators
+
+    for backend in gpu_backends()
+        Random.seed!(0)
+        n, m = 4, 5
+        x = gpu_randn(backend, n, m)
+        op = Sin(x)
+        test_NLop_gpu(op, x, gpu_randn(backend, n, m), false)
+    end
 end
 
-@testitem "NonlinearOp: Cos (GPU)" tags = [:gpu, :nonlinearoperator, :Cos] setup = [TestUtils, GpuTestUtils] begin
-    using Random, AbstractOperators, JLArrays
-    Random.seed!(0)
-    n, m = 4, 5
-    x = jl(randn(n, m))
-    op = Cos(x)
-    test_NLop_gpu(op, x, jl(randn(n, m)), false)
+@testitem "NonlinearOp: Cos (GPU)" tags = [:gpu, :nonlinearoperator, :Cos] setup = [TestUtils] begin
+    using GPUEnv, Random, AbstractOperators
+
+    for backend in gpu_backends()
+        Random.seed!(0)
+        n, m = 4, 5
+        x = gpu_randn(backend, n, m)
+        op = Cos(x)
+        test_NLop_gpu(op, x, gpu_randn(backend, n, m), false)
+    end
 end
 
-@testitem "NonlinearOp: Atan (GPU)" tags = [:gpu, :nonlinearoperator, :Atan] setup = [TestUtils, GpuTestUtils] begin
-    using Random, AbstractOperators, JLArrays
-    Random.seed!(0)
-    n = 10
-    x = jl(randn(n))
-    op = Atan(x)
-    test_NLop_gpu(op, x, jl(randn(n)), false)
+@testitem "NonlinearOp: Atan (GPU)" tags = [:gpu, :nonlinearoperator, :Atan] setup = [TestUtils] begin
+    using GPUEnv, Random, AbstractOperators
+
+    for backend in gpu_backends()
+        Random.seed!(0)
+        n = 10
+        x = gpu_randn(backend, n)
+        op = Atan(x)
+        test_NLop_gpu(op, x, gpu_randn(backend, n), false)
+    end
 end
 
-@testitem "NonlinearOp: Tanh (GPU)" tags = [:gpu, :nonlinearoperator, :Tanh] setup = [TestUtils, GpuTestUtils] begin
-    using Random, AbstractOperators, JLArrays
-    Random.seed!(0)
-    n = 10
-    x = jl(randn(n))
-    op = Tanh(x)
-    test_NLop_gpu(op, x, jl(randn(n)), false)
+@testitem "NonlinearOp: Tanh (GPU)" tags = [:gpu, :nonlinearoperator, :Tanh] setup = [TestUtils] begin
+    using GPUEnv, Random, AbstractOperators
+
+    for backend in gpu_backends()
+        Random.seed!(0)
+        n = 10
+        x = gpu_randn(backend, n)
+        op = Tanh(x)
+        test_NLop_gpu(op, x, gpu_randn(backend, n), false)
+    end
 end
 
-@testitem "NonlinearOp: Sech (GPU)" tags = [:gpu, :nonlinearoperator, :Sech] setup = [TestUtils, GpuTestUtils] begin
-    using Random, AbstractOperators, JLArrays
-    Random.seed!(0)
-    n = 10
-    x = jl(randn(n))
-    op = Sech(x)
-    test_NLop_gpu(op, x, jl(randn(n)), false)
+@testitem "NonlinearOp: Sech (GPU)" tags = [:gpu, :nonlinearoperator, :Sech] setup = [TestUtils] begin
+    using GPUEnv, Random, AbstractOperators
+
+    for backend in gpu_backends()
+        Random.seed!(0)
+        n = 10
+        x = gpu_randn(backend, n)
+        op = Sech(x)
+        test_NLop_gpu(op, x, gpu_randn(backend, n), false)
+    end
 end
 
-@testitem "NonlinearOp: Pow (GPU)" tags = [:gpu, :nonlinearoperator, :Pow] setup = [TestUtils, GpuTestUtils] begin
-    using Random, AbstractOperators, JLArrays
-    Random.seed!(0)
-    n = 10
-    x = jl(randn(n))
-    op = Pow(x, 2)
-    test_NLop_gpu(op, x, jl(randn(n)), false)
+@testitem "NonlinearOp: Pow (GPU)" tags = [:gpu, :nonlinearoperator, :Pow] setup = [TestUtils] begin
+    using GPUEnv, Random, AbstractOperators
 
-    x2 = jl(abs.(randn(n)))
-    op2 = Pow(x2, 0.5)
-    test_NLop_gpu(op2, x2, jl(abs.(randn(n))), false)
+    for backend in gpu_backends()
+        Random.seed!(0)
+        n = 10
+        x = gpu_randn(backend, n)
+        op = Pow(x, 2)
+        test_NLop_gpu(op, x, gpu_randn(backend, n), false)
+
+        x2 = abs.(gpu_randn(backend, n))
+        op2 = Pow(x2, 0.5)
+        test_NLop_gpu(op2, x2, abs.(gpu_randn(backend, n)), false)
+    end
 end

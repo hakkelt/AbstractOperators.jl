@@ -135,68 +135,25 @@ end
     @test remove_displacement(Prd) == Prd
 end
 
-@testitem "HadamardProd (GPU)" tags = [:gpu, :calculus, :HadamardProd] setup = [TestUtils, GpuTestUtils] begin
-    using AbstractOperators, JLArrays
+@testitem "HadamardProd (GPU)" tags = [:gpu, :calculus, :HadamardProd] setup = [TestUtils] begin
+    using Random, AbstractOperators, GPUEnv
 
-    # Use GPU-typed Eye so output is GPU
-    n = 3
-    P = HadamardProd(Eye(Float64, (n, n); array_type = JLArray{Float64}), Eye(Float64, (n, n); array_type = JLArray{Float64}))
-    x = jl(randn(n, n))
-    r = jl(randn(n, n))
-    test_NLop_gpu(P, x, r, false)
-
-    # Sin .* Cos (both element-wise, GPU-typed via array constructor)
-    n2, l = 3, 2
-    P2 = HadamardProd(Sin(jl(zeros(n2, l))), Cos(jl(zeros(n2, l))))
-    x2 = jl(randn(n2, l))
-    r2 = jl(randn(n2, l))
-    test_NLop_gpu(P2, x2, r2, false)
-end
-
-@testitem "HadamardProd (CUDA)" tags = [:gpu, :cuda, :calculus, :HadamardProd] setup = [TestUtils] begin
-    using Random, AbstractOperators
-    using CUDA
-    if CUDA.functional()
+    for backend in gpu_backends()
         Random.seed!(0)
 
         n = 3
         P = HadamardProd(
-            Eye(Float64, (n, n); array_type = CUDA.CuArray{Float64, 2}),
-            Eye(Float64, (n, n); array_type = CUDA.CuArray{Float64, 2}),
+            Eye(Float64, (n, n); array_type = gpu_wrapper(backend, Float64, n, n)),
+            Eye(Float64, (n, n); array_type = gpu_wrapper(backend, Float64, n, n)),
         )
-        x = CuArray(randn(n, n))
-        r = CuArray(randn(n, n))
+        x = gpu_randn(backend, n, n)
+        r = gpu_randn(backend, n, n)
         test_NLop_gpu(P, x, r, false)
 
         n2, l = 3, 2
-        P2 = HadamardProd(Sin(CUDA.zeros(Float64, n2, l)), Cos(CUDA.zeros(Float64, n2, l)))
-        x2 = CuArray(randn(n2, l))
-        r2 = CuArray(randn(n2, l))
-        test_NLop_gpu(P2, x2, r2, false)
-    end
-end
-
-@testitem "HadamardProd (AMDGPU)" tags = [:gpu, :amdgpu, :calculus, :HadamardProd] setup = [
-    TestUtils,
-] begin
-    using Random, AbstractOperators
-    using AMDGPU
-    if AMDGPU.functional()
-        Random.seed!(0)
-
-        n = 3
-        P = HadamardProd(
-            Eye(Float64, (n, n); array_type = AMDGPU.ROCArray{Float64, 2}),
-            Eye(Float64, (n, n); array_type = AMDGPU.ROCArray{Float64, 2}),
-        )
-        x = AMDGPU.ROCArray(randn(n, n))
-        r = AMDGPU.ROCArray(randn(n, n))
-        test_NLop_gpu(P, x, r, false)
-
-        n2, l = 3, 2
-        P2 = HadamardProd(Sin(AMDGPU.zeros(Float64, n2, l)), Cos(AMDGPU.zeros(Float64, n2, l)))
-        x2 = AMDGPU.ROCArray(randn(n2, l))
-        r2 = AMDGPU.ROCArray(randn(n2, l))
+        P2 = HadamardProd(Sin(gpu_zeros(backend, Float64, n2, l)), Cos(gpu_zeros(backend, Float64, n2, l)))
+        x2 = gpu_randn(backend, n2, l)
+        r2 = gpu_randn(backend, n2, l)
         test_NLop_gpu(P2, x2, r2, false)
     end
 end

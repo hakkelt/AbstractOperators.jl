@@ -5,10 +5,24 @@
     using RecursiveArrayTools: ArrayPartition
     using LinearAlgebra
     using Random
+    using Pkg
 
     export verb, test_op, test_NLop, gradient_fd, ArrayPartition, norm, dot, diag, opnorm
     export to_cpu, test_NLop_gpu
     export assert_cpu_approx, assert_adjoint_invariant
+
+    if VERSION < v"1.11"
+        Pkg.develop(path = normpath(joinpath(@__DIR__, ".."))) # AbstractOperators
+        Pkg.develop(path = normpath(joinpath(@__DIR__, "..", "DSPOperators"))) # DSPOperators
+        Pkg.develop(path = normpath(joinpath(@__DIR__, "..", "FFTWOperators"))) # FFTWOperators
+        Pkg.develop(path = normpath(joinpath(@__DIR__, "..", "NFFTOperators"))) # NFFTOperators
+        Pkg.develop(path = normpath(joinpath(@__DIR__, "..", "WaveletOperators"))) # WaveletOperators
+    elseif VERSION >= v"1.11" && Base.find_package("AcceleratedDCTs") === nothing
+        Pkg.add(name = "AcceleratedDCTs", version = "0.4")
+    end
+
+    using GPUEnv
+    GPUEnv.activate(; persist = true)
 
     const verb = get(ENV, "ABSTRACTOPERATORS_TEST_VERBOSE", "false") == "true"
 

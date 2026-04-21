@@ -1,11 +1,12 @@
-using Pkg
+# Run with: julia --project=benchmark benchmark/gpu_crossover.jl
+using GPUEnv
 
-Pkg.activate(temp=true; io = devnull)
-Pkg.develop(path = joinpath(@__DIR__, ".."))
-Pkg.develop(path = joinpath(@__DIR__, "..", "DSPOperators"))
-Pkg.develop(path = joinpath(@__DIR__, "..", "FFTWOperators"))
-Pkg.add(PackageSpec(name = "RecursiveArrayTools"))
-Pkg.instantiate()
+if VERSION < v"1.11"
+    println("AbstractOperators GPU crossover benchmark requires Julia 1.11 or newer. Skipping benchmark.")
+    exit(0)
+end
+
+GPUEnv.activate(persist = true, include_jlarrays = false, only_first = true, supports_fftw = true)
 
 using AbstractOperators
 using BenchmarkTools
@@ -16,78 +17,25 @@ using Random
 using RecursiveArrayTools: ArrayPartition
 
 # ── GPU backend detection ────────────────────────────────────────────────────
-# Try each backend in preference order; stop at the first functional one.
-# `Base.require` loads the package without a top-level `using` statement so we
-# can stay in a conditional context.
-const _GPU = let
-    found = nothing
-    for name in ("CUDA", "AMDGPU", "Metal", "oneAPI")
-        Pkg.add(PackageSpec(name = name))
-        #try
-            m = Base.require(Main, Symbol(name))
-            if @invokelatest m.functional()
-                found = m
-                break
-            end
-        #catch
-        #end
+# GPUEnv.activate installed available native backends; pick the first one.
+const _backend = let
+    bs = gpu_backends()
+    if isempty(bs)
+        @error "No functional GPU backend found"
+        exit(0)
     end
-    found
+    first(bs)
 end
 
-if _GPU === nothing
-    @warn "No functional GPU backend found (tried CUDA, AMDGPU, Metal, oneAPI)"
-    exit(0)
-end
-
-# Identify which backend we have (for synchronization dispatch).
-const _GPU_SYM = let
-    for (sym, name) in [(:cuda, "CUDA"), (:amdgpu, "AMDGPU"), (:metal, "Metal"), (:oneapi, "oneAPI")]
-        try
-            m = Base.require(Main, Symbol(name))
-            m === _GPU && (@eval(using $(Symbol(name))); break)
-        catch
-        end
-    end
-    if isdefined(Main, :CUDA) && Main.CUDA === _GPU
-        :cuda
-    elseif isdefined(Main, :AMDGPU) && Main.AMDGPU === _GPU
-        :amdgpu
-    elseif isdefined(Main, :Metal) && Main.Metal === _GPU
-        :metal
-    else
-        :oneapi
-    end
-end
-
-@info "GPU benchmark using backend: $_GPU_SYM"
-
-# ── Backend-agnostic helpers used by builder functions ───────────────────────
-# Transfer a CPU array to the elected GPU backend.
-function _gpu_to(x::AbstractArray)
-    if _GPU_SYM == :cuda
-        return _GPU.cu(x)
-    elseif _GPU_SYM == :amdgpu
-        return _GPU.roc(x)
-    elseif _GPU_SYM == :metal
-        return _GPU.mtl(x)
-    else  # oneapi
-        return _GPU.oneArray(x)
-    end
-end
-
-function _gpu_synchronize()
-    hasproperty(_GPU, :synchronize) && _GPU.synchronize()
-    return nothing
-end
+@info "GPU benchmark" backend = _backend.name
 
 # ── Timing utilities ─────────────────────────────────────────────────────────
 function _measure!(y, op, x, is_gpu::Bool; samples::Int)
     mul!(y, op, x)
-    is_gpu && _gpu_synchronize()
+    is_gpu && GPUEnv.synchronize_backend(_backend)
     return @belapsed begin
         mul!($y, $op, $x)
-        $is_gpu && $_gpu_synchronize()
+        $is_gpu && GPUEnv.synchronize_backend($_backend)
     end samples = samples evals = 1
 end
 
@@ -121,10 +69,10 @@ function _diag_cpu(n; threaded)
 end
 
 function _diag_gpu(n)
-    d = _GPU.randn(Float32, n)
+    d = gpu_randn(_backend, Float32, n)
     op = DiagOp(d; threaded = false)
-    x = _GPU.randn(Float32, n)
-    y = _GPU.zeros(Float32, n)
+    x = gpu_randn(_backend, Float32, n)
+    y = gpu_zeros(_backend, Float32, n)
     return op, x, y
 end
 
@@ -136,9 +84,9 @@ function _finitediff_cpu(n; threaded)
 end
 
 function _finitediff_gpu(n)
-    x = _GPU.randn(Float32, n)
+    x = gpu_randn(_backend, Float32, n)
     op = FiniteDiff(x, 1)
-    y = _GPU.zeros(Float32, n - 1)
+    y = gpu_zeros(_backend, Float32, n - 1)
     return op, x, y
 end
 
@@ -153,10 +101,10 @@ end
 
 function _getindex_gpu(n)
     dims = _shape2(n)
-    x = _GPU.randn(Float32, dims...)
+    x = gpu_randn(_backend, Float32, dims...)
     idx = (2:(dims[1] - 1), 2:(dims[2] - 1))
     op = GetIndex(x, idx)
-    y = _GPU.zeros(Float32, size(op, 1)...)
+    y = gpu_zeros(_backend, Float32, size(op, 1)...)
     return op, x, y
 end
 
@@ -170,10 +118,10 @@ function _getindex_boolmask_cpu(n; threaded)
 end
 
 function _getindex_boolmask_gpu(n)
-    x = _GPU.randn(Float32, n)
+    x = gpu_randn(_backend, Float32, n)
     mask = [i % 3 == 0 for i in 1:n]
     op = GetIndex(x, mask)
-    y = _GPU.zeros(Float32, size(op, 1)...)
+    y = gpu_zeros(_backend, Float32, size(op, 1)...)
     return op, x, y
 end
 
@@ -187,10 +135,10 @@ function _getindex_intvec_cpu(n; threaded)
 end
 
 function _getindex_intvec_gpu(n)
-    x = _GPU.randn(Float32, n)
+    x = gpu_randn(_backend, Float32, n)
     idx = collect(1:2:n)
     op = GetIndex(x, idx)
-    y = _GPU.zeros(Float32, size(op, 1)...)
+    y = gpu_zeros(_backend, Float32, size(op, 1)...)
     return op, x, y
 end
 
@@ -203,9 +151,9 @@ function _eye_cpu(n; threaded)
 end
 
 function _eye_gpu(n)
-    x = _GPU.randn(Float32, n)
-    op = Eye(Float32, (n,); array_type = typeof(x))
-    y = _GPU.zeros(Float32, n)
+    x = gpu_randn(_backend, Float32, n)
+    op = Eye(x)
+    y = gpu_zeros(_backend, Float32, n)
     return op, x, y
 end
 
@@ -219,10 +167,10 @@ function _matrixop_cpu(n; threaded)
 end
 
 function _matrixop_gpu(n)
-    A = _GPU.randn(Float32, n, n)
+    A = gpu_randn(_backend, Float32, n, n)
     op = MatrixOp(A)
-    x = _GPU.randn(Float32, n)
-    y = _GPU.zeros(Float32, n)
+    x = gpu_randn(_backend, Float32, n)
+    y = gpu_zeros(_backend, Float32, n)
     return op, x, y
 end
 
@@ -236,10 +184,10 @@ function _scale_cpu(n; threaded)
 end
 
 function _scale_gpu(n)
-    x = _GPU.randn(Float32, n)
-    A = Eye(Float32, (n,); array_type = typeof(x))
+    x = gpu_randn(_backend, Float32, n)
+    A = Eye(x)
     op = Scale(Float32(2.0), A; threaded = false)
-    y = _GPU.zeros(Float32, n)
+    y = gpu_zeros(_backend, Float32, n)
     return op, x, y
 end
 
@@ -254,11 +202,9 @@ function _hadamardprod_cpu(n; threaded)
 end
 
 function _hadamardprod_gpu(n)
-    x = _GPU.randn(Float32, n)
-    A = Sin(Float32, (n,); array_type = typeof(x))
-    B = Cos(Float32, (n,); array_type = typeof(x))
-    op = HadamardProd(A, B)
-    y = _GPU.zeros(Float32, n)
+    x = gpu_randn(_backend, Float32, n)
+    op = HadamardProd(Sin(x), Cos(x))
+    y = gpu_zeros(_backend, Float32, n)
     return op, x, y
 end
 
@@ -271,9 +217,9 @@ function _sin_cpu(n; threaded)
 end
 
 function _sin_gpu(n)
-    x = _GPU.randn(Float32, n)
-    op = Sin(Float32, (n,); array_type = typeof(x))
-    y = _GPU.zeros(Float32, n)
+    x = gpu_randn(_backend, Float32, n)
+    op = Sin(x)
+    y = gpu_zeros(_backend, Float32, n)
     return op, x, y
 end
 
@@ -286,9 +232,9 @@ function _tanh_cpu(n; threaded)
 end
 
 function _tanh_gpu(n)
-    x = _GPU.randn(Float32, n)
-    op = Tanh(Float32, (n,); array_type = typeof(x))
-    y = _GPU.zeros(Float32, n)
+    x = gpu_randn(_backend, Float32, n)
+    op = Tanh(x)
+    y = gpu_zeros(_backend, Float32, n)
     return op, x, y
 end
 
@@ -301,9 +247,9 @@ function _exp_cpu(n; threaded)
 end
 
 function _exp_gpu(n)
-    x = _GPU.randn(Float32, n)
-    op = Exp(Float32, (n,); array_type = typeof(x))
-    y = _GPU.zeros(Float32, n)
+    x = gpu_randn(_backend, Float32, n)
+    op = Exp(x)
+    y = gpu_zeros(_backend, Float32, n)
     return op, x, y
 end
 
@@ -318,13 +264,11 @@ function _dcat_cpu(n; threaded)
 end
 
 function _dcat_gpu(n)
-    x1 = _GPU.randn(Float32, n)
-    x2 = _GPU.randn(Float32, n)
+    x1 = gpu_randn(_backend, Float32, n)
+    x2 = gpu_randn(_backend, Float32, n)
     x = ArrayPartition(x1, x2)
-    op = DCAT(
-        Eye(Float32, (n,); array_type = typeof(x1)), DiagOp(_GPU.randn(Float32, n); threaded = false)
-    )
-    y = ArrayPartition(_GPU.zeros(Float32, n), _GPU.zeros(Float32, n))
+    op = DCAT(Eye(x1), DiagOp(gpu_randn(_backend, Float32, n); threaded = false))
+    y = ArrayPartition(gpu_zeros(_backend, Float32, n), gpu_zeros(_backend, Float32, n))
     return op, x, y
 end
 
@@ -338,10 +282,10 @@ function _affineadd_cpu(n; threaded)
 end
 
 function _affineadd_gpu(n)
-    x = _GPU.randn(Float32, n)
-    b = _GPU.randn(Float32, n)
-    op = AffineAdd(DiagOp(_GPU.randn(Float32, n); threaded = false), b)
-    y = _GPU.zeros(Float32, n)
+    x = gpu_randn(_backend, Float32, n)
+    b = gpu_randn(_backend, Float32, n)
+    op = AffineAdd(DiagOp(gpu_randn(_backend, Float32, n); threaded = false), b)
+    y = gpu_zeros(_backend, Float32, n)
     return op, x, y
 end
 
@@ -355,9 +299,9 @@ end
 
 function _zeropad_gpu(n)
     dims = _shape2(n)
-    x = _GPU.randn(Float32, dims...)
+    x = gpu_randn(_backend, Float32, dims...)
     op = ZeroPad(x, (0, 8))
-    y = _GPU.zeros(Float32, size(op, 1)...)
+    y = gpu_zeros(_backend, Float32, size(op, 1)...)
     return op, x, y
 end
 
@@ -371,9 +315,9 @@ end
 
 function _variation_gpu(n)
     dims = _shape2(n)
-    x = _GPU.randn(Float32, dims...)
+    x = gpu_randn(_backend, Float32, dims...)
     op = Variation(x; threaded = false)
-    y = _GPU.zeros(Float32, size(op, 1)...)
+    y = gpu_zeros(_backend, Float32, size(op, 1)...)
     return op, x, y
 end
 
@@ -387,10 +331,10 @@ end
 
 function _variation_adj_gpu(n)
     dims = _shape2(n)
-    x = _GPU.randn(Float32, dims...)
+    x = gpu_randn(_backend, Float32, dims...)
     op = adjoint(Variation(x; threaded = false))
-    b = _GPU.zeros(Float32, prod(dims), length(dims))
-    y = _GPU.zeros(Float32, dims...)
+    b = gpu_zeros(_backend, Float32, prod(dims), length(dims))
+    y = gpu_zeros(_backend, Float32, dims...)
     return op, b, y
 end
 
@@ -404,10 +348,10 @@ function _compose_cpu(n; threaded)
 end
 
 function _compose_gpu(n)
-    d = _gpu_to(randn(Float32, n - 1))
-    x = _GPU.randn(Float32, n)
+    d = gpu_randn(_backend, Float32, n - 1)
+    x = gpu_randn(_backend, Float32, n)
     op = Compose(DiagOp(d; threaded = false), FiniteDiff(x, 1))
-    y = _GPU.zeros(Float32, n - 1)
+    y = gpu_zeros(_backend, Float32, n - 1)
     return op, x, y
 end
 
@@ -420,10 +364,11 @@ function _sum_cpu(n; threaded)
 end
 
 function _sum_gpu(n)
-    x = _GPU.randn(Float32, n)
-    d = _gpu_to(randn(Float32, n))
-    op = Sum(Eye(Float32, (n,); array_type = typeof(x)), DiagOp(d; threaded = false))
-    y = _GPU.zeros(Float32, n)
+    x = gpu_randn(_backend, Float32, n)
+    d1 = gpu_randn(_backend, Float32, n)
+    d2 = gpu_randn(_backend, Float32, n)
+    op = Sum(DiagOp(d1; threaded = false), DiagOp(d2; threaded = false))
+    y = gpu_zeros(_backend, Float32, n)
     return op, x, y
 end
 
@@ -437,9 +382,9 @@ end
 
 function _broadcast_gpu(n)
     dims = _broad_shape(n)
-    x = _GPU.randn(Float32, dims[1])
+    x = gpu_randn(_backend, Float32, dims[1])
     op = BroadCast(Eye(x), dims; threaded = false)
-    y = _GPU.zeros(Float32, dims...)
+    y = gpu_zeros(_backend, Float32, dims...)
     return op, x, y
 end
 
@@ -453,13 +398,11 @@ function _hcat_cpu(n; threaded)
 end
 
 function _hcat_gpu(n)
-    x1 = _GPU.randn(Float32, n)
-    x2 = _GPU.randn(Float32, n)
+    x1 = gpu_randn(_backend, Float32, n)
+    x2 = gpu_randn(_backend, Float32, n)
     x = ArrayPartition(x1, x2)
-    op = HCAT(
-        Eye(Float32, (n,); array_type = typeof(x1)), DiagOp(_GPU.randn(Float32, n); threaded = false)
-    )
-    y = _GPU.zeros(Float32, n)
+    op = HCAT(DiagOp(gpu_randn(_backend, Float32, n); threaded = false), DiagOp(gpu_randn(_backend, Float32, n); threaded = false))
+    y = gpu_zeros(_backend, Float32, n)
     return op, x, y
 end
 
@@ -471,11 +414,9 @@ function _vcat_cpu(n; threaded)
 end
 
 function _vcat_gpu(n)
-    x = _GPU.randn(Float32, n)
-    op = VCAT(
-        Eye(Float32, (n,); array_type = typeof(x)), DiagOp(_GPU.randn(Float32, n); threaded = false)
-    )
-    y = ArrayPartition(_GPU.zeros(Float32, n), _GPU.zeros(Float32, n))
+    x = gpu_randn(_backend, Float32, n)
+    op = VCAT(Eye(x), DiagOp(gpu_randn(_backend, Float32, n); threaded = false))
+    y = ArrayPartition(gpu_zeros(_backend, Float32, n), gpu_zeros(_backend, Float32, n))
     return op, x, y
 end
 
@@ -488,10 +429,11 @@ function _filt_cpu(n; threaded)
 end
 
 function _filt_gpu(n)
-    x = _GPU.randn(Float32, n)
-    taps = randn(Float32, 7)
+    x_cpu = randn(Float64, n)
+    x = to_gpu(_fftw_backend, x_cpu)
+    taps = randn(Float64, 7)
     op = Filt(x, taps)
-    y = _GPU.zeros(Float32, n)
+    y = gpu_zeros(_fftw_backend, Float64, n)
     return op, x, y
 end
 
@@ -509,9 +451,9 @@ function _mimofilt_gpu(n)
     len = max(64, n)
     taps = [randn(Float32, 5), randn(Float32, 3), randn(Float32, 4), randn(Float32, 5)]
     coeffs = [Float32[1] for _ in taps]
-    x = _GPU.randn(Float32, len, 2)
+    x = gpu_randn(_backend, Float32, len, 2)
     op = MIMOFilt(x, taps, coeffs)
-    y = _GPU.zeros(Float32, len, 2)
+    y = gpu_zeros(_backend, Float32, len, 2)
     return op, x, y
 end
 
@@ -524,10 +466,10 @@ function _conv_cpu(n; threaded)
 end
 
 function _conv_gpu(n)
-    h = _gpu_to(randn(Float32, 17))
+    h = gpu_randn(_backend, Float32, 17)
     op = Conv(Float32, (n,), h)
-    x = _GPU.randn(Float32, n)
-    y = _GPU.zeros(Float32, size(op, 1)...)
+    x = gpu_randn(_backend, Float32, n)
+    y = gpu_zeros(_backend, Float32, size(op, 1)...)
     return op, x, y
 end
 
@@ -540,10 +482,10 @@ function _xcorr_cpu(n; threaded)
 end
 
 function _xcorr_gpu(n)
-    h = _gpu_to(randn(Float32, 17))
+    h = gpu_randn(_backend, Float32, 17)
     op = Xcorr(Float32, (n,), h)
-    x = _GPU.randn(Float32, n)
-    y = _GPU.zeros(Float32, size(op, 1)...)
+    x = gpu_randn(_backend, Float32, n)
+    y = gpu_zeros(_backend, Float32, size(op, 1)...)
     return op, x, y
 end
 
@@ -557,9 +499,9 @@ end
 
 function _dft_gpu(n)
     dims = _shape2(n)
-    x = _GPU.randn(ComplexF32, dims...)
+    x = gpu_randn(_backend, ComplexF32, dims...)
     op = DFT(x)
-    y = _GPU.zeros(ComplexF32, dims...)
+    y = similar(x, ComplexF32)
     return op, x, y
 end
 
@@ -757,7 +699,6 @@ const CONFIGS = [
 
 function main()
     Random.seed!(1234)
-    _GPU.functional() || error("GPU backend ($_GPU_SYM) is not functional")
 
     selected_names = split(get(ENV, "ABSTRACTOPERATORS_GPU_BENCH_OPERATORS", ""), ',')
     selected_names = filter!(!isempty, selected_names)
@@ -831,6 +772,7 @@ function main()
                         gpu,
                     )
                 catch err
+                    note = sprint(showerror, err)
                     println(
                         io,
                         join(
@@ -842,12 +784,12 @@ function main()
                                 missing,
                                 missing,
                                 missing,
-                                sprint(showerror, err),
+                                note,
                             ),
                             '\t',
                         ),
                     )
-                    println(config.name, " n=", n, " ERROR: ", sprint(showerror, err))
+                    println(config.name, " n=", n, " ERROR: ", note)
                 end
             end
             range_str = "n=$(first(sizes))..$(last(sizes))"

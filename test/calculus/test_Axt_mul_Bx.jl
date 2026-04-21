@@ -114,85 +114,28 @@ end
     @test Jacobian(Axt_mul_Bx(A, B), x) == Jacobian(Axt_mul_Bx(A, B), x)
 end
 
-@testitem "Axt_mul_Bx (GPU)" tags = [:gpu, :calculus, :Axt_mul_Bx] setup = [TestUtils, GpuTestUtils] begin
-    using Random, AbstractOperators, JLArrays, LinearAlgebra
-    Random.seed!(0)
+@testitem "Axt_mul_Bx (GPU)" tags = [:gpu, :calculus, :Axt_mul_Bx] setup = [TestUtils] begin
+    using Random, AbstractOperators, LinearAlgebra, GPUEnv
 
-    n, m = 3, 4
-    AL = jl(randn(n, m))
-    BL = jl(randn(n, m))
-    A, B = MatrixOp(AL), MatrixOp(BL)
-    P = Axt_mul_Bx(A, B)
-    x = jl(randn(m))
-    y = jl(zeros(1))
-    mul!(y, P, x)
-    Acpu, Bcpu, xcpu = Array(AL), Array(BL), Array(x)
-    @test Array(y)[1] ≈ dot(Acpu * xcpu, Bcpu * xcpu)
-
-    # matrix case
-    n, m, l = 3, 5, 4
-    A2, B2 = MatrixOp(jl(randn(n, m)), l), MatrixOp(jl(randn(n, m)), l)
-    P2 = Axt_mul_Bx(A2, B2)
-    x2 = jl(randn(m, l))
-    y2 = jl(zeros(l, l))
-    mul!(y2, P2, x2)
-    Ax = Array(A2.A) * Array(x2)
-    Bx = Array(B2.A) * Array(x2)
-    @test Array(y2) ≈ Ax' * Bx
-end
-
-@testitem "Axt_mul_Bx (CUDA)" tags = [:gpu, :cuda, :calculus, :Axt_mul_Bx] setup = [TestUtils] begin
-    using Random, AbstractOperators, LinearAlgebra
-    using CUDA
-    if CUDA.functional()
+    for backend in gpu_backends()
         Random.seed!(0)
 
         n, m = 3, 4
-        AL = CuArray(randn(n, m))
-        BL = CuArray(randn(n, m))
+        AL = gpu_randn(backend, n, m)
+        BL = gpu_randn(backend, n, m)
         A, B = MatrixOp(AL), MatrixOp(BL)
         P = Axt_mul_Bx(A, B)
-        x = CuArray(randn(m))
-        y = CUDA.zeros(Float64, 1)
+        x = gpu_randn(backend, m)
+        y = gpu_zeros(backend, Float64, 1)
         mul!(y, P, x)
         Acpu, Bcpu, xcpu = Array(AL), Array(BL), Array(x)
         @test Array(y)[1] ≈ dot(Acpu * xcpu, Bcpu * xcpu)
 
         n, m, l = 3, 5, 4
-        A2, B2 = MatrixOp(CuArray(randn(n, m)), l), MatrixOp(CuArray(randn(n, m)), l)
+        A2, B2 = MatrixOp(gpu_randn(backend, n, m), l), MatrixOp(gpu_randn(backend, n, m), l)
         P2 = Axt_mul_Bx(A2, B2)
-        x2 = CuArray(randn(m, l))
-        y2 = CUDA.zeros(Float64, l, l)
-        mul!(y2, P2, x2)
-        Ax = Array(A2.A) * Array(x2)
-        Bx = Array(B2.A) * Array(x2)
-        @test Array(y2) ≈ Ax' * Bx
-    end
-end
-
-@testitem "Axt_mul_Bx (AMDGPU)" tags = [:gpu, :amdgpu, :calculus, :Axt_mul_Bx] setup = [TestUtils] begin
-    using Random, AbstractOperators, LinearAlgebra
-    using AMDGPU
-    if AMDGPU.functional()
-        Random.seed!(0)
-
-        n, m = 3, 4
-        AL = AMDGPU.ROCArray(randn(n, m))
-        BL = AMDGPU.ROCArray(randn(n, m))
-        A, B = MatrixOp(AL), MatrixOp(BL)
-        P = Axt_mul_Bx(A, B)
-        x = AMDGPU.ROCArray(randn(m))
-        y = AMDGPU.zeros(1)
-        mul!(y, P, x)
-        Acpu, Bcpu, xcpu = Array(AL), Array(BL), Array(x)
-        @test Array(y)[1] ≈ dot(Acpu * xcpu, Bcpu * xcpu)
-
-        n, m, l = 3, 5, 4
-        A2, B2 = MatrixOp(AMDGPU.ROCArray(randn(n, m)), l),
-            MatrixOp(AMDGPU.ROCArray(randn(n, m)), l)
-        P2 = Axt_mul_Bx(A2, B2)
-        x2 = AMDGPU.ROCArray(randn(m, l))
-        y2 = AMDGPU.zeros(l, l)
+        x2 = gpu_randn(backend, m, l)
+        y2 = gpu_zeros(backend, Float64, l, l)
         mul!(y2, P2, x2)
         Ax = Array(A2.A) * Array(x2)
         Bx = Array(B2.A) * Array(x2)

@@ -67,11 +67,11 @@ struct HCAT{
 end
 
 function _compute_hcat_ds(A, idxs)
-    ds_list = [d <: ArrayPartition ? [d.parameters[2].types...] : d for d in domain_storage_type.(A)]
+    ds_list = [d <: ArrayPartition ? [d.parameters[2].types...] : d for d in domain_array_type.(A)]
     domain = vcat(ds_list...)
     p = vcat([[idx...] for idx in idxs]...)
     invpermute!(domain, p)
-    T = promote_type([eltype(d) for d in domain]...)
+    T = promote_type(map(_storage_eltype, domain)...)
     return ArrayPartition{T, Tuple{domain...}}
 end
 

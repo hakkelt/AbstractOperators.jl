@@ -128,64 +128,21 @@ end
     @test VCAT(Aeq1, Aeq2) != VCAT(Aeq2, Aeq1)
 end
 
-@testitem "VCAT (GPU)" tags = [:gpu, :calculus, :VCAT] setup = [TestUtils, GpuTestUtils] begin
-    using Random, AbstractOperators, JLArrays
-    Random.seed!(0)
+@testitem "VCAT (GPU)" tags = [:gpu, :calculus, :VCAT] setup = [TestUtils] begin
+    using Random, AbstractOperators, GPUEnv
 
-    n = 4
-    opV = VCAT(DiagOp(jl(ones(n))), DiagOp(jl(2 * ones(n))))
-    test_op(opV, jl(randn(n)), ArrayPartition(jl(randn(n)), jl(randn(n))), false)
-
-    m1, m2, n = 4, 7, 5
-    A1 = jl(randn(m1, n))
-    A2 = jl(randn(m2, n))
-    opV2 = VCAT(MatrixOp(A1), MatrixOp(A2))
-    test_op(opV2, jl(randn(n)), ArrayPartition(jl(randn(m1)), jl(randn(m2))), false)
-end
-
-@testitem "VCAT (CUDA)" tags = [:gpu, :cuda, :calculus, :VCAT] setup = [TestUtils] begin
-    using Random, AbstractOperators
-    using CUDA
-    if CUDA.functional()
+    for backend in gpu_backends()
         Random.seed!(0)
 
         n = 4
-        opV = VCAT(DiagOp(CuArray(ones(n))), DiagOp(CuArray(2 * ones(n))))
-        test_op(opV, CuArray(randn(n)), ArrayPartition(CuArray(randn(n)), CuArray(randn(n))), false)
+        opV = VCAT(DiagOp(gpu_ones(backend, Float64, n)), DiagOp(backend(2 .* ones(n))))
+        test_op(opV, gpu_randn(backend, n), ArrayPartition(gpu_randn(backend, n), gpu_randn(backend, n)), false)
 
         m1, m2, n = 4, 7, 5
-        A1 = CuArray(randn(m1, n))
-        A2 = CuArray(randn(m2, n))
+        A1 = gpu_randn(backend, m1, n)
+        A2 = gpu_randn(backend, m2, n)
         opV2 = VCAT(MatrixOp(A1), MatrixOp(A2))
-        test_op(opV2, CuArray(randn(n)), ArrayPartition(CuArray(randn(m1)), CuArray(randn(m2))), false)
-    end
-end
-
-@testitem "VCAT (AMDGPU)" tags = [:gpu, :amdgpu, :calculus, :VCAT] setup = [TestUtils] begin
-    using Random, AbstractOperators
-    using AMDGPU
-    if AMDGPU.functional()
-        Random.seed!(0)
-
-        n = 4
-        opV = VCAT(DiagOp(AMDGPU.ROCArray(ones(n))), DiagOp(AMDGPU.ROCArray(2 * ones(n))))
-        test_op(
-            opV,
-            AMDGPU.ROCArray(randn(n)),
-            ArrayPartition(AMDGPU.ROCArray(randn(n)), AMDGPU.ROCArray(randn(n))),
-            false,
-        )
-
-        m1, m2, n = 4, 7, 5
-        A1 = AMDGPU.ROCArray(randn(m1, n))
-        A2 = AMDGPU.ROCArray(randn(m2, n))
-        opV2 = VCAT(MatrixOp(A1), MatrixOp(A2))
-        test_op(
-            opV2,
-            AMDGPU.ROCArray(randn(n)),
-            ArrayPartition(AMDGPU.ROCArray(randn(m1)), AMDGPU.ROCArray(randn(m2))),
-            false,
-        )
+        test_op(opV2, gpu_randn(backend, n), ArrayPartition(gpu_randn(backend, m1), gpu_randn(backend, m2)), false)
     end
 end
 

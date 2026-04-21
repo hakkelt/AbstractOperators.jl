@@ -57,11 +57,11 @@ struct VCAT{
 end
 
 function _compute_vcat_cs(A, idxs)
-    cs_list = [d <: ArrayPartition ? [d.parameters[2].types...] : d for d in codomain_storage_type.(A)]
+    cs_list = [d <: ArrayPartition ? [d.parameters[2].types...] : d for d in codomain_array_type.(A)]
     codomain = vcat(cs_list...)
     p = vcat([[idx...] for idx in idxs]...)
     invpermute!(codomain, p)
-    T = promote_type([eltype(d) for d in codomain]...)
+    T = promote_type(map(_storage_eltype, codomain)...)
     return ArrayPartition{T, Tuple{codomain...}}
 end
 

@@ -85,82 +85,29 @@ end
     @test norm(ArrayPartition(A * x.x[1], B * x.x[2]) - y) < 1.0e-8
 end
 
-@testitem "DCAT (GPU)" tags = [:gpu, :calculus, :DCAT] setup = [TestUtils, GpuTestUtils] begin
-    using Random, AbstractOperators, JLArrays
-    Random.seed!(0)
+@testitem "DCAT (GPU)" tags = [:gpu, :calculus, :DCAT] setup = [TestUtils] begin
+    using Random, AbstractOperators, GPUEnv
 
-    n1, n2 = 3, 4
-    opD = DCAT(DiagOp(jl(ones(n1))), DiagOp(jl(2 * ones(n2))))
-    test_op(
-        opD,
-        ArrayPartition(jl(randn(n1)), jl(randn(n2))),
-        ArrayPartition(jl(randn(n1)), jl(randn(n2))),
-        false,
-    )
-
-    m1, n1, m2, n2 = 4, 7, 5, 2
-    A1 = jl(randn(m1, n1))
-    A2 = jl(randn(m2, n2))
-    opD2 = DCAT(MatrixOp(A1), MatrixOp(A2))
-    test_op(
-        opD2,
-        ArrayPartition(jl(randn(n1)), jl(randn(n2))),
-        ArrayPartition(jl(randn(m1)), jl(randn(m2))),
-        false,
-    )
-end
-
-@testitem "DCAT (CUDA)" tags = [:gpu, :cuda, :calculus, :DCAT] setup = [TestUtils] begin
-    using Random, AbstractOperators
-    using CUDA
-    if CUDA.functional()
+    for backend in gpu_backends()
         Random.seed!(0)
 
         n1, n2 = 3, 4
-        opD = DCAT(DiagOp(CuArray(ones(n1))), DiagOp(CuArray(2 * ones(n2))))
+        opD = DCAT(DiagOp(gpu_ones(backend, Float64, n1)), DiagOp(backend(2 .* ones(n2))))
         test_op(
             opD,
-            ArrayPartition(CuArray(randn(n1)), CuArray(randn(n2))),
-            ArrayPartition(CuArray(randn(n1)), CuArray(randn(n2))),
+            ArrayPartition(gpu_randn(backend, n1), gpu_randn(backend, n2)),
+            ArrayPartition(gpu_randn(backend, n1), gpu_randn(backend, n2)),
             false,
         )
 
         m1, n1, m2, n2 = 4, 7, 5, 2
-        A1 = CuArray(randn(m1, n1))
-        A2 = CuArray(randn(m2, n2))
+        A1 = gpu_randn(backend, m1, n1)
+        A2 = gpu_randn(backend, m2, n2)
         opD2 = DCAT(MatrixOp(A1), MatrixOp(A2))
         test_op(
             opD2,
-            ArrayPartition(CuArray(randn(n1)), CuArray(randn(n2))),
-            ArrayPartition(CuArray(randn(m1)), CuArray(randn(m2))),
-            false,
-        )
-    end
-end
-
-@testitem "DCAT (AMDGPU)" tags = [:gpu, :amdgpu, :calculus, :DCAT] setup = [TestUtils] begin
-    using Random, AbstractOperators
-    using AMDGPU
-    if AMDGPU.functional()
-        Random.seed!(0)
-
-        n1, n2 = 3, 4
-        opD = DCAT(DiagOp(AMDGPU.ROCArray(ones(n1))), DiagOp(AMDGPU.ROCArray(2 * ones(n2))))
-        test_op(
-            opD,
-            ArrayPartition(AMDGPU.ROCArray(randn(n1)), AMDGPU.ROCArray(randn(n2))),
-            ArrayPartition(AMDGPU.ROCArray(randn(n1)), AMDGPU.ROCArray(randn(n2))),
-            false,
-        )
-
-        m1, n1, m2, n2 = 4, 7, 5, 2
-        A1 = AMDGPU.ROCArray(randn(m1, n1))
-        A2 = AMDGPU.ROCArray(randn(m2, n2))
-        opD2 = DCAT(MatrixOp(A1), MatrixOp(A2))
-        test_op(
-            opD2,
-            ArrayPartition(AMDGPU.ROCArray(randn(n1)), AMDGPU.ROCArray(randn(n2))),
-            ArrayPartition(AMDGPU.ROCArray(randn(m1)), AMDGPU.ROCArray(randn(m2))),
+            ArrayPartition(gpu_randn(backend, n1), gpu_randn(backend, n2)),
+            ArrayPartition(gpu_randn(backend, m1), gpu_randn(backend, m2)),
             false,
         )
     end

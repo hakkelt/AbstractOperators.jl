@@ -31,7 +31,7 @@
 end  # @testmodule ZeroPadTestHelper
 
 @testitem "ZeroPad" tags = [:linearoperator, :ZeroPad] setup = [TestUtils, ZeroPadTestHelper] begin
-    using Random, AbstractOperators, JLArrays
+    using Random, AbstractOperators
     Random.seed!(0)
     verb && println(" --- Testing ZeroPad --- ")
 
@@ -99,30 +99,11 @@ end  # @testmodule ZeroPadTestHelper
     @test occursin("[I;0]", s)
 end
 
-@testitem "ZeroPad (JLArray)" tags = [:gpu, :jlarray, :linearoperator, :ZeroPad] setup = [TestUtils, GpuTestUtils, ZeroPadTestHelper] begin
-    using Random, AbstractOperators, JLArrays
-    Random.seed!(0)
-    test_zeropad_mul(jl, false, test_op, to_cpu, norm)
-end
+@testitem "ZeroPad (GPU)" tags = [:gpu, :linearoperator, :ZeroPad] setup = [TestUtils, ZeroPadTestHelper] begin
+    using Random, AbstractOperators, GPUEnv
 
-@testitem "ZeroPad (CUDA)" tags = [:gpu, :cuda, :linearoperator, :ZeroPad] setup = [
-    TestUtils, ZeroPadTestHelper,
-] begin
-    using Random, AbstractOperators
-    using CUDA
-    if CUDA.functional()
+    for backend in gpu_backends()
         Random.seed!(0)
-        test_zeropad_mul(CuArray, false, test_op, to_cpu, norm)
-    end
-end
-
-@testitem "ZeroPad (AMDGPU)" tags = [:gpu, :amdgpu, :linearoperator, :ZeroPad] setup = [
-    TestUtils, ZeroPadTestHelper,
-] begin
-    using Random, AbstractOperators
-    using AMDGPU
-    if AMDGPU.functional()
-        Random.seed!(0)
-        test_zeropad_mul(AMDGPU.ROCArray, false, test_op, to_cpu, norm)
+        test_zeropad_mul(backend, false, test_op, to_cpu, norm)
     end
 end

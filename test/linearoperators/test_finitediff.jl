@@ -87,30 +87,11 @@ end
     @test size(FiniteDiff(Float64, (3, 4, 5), 2)) == ((3, 3, 5), (3, 4, 5))
 end
 
-@testitem "FiniteDiff (GPU)" tags = [:gpu, :jlarray, :linearoperator, :FiniteDiff] setup = [TestUtils, GpuTestUtils, FiniteDiffTestHelper] begin
-    using Random, AbstractOperators, JLArrays
-    Random.seed!(0)
-    test_finitediff_mul(jl, false, test_op)
-end
+@testitem "FiniteDiff (GPU)" tags = [:gpu, :linearoperator, :FiniteDiff] setup = [TestUtils, FiniteDiffTestHelper] begin
+    using Random, AbstractOperators, GPUEnv
 
-@testitem "FiniteDiff (CUDA)" tags = [:gpu, :cuda, :linearoperator, :FiniteDiff] setup = [
-    TestUtils, FiniteDiffTestHelper,
-] begin
-    using Random, AbstractOperators
-    using CUDA
-    if CUDA.functional()
+    for backend in gpu_backends()
         Random.seed!(0)
-        test_finitediff_mul(CuArray, false, test_op)
-    end
-end
-
-@testitem "FiniteDiff (AMDGPU)" tags = [:gpu, :amdgpu, :linearoperator, :FiniteDiff] setup = [
-    TestUtils, FiniteDiffTestHelper,
-] begin
-    using Random, AbstractOperators
-    using AMDGPU
-    if AMDGPU.functional()
-        Random.seed!(0)
-        test_finitediff_mul(AMDGPU.ROCArray, false, test_op)
+        test_finitediff_mul(backend, false, test_op)
     end
 end

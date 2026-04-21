@@ -108,155 +108,55 @@ end
     @test occursin("↓", String(take!(io)))
 end
 
-@testitem "GetIndex (JLArray)" tags = [:linearoperator, :GetIndex, :gpu, :jlarray] setup = [TestUtils, GpuTestUtils] begin
-    using Random, AbstractOperators
-    Random.seed!(0)
-    n, m, k = 5, 4, 3
-    gpu_wrapper = Base.typename(typeof(jl(randn(1)))).wrapper
-    # 1-D range
-    test_op(GetIndex(jl(zeros(Float64, n)), (1:k,)), jl(randn(n)), jl(randn(k)), false)
-    # 2-D range + colon
-    test_op(GetIndex(jl(zeros(Float64, n, m)), (1:k, :)), jl(randn(n, m)), jl(randn(k, m)), false)
-    # colon + scalar int  (column selection)
-    test_op(GetIndex(jl(zeros(Float64, n, m)), (:, 2)), jl(randn(n, m)), jl(randn(n)), false)
-    # range + range  (submatrix)
-    test_op(
-        GetIndex(jl(zeros(Float64, n, m)), (2:k, 2:m)),
-        jl(randn(n, m)),
-        jl(randn(k - 1, m - 1)),
-        false,
-    )
-    # range + scalar int  (rows of a specific column)
-    test_op(GetIndex(jl(zeros(Float64, n, m)), (1:k, 2)), jl(randn(n, m)), jl(randn(k)), false)
+@testitem "GetIndex (GPU)" tags = [:linearoperator, :GetIndex, :gpu] setup = [TestUtils] begin
+    using Random, AbstractOperators, GPUEnv
 
-    idx_vec = collect(1:2:n)
-    op_vec = GetIndex(jl(zeros(Float64, n)), idx_vec)
-    @test Base.typename(typeof(op_vec.idx[1])).wrapper == gpu_wrapper
-    @test eltype(op_vec.idx[1]) <: Integer
-    test_op(op_vec, jl(randn(n)), jl(randn(length(idx_vec))), false)
-
-    mask = falses(n)
-    mask[2:2:n] .= true
-    op_mask = GetIndex(jl(zeros(Float64, n)), mask)
-    @test Base.typename(typeof(op_mask.idx[1])).wrapper == gpu_wrapper
-    @test eltype(op_mask.idx[1]) <: Integer
-    @test length(op_mask.idx[1]) == sum(mask)
-    test_op(op_mask, jl(randn(n)), jl(randn(sum(mask))), false)
-end
-
-@testitem "GetIndex (CUDA)" tags = [:gpu, :cuda, :linearoperator, :GetIndex] setup = [TestUtils] begin
-    using Random, AbstractOperators
-    using CUDA
-    if CUDA.functional()
+    for backend in gpu_backends()
         Random.seed!(0)
         n, m, k = 5, 4, 3
-        # 1-D range
-        test_op(GetIndex(CUDA.zeros(Float64, n), (1:k,)), CuArray(randn(n)), CuArray(randn(k)), false)
-        # 2-D range + colon
-        test_op(
-            GetIndex(CUDA.zeros(Float64, n, m), (1:k, :)),
-            CuArray(randn(n, m)),
-            CuArray(randn(k, m)),
-            false,
-        )
-        # colon + scalar int  (column selection)
-        test_op(
-            GetIndex(CUDA.zeros(Float64, n, m), (:, 2)), CuArray(randn(n, m)), CuArray(randn(n)), false
-        )
-        # range + range  (submatrix)
-        test_op(
-            GetIndex(CUDA.zeros(Float64, n, m), (2:k, 2:m)),
-            CuArray(randn(n, m)),
-            CuArray(randn(k - 1, m - 1)),
-            false,
-        )
-        # range + scalar int  (rows of a specific column)
-        test_op(
-            GetIndex(CUDA.zeros(Float64, n, m), (1:k, 2)),
-            CuArray(randn(n, m)),
-            CuArray(randn(k)),
-            false,
-        )
-        # vector of indices
-        idx_vec = collect(1:2:n)
-        op_vec = GetIndex(CUDA.zeros(Float64, n), idx_vec)
-        @test op_vec.idx[1] isa CUDA.CuArray{Int, 1}
-        test_op(op_vec, CuArray(randn(n)), CuArray(randn(length(idx_vec))), false)
-        # vector of indices with array_type keyword
-        op_vec_kw = GetIndex(Float64, (n,), idx_vec; array_type = CUDA.CuArray{Float64, 1})
-        @test op_vec_kw.idx[1] isa CUDA.CuArray{Int, 1}
-        # boolean mask
-        mask = falses(n)
-        mask[2:2:n] .= true
-        op_mask = GetIndex(CUDA.zeros(Float64, n), mask)
-        @test op_mask.idx[1] isa CUDA.CuArray{Int, 1}
-        @test length(op_mask.idx[1]) == sum(mask)
-        test_op(op_mask, CuArray(randn(n)), CuArray(randn(sum(mask))), false)
-        # boolean mask with array_type keyword
-        op_mask_kw = GetIndex(Float64, (n,), mask; array_type = CUDA.CuArray{Float64, 1})
-        @test op_mask_kw.idx[1] isa CUDA.CuArray{Int, 1}
-    end
-end
+        backend_type_wrapper = gpu_wrapper(backend, randn(1))
 
-@testitem "GetIndex (AMDGPU)" tags = [:gpu, :amdgpu, :linearoperator, :GetIndex] setup = [TestUtils] begin
-    using Random, AbstractOperators
-    using AMDGPU
-    if AMDGPU.functional()
-        Random.seed!(0)
-        n, m, k = 5, 4, 3
-        # 1-D range
+        test_op(GetIndex(gpu_zeros(backend, Float64, n), (1:k,)), gpu_randn(backend, n), gpu_randn(backend, k), false)
         test_op(
-            GetIndex(AMDGPU.zeros(Float64, n), (1:k,)),
-            AMDGPU.ROCArray(randn(n)),
-            AMDGPU.ROCArray(randn(k)),
+            GetIndex(gpu_zeros(backend, Float64, n, m), (1:k, :)),
+            gpu_randn(backend, n, m),
+            gpu_randn(backend, k, m),
             false,
         )
-        # 2-D range + colon
         test_op(
-            GetIndex(AMDGPU.zeros(Float64, n, m), (1:k, :)),
-            AMDGPU.ROCArray(randn(n, m)),
-            AMDGPU.ROCArray(randn(k, m)),
+            GetIndex(gpu_zeros(backend, Float64, n, m), (:, 2)),
+            gpu_randn(backend, n, m),
+            gpu_randn(backend, n),
             false,
         )
-        # colon + scalar int  (column selection)
         test_op(
-            GetIndex(AMDGPU.zeros(Float64, n, m), (:, 2)),
-            AMDGPU.ROCArray(randn(n, m)),
-            AMDGPU.ROCArray(randn(n)),
+            GetIndex(gpu_zeros(backend, Float64, n, m), (2:k, 2:m)),
+            gpu_randn(backend, n, m),
+            gpu_randn(backend, k - 1, m - 1),
             false,
         )
-        # range + range  (submatrix)
         test_op(
-            GetIndex(AMDGPU.zeros(Float64, n, m), (2:k, 2:m)),
-            AMDGPU.ROCArray(randn(n, m)),
-            AMDGPU.ROCArray(randn(k - 1, m - 1)),
+            GetIndex(gpu_zeros(backend, Float64, n, m), (1:k, 2)),
+            gpu_randn(backend, n, m),
+            gpu_randn(backend, k),
             false,
         )
-        # range + scalar int  (rows of a specific column)
-        test_op(
-            GetIndex(AMDGPU.zeros(Float64, n, m), (1:k, 2)),
-            AMDGPU.ROCArray(randn(n, m)),
-            AMDGPU.ROCArray(randn(k)),
-            false,
-        )
-        # vector of indices
+
         idx_vec = collect(1:2:n)
-        op_vec = GetIndex(AMDGPU.zeros(Float64, n), idx_vec)
-        @test op_vec.idx[1] isa AMDGPU.ROCArray{Int, 1}
-        test_op(op_vec, AMDGPU.ROCArray(randn(n)), AMDGPU.ROCArray(randn(length(idx_vec))), false)
-        # vector of indices with array_type keyword
-        op_vec_kw = GetIndex(Float64, (n,), idx_vec; array_type = AMDGPU.ROCArray{Float64, 1})
-        @test op_vec_kw.idx[1] isa AMDGPU.ROCArray{Int, 1}
-        # boolean mask
+        op_vec = GetIndex(gpu_zeros(backend, Float64, n), idx_vec)
+        @test Base.typename(typeof(op_vec.idx[1])).wrapper == backend_type_wrapper
+        test_op(op_vec, gpu_randn(backend, n), gpu_randn(backend, length(idx_vec)), false)
+        op_vec_kw = GetIndex(Float64, (n,), idx_vec; array_type = gpu_wrapper(backend, Float64, 1))
+        @test Base.typename(typeof(op_vec_kw.idx[1])).wrapper == backend_type_wrapper
+
         mask = falses(n)
         mask[2:2:n] .= true
-        op_mask = GetIndex(AMDGPU.zeros(Float64, n), mask)
-        @test op_mask.idx[1] isa AMDGPU.ROCArray{Int, 1}
+        op_mask = GetIndex(gpu_zeros(backend, Float64, n), mask)
+        @test Base.typename(typeof(op_mask.idx[1])).wrapper == backend_type_wrapper
         @test length(op_mask.idx[1]) == sum(mask)
-        test_op(op_mask, AMDGPU.ROCArray(randn(n)), AMDGPU.ROCArray(randn(sum(mask))), false)
-        # boolean mask with array_type keyword
-        op_mask_kw = GetIndex(Float64, (n,), mask; array_type = AMDGPU.ROCArray{Float64, 1})
-        @test op_mask_kw.idx[1] isa AMDGPU.ROCArray{Int, 1}
+        test_op(op_mask, gpu_randn(backend, n), gpu_randn(backend, sum(mask)), false)
+        op_mask_kw = GetIndex(Float64, (n,), mask; array_type = gpu_wrapper(backend, Float64, 1))
+        @test Base.typename(typeof(op_mask_kw.idx[1])).wrapper == backend_type_wrapper
     end
 end
 

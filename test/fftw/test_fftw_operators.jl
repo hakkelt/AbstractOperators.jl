@@ -346,32 +346,19 @@ end
     @test is_full_column_rank(op) == false
 end
 
-@testitem "DCT (GPU via OperatorWrapper)" tags = [:fftw, :gpu, :jlarray, :DCT] setup = [TestUtils, GpuTestUtils] begin
-    using FFTW, LinearAlgebra, Random, FFTWOperators, JLArrays, AbstractOperators
+@testitem "DCT/IDCT (GPU)" tags = [:gpu, :fftw, :DCT, :IDCT] setup = [TestUtils] begin
+    using AbstractOperators, FFTW, FFTWOperators, GPUEnv, Random
+    has_accelerated_dcts = Base.find_package("AcceleratedDCTs") !== nothing
 
-    n = 4
-    cpu_op = DCT(Float64, (n,))
-    gpu_op = OperatorWrapper(cpu_op; array_type = JLArray{Float64})
-
-    x_gpu = jl(randn(n))
-    y_gpu = jl(zeros(n))
-    mul!(y_gpu, gpu_op, x_gpu)
-    @test collect(y_gpu) ≈ dct(collect(x_gpu))
-
-    b_gpu = jl(randn(n))
-    z_gpu = jl(zeros(n))
-    mul!(z_gpu, gpu_op', b_gpu)
-    @test collect(z_gpu) ≈ idct(collect(b_gpu))
-end
-
-@testitem "DCT/IDCT (CUDA via AcceleratedDCTs)" tags = [:fftw, :gpu, :cuda, :DCT, :IDCT] setup = [TestUtils] begin
-    using AbstractOperators, FFTW, FFTWOperators, Random
-    using AcceleratedDCTs, CUDA
-    if CUDA.functional()
+    for backend in gpu_backends(; include_jlarrays = false, supports_fftw = true)
         Random.seed!(0)
+
+        has_accelerated_dcts || continue
+        import AcceleratedDCTs
+
         dims = (8, 10)
         x_cpu = randn(Float32, dims...)
-        x_gpu = CuArray(x_cpu)
+        x_gpu = to_gpu(backend, x_cpu)
 
         dct_op = DCT(x_gpu)
         y_gpu = similar(x_gpu)
@@ -390,119 +377,40 @@ end
     end
 end
 
-@testitem "DCT/IDCT (AMDGPU via AcceleratedDCTs)" tags = [:fftw, :gpu, :amdgpu, :DCT, :IDCT] setup = [TestUtils] begin
-    using AbstractOperators, FFTW, FFTWOperators, Random
-    using AMDGPU
-    using AcceleratedDCTs
+@testitem "DFT/RDFT/IRDFT (GPU)" tags = [:gpu, :fftw, :DFT, :RDFT, :IRDFT] setup = [TestUtils] begin
+    using FFTW, FFTWOperators, GPUEnv, LinearAlgebra, Random, AbstractOperators
 
-    if AMDGPU.functional()
+    for backend in gpu_backends(supports_fftw = true)
         Random.seed!(0)
-        dims = (8, 10)
-        x_cpu = randn(Float32, dims...)
-        x_gpu = AMDGPU.ROCArray(x_cpu)
+        n, m = 8, 6
 
-        dct_op = DCT(x_gpu)
-        y_gpu = similar(x_gpu)
-        mul!(y_gpu, dct_op, x_gpu)
-        @test collect(y_gpu) ≈ dct(x_cpu) rtol = 1.0e-4 atol = 1.0e-4
+        x_cpu = randn(Float64, n, m)
+        op = DFT(to_gpu(backend, x_cpu))
+        @test op isa DFT
+        x_gpu = to_gpu(backend, x_cpu)
+        y_gpu = similar(x_gpu, Complex{Float64})
+        mul!(y_gpu, op, x_gpu)
+        @test Array(y_gpu) ≈ fft(x_cpu)
+        r_gpu = similar(x_gpu, Float64)
+        mul!(r_gpu, op', y_gpu)
+        @test Array(r_gpu) ≈ real.(bfft(Array(y_gpu)))
 
-        idct_op = IDCT(x_gpu)
-        x_rec_gpu = similar(x_gpu)
-        mul!(x_rec_gpu, idct_op, y_gpu)
-        @test collect(x_rec_gpu) ≈ x_cpu rtol = 1.0e-4 atol = 1.0e-4
-    end
-end
+        xc_cpu = randn(ComplexF64, n, m)
+        opc = DFT(to_gpu(backend, xc_cpu))
+        @test opc isa DFT
+        xc_gpu = to_gpu(backend, xc_cpu)
+        yc_gpu = similar(xc_gpu)
+        mul!(yc_gpu, opc, xc_gpu)
+        @test Array(yc_gpu) ≈ fft(xc_cpu)
 
-@testitem "DFT/RDFT/IRDFT (JLArray)" tags = [:fftw, :gpu, :jlarray, :DFT, :RDFT, :IRDFT] setup = [TestUtils, GpuTestUtils] begin
-    using FFTW, LinearAlgebra, Random, FFTWOperators, JLArrays, AbstractOperators
-    Random.seed!(0)
+        opr = RDFT(to_gpu(backend, x_cpu))
+        yr_gpu = similar(x_gpu, Complex{Float64}, n ÷ 2 + 1, m)
+        mul!(yr_gpu, opr, x_gpu)
+        @test Array(yr_gpu) ≈ rfft(x_cpu, 1)
 
-    n, m = 8, 6
-
-    # DFT with real input — exercises the GPU DFT constructor branch (D <: Real)
-    x_cpu = randn(Float64, n, m)
-    op = DFT(jl(x_cpu))
-    @test op isa DFT
-    x_gpu = jl(x_cpu)
-    y_gpu = similar(x_gpu, Complex{Float64})
-    mul!(y_gpu, op, x_gpu)
-    @test Array(y_gpu) ≈ fft(x_cpu)
-    r_gpu = similar(x_gpu, Float64)  # adjoint of real-input DFT outputs real
-    mul!(r_gpu, op', y_gpu)
-    @test Array(r_gpu) ≈ real.(bfft(Array(y_gpu)))
-
-    # DFT with complex input — exercises the GPU DFT constructor branch (D <: Complex)
-    xc_cpu = randn(ComplexF64, n, m)
-    opc = DFT(jl(xc_cpu))
-    @test opc isa DFT
-    xc_gpu = jl(xc_cpu)
-    yc_gpu = similar(xc_gpu)
-    mul!(yc_gpu, opc, xc_gpu)
-    @test Array(yc_gpu) ≈ fft(xc_cpu)
-
-    # RDFT with real input
-    opr = RDFT(jl(x_cpu))
-    yr_gpu = similar(x_gpu, Complex{Float64}, n ÷ 2 + 1, m)
-    mul!(yr_gpu, opr, x_gpu)
-    @test Array(yr_gpu) ≈ rfft(x_cpu, 1)
-
-    # IRDFT
-    opir = IRDFT(jl(yr_gpu), n)
-    out_gpu = similar(x_gpu)
-    mul!(out_gpu, opir, yr_gpu)
-    @test Array(out_gpu) ≈ x_cpu  rtol = 1e-12
-end
-
-@testitem "DFT/RDFT/IRDFT (CUDA)" tags = [:fftw, :gpu, :cuda] setup = [TestUtils] begin
-    using FFTWOperators, LinearAlgebra, Random
-    using CUDA
-    if CUDA.functional()
-        conv = CUDA.cu
-        Random.seed!(11)
-
-        n = 8
-        x = conv(randn(ComplexF64, n))
-        op = DFT(x)
-        y = conv(zeros(ComplexF64, n))
-        mul!(y, op, x)
-        @test y isa typeof(x)
-
-        xr = conv(randn(Float64, n))
-        rop = RDFT(xr)
-        ry = conv(zeros(ComplexF64, n ÷ 2 + 1))
-        mul!(ry, rop, xr)
-        @test ry isa typeof(ry)
-
-        ir = IRDFT(ry, n)
-        out = conv(zeros(Float64, n))
-        mul!(out, ir, ry)
-        @test out isa typeof(xr)
-    end
-end
-
-@testitem "DFT/RDFT/IRDFT (AMDGPU)" tags = [:fftw, :gpu, :amdgpu] setup = [TestUtils] begin
-    using FFTWOperators, LinearAlgebra, Random
-    using AMDGPU
-    if AMDGPU.functional()
-        conv = AMDGPU.ROCArray
-        Random.seed!(12)
-
-        n = 8
-        x = conv(randn(ComplexF64, n))
-        op = DFT(x)
-        y = conv(zeros(ComplexF64, n))
-        mul!(y, op, x)
-        @test y isa typeof(x)
-
-        xr = conv(randn(Float64, n))
-        rop = RDFT(xr)
-        ry = conv(zeros(ComplexF64, n ÷ 2 + 1))
-        mul!(ry, rop, xr)
-        @test ry isa typeof(ry)
-
-        ir = IRDFT(ry, n)
-        out = conv(zeros(Float64, n))
-        mul!(out, ir, ry)
-        @test out isa typeof(xr)
+        opir = IRDFT(to_gpu(backend, Array(yr_gpu)), n)
+        out_gpu = similar(x_gpu)
+        mul!(out_gpu, opir, yr_gpu)
+        @test Array(out_gpu) ≈ x_cpu rtol = 1.0e-12
     end
 end

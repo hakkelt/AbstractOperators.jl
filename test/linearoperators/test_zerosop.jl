@@ -76,39 +76,15 @@
     @test occursin("0", s)
 end
 
-@testitem "Zeros (JLArray)" tags = [:linearoperator, :Zeros, :gpu, :jlarray] setup = [TestUtils, GpuTestUtils] begin
-    using Random, AbstractOperators
-    Random.seed!(0)
-    n = (3, 4)
-    m = (5, 2)
-    op = Zeros(Float64, n, Float64, m; array_type = typeof(jl(randn(1))))
-    y = test_op(op, jl(randn(n)), jl(randn(m)), false)
-    @test collect(y) == zeros(Float64, m)
-end
+@testitem "Zeros (GPU)" tags = [:gpu, :linearoperator, :Zeros] setup = [TestUtils] begin
+    using Random, AbstractOperators, GPUEnv
 
-@testitem "Zeros (CUDA)" tags = [:gpu, :cuda, :linearoperator, :Zeros] setup = [TestUtils] begin
-    using Random, AbstractOperators
-    using CUDA: CuArray
-    using CUDA
-    if CUDA.functional()
+    for backend in gpu_backends()
         Random.seed!(0)
         n = (3, 4)
         m = (5, 2)
-        op = Zeros(Float64, n, Float64, m; array_type = typeof(CUDA.zeros(Float64, 1)))
-        y = test_op(op, CuArray(randn(n)), CuArray(randn(m)), false)
-        @test collect(y) == zeros(Float64, m)
-    end
-end
-
-@testitem "Zeros (AMDGPU)" tags = [:gpu, :amdgpu, :linearoperator, :Zeros] setup = [TestUtils] begin
-    using Random, AbstractOperators
-    using AMDGPU
-    if AMDGPU.functional()
-        Random.seed!(0)
-        n = (3, 4)
-        m = (5, 2)
-        op = Zeros(Float64, n, Float64, m; array_type = typeof(AMDGPU.zeros(Float64, 1)))
-        y = test_op(op, AMDGPU.ROCArray(randn(n)), AMDGPU.ROCArray(randn(m)), false)
+        op = Zeros(Float64, n, Float64, m; array_type = gpu_wrapper(backend, Float64, 1))
+        y = test_op(op, gpu_randn(backend, n...), gpu_randn(backend, m...), false)
         @test collect(y) == zeros(Float64, m)
     end
 end

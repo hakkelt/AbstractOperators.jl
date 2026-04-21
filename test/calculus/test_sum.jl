@@ -81,53 +81,20 @@ end
     @test norm(A * x + opB * x - y) < 1.0e-8
 end
 
-@testitem "Sum (GPU)" tags = [:gpu, :calculus, :Sum] setup = [TestUtils, GpuTestUtils] begin
-    using Random, AbstractOperators, JLArrays
-    Random.seed!(0)
+@testitem "Sum (GPU)" tags = [:gpu, :calculus, :Sum] setup = [TestUtils] begin
+    using Random, AbstractOperators, GPUEnv
 
-    n = 5
-    opS = Sum(DiagOp(jl(ones(n))), DiagOp(jl(2 * ones(n))))
-    test_op(opS, jl(randn(n)), jl(randn(n)), false)
-
-    m, n2 = 5, 7
-    A1 = jl(randn(m, n2))
-    A2 = jl(randn(m, n2))
-    opS2 = Sum(MatrixOp(A1), MatrixOp(A2))
-    test_op(opS2, jl(randn(n2)), jl(randn(m)), false)
-end
-
-@testitem "Sum (CUDA)" tags = [:gpu, :cuda, :calculus, :Sum] setup = [TestUtils] begin
-    using Random, AbstractOperators
-    using CUDA
-    if CUDA.functional()
+    for backend in gpu_backends()
         Random.seed!(0)
 
         n = 5
-        opS = Sum(DiagOp(CuArray(ones(n))), DiagOp(CuArray(2 * ones(n))))
-        test_op(opS, CuArray(randn(n)), CuArray(randn(n)), false)
+        opS = Sum(DiagOp(gpu_ones(backend, Float64, n)), DiagOp(backend(2 .* ones(n))))
+        test_op(opS, gpu_randn(backend, n), gpu_randn(backend, n), false)
 
         m, n2 = 5, 7
-        A1 = CuArray(randn(m, n2))
-        A2 = CuArray(randn(m, n2))
+        A1 = gpu_randn(backend, m, n2)
+        A2 = gpu_randn(backend, m, n2)
         opS2 = Sum(MatrixOp(A1), MatrixOp(A2))
-        test_op(opS2, CuArray(randn(n2)), CuArray(randn(m)), false)
-    end
-end
-
-@testitem "Sum (AMDGPU)" tags = [:gpu, :amdgpu, :calculus, :Sum] setup = [TestUtils] begin
-    using Random, AbstractOperators
-    using AMDGPU
-    if AMDGPU.functional()
-        Random.seed!(0)
-
-        n = 5
-        opS = Sum(DiagOp(AMDGPU.ROCArray(ones(n))), DiagOp(AMDGPU.ROCArray(2 * ones(n))))
-        test_op(opS, AMDGPU.ROCArray(randn(n)), AMDGPU.ROCArray(randn(n)), false)
-
-        m, n2 = 5, 7
-        A1 = AMDGPU.ROCArray(randn(m, n2))
-        A2 = AMDGPU.ROCArray(randn(m, n2))
-        opS2 = Sum(MatrixOp(A1), MatrixOp(A2))
-        test_op(opS2, AMDGPU.ROCArray(randn(n2)), AMDGPU.ROCArray(randn(m)), false)
+        test_op(opS2, gpu_randn(backend, n2), gpu_randn(backend, m), false)
     end
 end

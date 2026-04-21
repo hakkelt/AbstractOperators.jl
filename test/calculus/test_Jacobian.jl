@@ -186,79 +186,26 @@ end
     @test length(JJ.A) == 2
 end
 
-@testitem "Jacobian (GPU)" tags = [:gpu, :calculus, :Jacobian] setup = [TestUtils, GpuTestUtils] begin
-    using AbstractOperators, JLArrays
+@testitem "Jacobian (GPU)" tags = [:gpu, :calculus, :Jacobian] setup = [TestUtils] begin
+    using Random, AbstractOperators, GPUEnv
 
-    # Construct Sin from GPU array to get GPU storage type
-    n = 5
-    A = Sin(jl(zeros(n)))
-    x = jl(randn(n))
-    J = Jacobian(A, x)
-    # Test adjoint Jacobian mul! (J' * y is the gradient direction)
-    y = jl(randn(n))
-    grad = J' * y
-    grad2 = similar(grad)
-    mul!(grad2, J', y)
-    @test collect(grad) ≈ collect(grad2)
-
-    # Exp Jacobian adjoint
-    A2 = Exp(jl(zeros(n)))
-    x2 = jl(randn(n))
-    J2 = Jacobian(A2, x2)
-    y2 = jl(randn(n))
-    grad3 = J2' * y2
-    grad4 = similar(grad3)
-    mul!(grad4, J2', y2)
-    @test collect(grad3) ≈ collect(grad4)
-end
-
-@testitem "Jacobian (CUDA)" tags = [:gpu, :cuda, :calculus, :Jacobian] setup = [TestUtils] begin
-    using Random, AbstractOperators
-    using CUDA
-    if CUDA.functional()
+    for backend in gpu_backends()
         Random.seed!(0)
 
         n = 5
-        A = Sin(CUDA.zeros(Float64, n))
-        x = CuArray(randn(n))
+        A = Sin(gpu_zeros(backend, Float64, n))
+        x = gpu_randn(backend, n)
         J = Jacobian(A, x)
-        y = CuArray(randn(n))
+        y = gpu_randn(backend, n)
         grad = J' * y
         grad2 = similar(grad)
         mul!(grad2, J', y)
         @test collect(grad) ≈ collect(grad2)
 
-        A2 = Exp(CUDA.zeros(Float64, n))
-        x2 = CuArray(randn(n))
+        A2 = Exp(gpu_zeros(backend, Float64, n))
+        x2 = gpu_randn(backend, n)
         J2 = Jacobian(A2, x2)
-        y2 = CuArray(randn(n))
-        grad3 = J2' * y2
-        grad4 = similar(grad3)
-        mul!(grad4, J2', y2)
-        @test collect(grad3) ≈ collect(grad4)
-    end
-end
-
-@testitem "Jacobian (AMDGPU)" tags = [:gpu, :amdgpu, :calculus, :Jacobian] setup = [TestUtils] begin
-    using Random, AbstractOperators
-    using AMDGPU
-    if AMDGPU.functional()
-        Random.seed!(0)
-
-        n = 5
-        A = Sin(AMDGPU.zeros(n))
-        x = AMDGPU.ROCArray(randn(n))
-        J = Jacobian(A, x)
-        y = AMDGPU.ROCArray(randn(n))
-        grad = J' * y
-        grad2 = similar(grad)
-        mul!(grad2, J', y)
-        @test collect(grad) ≈ collect(grad2)
-
-        A2 = Exp(AMDGPU.zeros(n))
-        x2 = AMDGPU.ROCArray(randn(n))
-        J2 = Jacobian(A2, x2)
-        y2 = AMDGPU.ROCArray(randn(n))
+        y2 = gpu_randn(backend, n)
         grad3 = J2' * y2
         grad4 = similar(grad3)
         mul!(grad4, J2', y2)

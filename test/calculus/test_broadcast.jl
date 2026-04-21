@@ -159,62 +159,25 @@ end
     end
 end
 
-@testitem "BroadCast (GPU)" tags = [:gpu, :calculus, :BroadCast] setup = [TestUtils, GpuTestUtils] begin
-    using Random, AbstractOperators, JLArrays
-    Random.seed!(0)
+@testitem "BroadCast (GPU)" tags = [:gpu, :calculus, :BroadCast] setup = [TestUtils] begin
+    using Random, AbstractOperators, GPUEnv
 
-    # threaded=true may conflict with GPU dispatch; test with threaded=false only
-    m, n = 8, 4
-    dim_out = (m, 10)
-    A1 = jl(randn(m, n))
-    opR = BroadCast(MatrixOp(A1), dim_out; threaded = false)
-    test_op(opR, jl(randn(n)), jl(randn(dim_out)), false)
-
-    # Use GPU-typed Eye so NoOperatorBroadCast gets GPU storage
-    m2, n2 = 3, 3
-    dim_out2 = (m2, n2, 5)
-    opR2 = BroadCast(Eye(Float64, (m2, n2); array_type = JLArray{Float64}), dim_out2; threaded = false)
-    test_op(opR2, jl(randn(m2, n2)), jl(randn(dim_out2)), false)
-end
-
-@testitem "BroadCast (CUDA)" tags = [:gpu, :cuda, :calculus, :BroadCast] setup = [TestUtils] begin
-    using Random, AbstractOperators
-    using CUDA
-    if CUDA.functional()
+    for backend in gpu_backends()
         Random.seed!(0)
 
         m, n = 8, 4
         dim_out = (m, 10)
-        A1 = CuArray(randn(m, n))
+        A1 = gpu_randn(backend, m, n)
         opR = BroadCast(MatrixOp(A1), dim_out; threaded = false)
-        test_op(opR, CuArray(randn(n)), CuArray(randn(dim_out)), false)
+        test_op(opR, gpu_randn(backend, n), gpu_randn(backend, dim_out...), false)
 
         m2, n2 = 3, 3
         dim_out2 = (m2, n2, 5)
         opR2 = BroadCast(
-            Eye(Float64, (m2, n2); array_type = CUDA.CuArray{Float64, 2}), dim_out2; threaded = false
+            Eye(Float64, (m2, n2); array_type = gpu_wrapper(backend, Float64, m2, n2)),
+            dim_out2;
+            threaded = false,
         )
-        test_op(opR2, CuArray(randn(m2, n2)), CuArray(randn(dim_out2)), false)
-    end
-end
-
-@testitem "BroadCast (AMDGPU)" tags = [:gpu, :amdgpu, :calculus, :BroadCast] setup = [TestUtils] begin
-    using Random, AbstractOperators
-    using AMDGPU
-    if AMDGPU.functional()
-        Random.seed!(0)
-
-        m, n = 8, 4
-        dim_out = (m, 10)
-        A1 = AMDGPU.ROCArray(randn(m, n))
-        opR = BroadCast(MatrixOp(A1), dim_out; threaded = false)
-        test_op(opR, AMDGPU.ROCArray(randn(n)), AMDGPU.ROCArray(randn(dim_out)), false)
-
-        m2, n2 = 3, 3
-        dim_out2 = (m2, n2, 5)
-        opR2 = BroadCast(
-            Eye(Float64, (m2, n2); array_type = AMDGPU.ROCArray{Float64, 2}), dim_out2; threaded = false
-        )
-        test_op(opR2, AMDGPU.ROCArray(randn(m2, n2)), AMDGPU.ROCArray(randn(dim_out2)), false)
+        test_op(opR2, gpu_randn(backend, m2, n2), gpu_randn(backend, dim_out2...), false)
     end
 end

@@ -181,17 +181,20 @@ end
     end
 end
 
-@testitem "SimpleBatchOp GPU (JLArray)" tags = [:batching, :SimpleBatchOp] setup = [TestUtils, GpuTestUtils, SimpleBatchOpHelpers] begin
-    using Random, AbstractOperators, JLArrays
-    Random.seed!(0)
-    op = DiagOp(jl([1.0, 2.0]))
-    batch_op = BatchOp(op, (3, 4), (:_, :b, :b))
-    x = jl(ones(2, 3, 4))
-    y_gpu = batch_op * x
-    @test size(Array(y_gpu)) == (2, 3, 4)
-    @test all(Array(y_gpu)[1, :, :] .≈ 1.0)
-    @test all(Array(y_gpu)[2, :, :] .≈ 2.0)
-    y_gpu2 = similar(y_gpu)
-    mul!(y_gpu2, batch_op, x)
-    @test Array(y_gpu2) ≈ Array(y_gpu)
+@testitem "SimpleBatchOp (GPU)" tags = [:gpu, :batching, :SimpleBatchOp] setup = [TestUtils, SimpleBatchOpHelpers] begin
+    using Random, AbstractOperators, GPUEnv
+
+    for backend in gpu_backends()
+        Random.seed!(0)
+        op = DiagOp(to_gpu(backend, [1.0, 2.0]))
+        batch_op = BatchOp(op, (3, 4), (:_, :b, :b))
+        x = gpu_ones(backend, 2, 3, 4)
+        y_gpu = batch_op * x
+        @test size(Array(y_gpu)) == (2, 3, 4)
+        @test all(Array(y_gpu)[1, :, :] .≈ 1.0)
+        @test all(Array(y_gpu)[2, :, :] .≈ 2.0)
+        y_gpu2 = similar(y_gpu)
+        mul!(y_gpu2, batch_op, x)
+        @test Array(y_gpu2) ≈ Array(y_gpu)
+    end
 end

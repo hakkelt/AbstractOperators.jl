@@ -40,20 +40,20 @@ struct DCAT{
 end
 
 function _compute_dcat_ds(A, idxD)
-    ds_list = [d <: ArrayPartition ? [d.parameters[2].types...] : d for d in domain_storage_type.(A)]
+    ds_list = [d <: ArrayPartition ? [d.parameters[2].types...] : d for d in domain_array_type.(A)]
     domain = vcat(ds_list...)
     p = vcat([[idx...] for idx in idxD]...)
     invpermute!(domain, p)
-    T = promote_type([eltype(d) for d in domain]...)
+    T = promote_type(map(_storage_eltype, domain)...)
     return ArrayPartition{T, Tuple{domain...}}
 end
 
 function _compute_dcat_cs(A, idxC)
-    cs_list = [d <: ArrayPartition ? [d.parameters[2].types...] : d for d in codomain_storage_type.(A)]
+    cs_list = [d <: ArrayPartition ? [d.parameters[2].types...] : d for d in codomain_array_type.(A)]
     codomain = vcat(cs_list...)
     p = vcat([[idx...] for idx in idxC]...)
     invpermute!(codomain, p)
-    T = promote_type([eltype(d) for d in codomain]...)
+    T = promote_type(map(_storage_eltype, codomain)...)
     return ArrayPartition{T, Tuple{codomain...}}
 end
 

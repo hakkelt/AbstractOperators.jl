@@ -341,52 +341,19 @@ end
     end
 end
 
-@testitem "Compose (GPU)" tags = [:gpu, :calculus, :Compose] setup = [TestUtils, GpuTestUtils] begin
-    using Random, AbstractOperators, JLArrays
-    Random.seed!(0)
+@testitem "Compose (GPU)" tags = [:gpu, :calculus, :Compose] setup = [TestUtils] begin
+    using Random, AbstractOperators, GPUEnv
 
-    # Both operators need matching GPU storage types for Compose
-    m1, m2 = 4, 7
-    A1 = jl(randn(m2, m1))
-    opC = Compose(FiniteDiff(jl(zeros(Float64, m2))), MatrixOp(A1))
-    test_op(opC, jl(randn(m1)), jl(randn(m2 - 1)), false)
-
-    # Chain of DiagOps
-    n = 5
-    opC2 = DiagOp(jl(randn(n))) * DiagOp(jl(randn(n)))
-    test_op(opC2, jl(randn(n)), jl(randn(n)), false)
-end
-
-@testitem "Compose (CUDA)" tags = [:gpu, :cuda, :calculus, :Compose] setup = [TestUtils] begin
-    using Random, AbstractOperators
-    using CUDA
-    if CUDA.functional()
+    for backend in gpu_backends()
         Random.seed!(0)
 
         m1, m2 = 4, 7
-        A1 = CuArray(randn(m2, m1))
-        opC = Compose(FiniteDiff(CUDA.zeros(Float64, m2)), MatrixOp(A1))
-        test_op(opC, CuArray(randn(m1)), CuArray(randn(m2 - 1)), false)
+        A1 = gpu_randn(backend, m2, m1)
+        opC = Compose(FiniteDiff(gpu_zeros(backend, Float64, m2)), MatrixOp(A1))
+        test_op(opC, gpu_randn(backend, m1), gpu_randn(backend, m2 - 1), false)
 
         n = 5
-        opC2 = DiagOp(CuArray(randn(n))) * DiagOp(CuArray(randn(n)))
-        test_op(opC2, CuArray(randn(n)), CuArray(randn(n)), false)
-    end
-end
-
-@testitem "Compose (AMDGPU)" tags = [:gpu, :amdgpu, :calculus, :Compose] setup = [TestUtils] begin
-    using Random, AbstractOperators
-    using AMDGPU
-    if AMDGPU.functional()
-        Random.seed!(0)
-
-        m1, m2 = 4, 7
-        A1 = AMDGPU.ROCArray(randn(m2, m1))
-        opC = Compose(FiniteDiff(AMDGPU.zeros(Float64, m2)), MatrixOp(A1))
-        test_op(opC, AMDGPU.ROCArray(randn(m1)), AMDGPU.ROCArray(randn(m2 - 1)), false)
-
-        n = 5
-        opC2 = DiagOp(AMDGPU.ROCArray(randn(n))) * DiagOp(AMDGPU.ROCArray(randn(n)))
-        test_op(opC2, AMDGPU.ROCArray(randn(n)), AMDGPU.ROCArray(randn(n)), false)
+        opC2 = DiagOp(gpu_randn(backend, n)) * DiagOp(gpu_randn(backend, n))
+        test_op(opC2, gpu_randn(backend, n), gpu_randn(backend, n), false)
     end
 end

@@ -61,50 +61,19 @@ end
     @test op2 * x1 ≈ A * x1
 end
 
-@testitem "MyLinOp (JLArray)" tags = [:linearoperator, :MyLinOp, :gpu, :jlarray] setup = [TestUtils, GpuTestUtils] begin
-    using Random, AbstractOperators
-    Random.seed!(0)
-    n, m = 5, 4
-    A = jl(randn(n, m))
-    AT = Base.typename(typeof(jl(randn(1)))).wrapper
-    op = MyLinOp(Float64, (m,), (n,), (y, x) -> mul!(y, A, x), (y, x) -> mul!(y, A', x); array_type = AT)
-    x = jl(randn(m))
-    y = jl(randn(n))
-    test_op(op, x, y, false)
-    @test domain_storage_type(op) <: AT
-end
+@testitem "MyLinOp (GPU)" tags = [:gpu, :linearoperator, :MyLinOp] setup = [TestUtils] begin
+    using Random, AbstractOperators, GPUEnv
 
-@testitem "MyLinOp (CUDA)" tags = [:gpu, :cuda, :linearoperator, :MyLinOp] setup = [TestUtils] begin
-    using Random, AbstractOperators
-    using CUDA
-    if CUDA.functional()
+    for backend in gpu_backends()
         Random.seed!(0)
         n, m = 5, 4
-        A = CuArray(randn(n, m))
-        AT = Base.typename(typeof(CUDA.zeros(Float64, 1))).wrapper
+        A = gpu_randn(backend, n, m)
+        AT = gpu_wrapper(backend, randn(1))
         op = MyLinOp(
             Float64, (m,), (n,), (y, x) -> mul!(y, A, x), (y, x) -> mul!(y, A', x); array_type = AT
         )
-        x = CuArray(randn(m))
-        y = CuArray(randn(n))
-        test_op(op, x, y, false)
-        @test domain_storage_type(op) <: AT
-    end
-end
-
-@testitem "MyLinOp (AMDGPU)" tags = [:gpu, :amdgpu, :linearoperator, :MyLinOp] setup = [TestUtils] begin
-    using Random, AbstractOperators
-    using AMDGPU
-    if AMDGPU.functional()
-        Random.seed!(0)
-        n, m = 5, 4
-        A = AMDGPU.ROCArray(randn(n, m))
-        AT = Base.typename(typeof(AMDGPU.zeros(Float64, 1))).wrapper
-        op = MyLinOp(
-            Float64, (m,), (n,), (y, x) -> mul!(y, A, x), (y, x) -> mul!(y, A', x); array_type = AT
-        )
-        x = AMDGPU.ROCArray(randn(m))
-        y = AMDGPU.ROCArray(randn(n))
+        x = gpu_randn(backend, m)
+        y = gpu_randn(backend, n)
         test_op(op, x, y, false)
         @test domain_storage_type(op) <: AT
     end

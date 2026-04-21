@@ -109,52 +109,19 @@ end
     @test opnorm(Qop) ≈ estimate_opnorm(Qop) rtol = 0.02
 end
 
-@testitem "MatrixOp (JLArray)" tags = [:linearoperator, :MatrixOp, :gpu, :jlarray] setup = [TestUtils, GpuTestUtils] begin
-    using Random, AbstractOperators
-    Random.seed!(0)
-    n, m = 5, 4
-    A = randn(n, m)
-    test_op(MatrixOp(jl(A)), jl(randn(m)), jl(randn(n)), false)
-    Ac = randn(n, m) + im * randn(n, m)
-    test_op(MatrixOp(jl(Ac)), jl(randn(m) + im * randn(m)), jl(randn(n) + im * randn(n)), false)
-end
+@testitem "MatrixOp (GPU)" tags = [:gpu, :linearoperator, :MatrixOp] setup = [TestUtils] begin
+    using Random, AbstractOperators, GPUEnv
 
-@testitem "MatrixOp (CUDA)" tags = [:gpu, :cuda, :linearoperator, :MatrixOp] setup = [TestUtils] begin
-    using Random, AbstractOperators
-    using CUDA
-    if CUDA.functional()
+    for backend in gpu_backends()
         Random.seed!(0)
         n, m = 5, 4
         A = randn(n, m)
-        test_op(MatrixOp(CuArray(A)), CuArray(randn(m)), CuArray(randn(n)), false)
+        test_op(MatrixOp(to_gpu(backend, A)), gpu_randn(backend, m), gpu_randn(backend, n), false)
         Ac = randn(n, m) + im * randn(n, m)
         test_op(
-            MatrixOp(CuArray(Ac)),
-            CuArray(randn(m) + im * randn(m)),
-            CuArray(randn(n) + im * randn(n)),
-            false,
-        )
-    end
-end
-
-@testitem "MatrixOp (AMDGPU)" tags = [:gpu, :amdgpu, :linearoperator, :MatrixOp] setup = [TestUtils] begin
-    using Random, AbstractOperators
-    using AMDGPU
-    if AMDGPU.functional()
-        Random.seed!(0)
-        n, m = 5, 4
-        A = randn(n, m)
-        test_op(
-            MatrixOp(AMDGPU.ROCArray(A)),
-            AMDGPU.ROCArray(randn(m)),
-            AMDGPU.ROCArray(randn(n)),
-            false,
-        )
-        Ac = randn(n, m) + im * randn(n, m)
-        test_op(
-            MatrixOp(AMDGPU.ROCArray(Ac)),
-            AMDGPU.ROCArray(randn(m) + im * randn(m)),
-            AMDGPU.ROCArray(randn(n) + im * randn(n)),
+            MatrixOp(to_gpu(backend, Ac)),
+            gpu_randn(backend, ComplexF64, m),
+            gpu_randn(backend, ComplexF64, n),
             false,
         )
     end

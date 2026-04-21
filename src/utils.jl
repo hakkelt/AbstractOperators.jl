@@ -19,12 +19,14 @@ end
     for pair in thread_count_functions[]
         pair.second(n)
     end
+    return
 end
 
 @noinline function _restore_thread_counts(prev::Vector)
     for (i, pair) in enumerate(thread_count_functions[])
         pair.second(prev[i])
     end
+    return
 end
 
 function set_thread_counts_expr(thread_count_expr, body_expr)
@@ -80,10 +82,11 @@ function _check_domain_storage(domain_array, op)
         throw(
             ArgumentError(
                 "Input storage type $(typeof(domain_array)) is not compatible with " *
-                "operator's expected domain storage $(domain_storage_type(op))",
+                    "operator's expected domain storage $(domain_storage_type(op))",
             ),
         )
     end
+    return
 end
 
 function _check_codomain_storage(codomain_array, op)
@@ -91,10 +94,11 @@ function _check_codomain_storage(codomain_array, op)
         throw(
             ArgumentError(
                 "Output storage type $(typeof(codomain_array)) is not compatible with " *
-                "operator's expected codomain storage $(codomain_storage_type(op))",
+                    "operator's expected codomain storage $(codomain_storage_type(op))",
             ),
         )
     end
+    return
 end
 
 function check(codomain_array, op, domain_array)

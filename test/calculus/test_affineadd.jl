@@ -1,7 +1,6 @@
 @testitem "AffineAdd: basic operations" tags = [:calculus, :AffineAdd] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing AffineAdd --- ")
 
     n, m = 5, 6
     A = randn(n, m)
@@ -125,70 +124,23 @@ end
     @test sign(AffineAdd(opA, d, false)) == -1
 end
 
-@testitem "AffineAdd (GPU)" tags = [:gpu, :calculus, :AffineAdd] setup = [TestUtils, GpuTestUtils] begin
-    using Random, AbstractOperators, JLArrays
-    Random.seed!(0)
+@testitem "AffineAdd (GPU)" tags = [:gpu, :calculus, :AffineAdd] setup = [TestUtils] begin
+    using Random, AbstractOperators, GPUEnv
 
-    n, m = 5, 6
-    A = randn(n, m)
-    d = randn(n)
-    # AffineAdd is affine (not linear), so we test mul! directly rather than test_op
-    T = AffineAdd(MatrixOp(jl(A)), jl(d))
-    x1 = jl(randn(m))
-    y1 = T * x1
-    y1_buf = similar(y1)
-    mul!(y1_buf, T, x1)
-    @test collect(y1) ≈ collect(y1_buf)
-
-    # adjoint (adjoint of AffineAdd is adjoint of linear part)
-    r = jl(randn(n))
-    r_adj = T' * r
-    r_adj2 = similar(r_adj)
-    mul!(r_adj2, T', r)
-    @test collect(r_adj) ≈ collect(r_adj2)
-end
-
-@testitem "AffineAdd (CUDA)" tags = [:gpu, :cuda, :calculus, :AffineAdd] setup = [TestUtils] begin
-    using Pkg, Random, AbstractOperators
-    using CUDA
-    if CUDA.functional()
+    for backend in gpu_backends()
         Random.seed!(0)
 
         n, m = 5, 6
-        A = randn(n, m)
-        d = randn(n)
-        T = AffineAdd(MatrixOp(CuArray(A)), CuArray(d))
-        x1 = CuArray(randn(m))
+        A = gpu_randn(backend, n, m)
+        d = gpu_randn(backend, n)
+        T = AffineAdd(MatrixOp(A), d)
+        x1 = gpu_randn(backend, m)
         y1 = T * x1
         y1_buf = similar(y1)
         mul!(y1_buf, T, x1)
         @test collect(y1) ≈ collect(y1_buf)
 
-        r = CuArray(randn(n))
-        r_adj = T' * r
-        r_adj2 = similar(r_adj)
-        mul!(r_adj2, T', r)
-        @test collect(r_adj) ≈ collect(r_adj2)
-    end
-end
-
-@testitem "AffineAdd (AMDGPU)" tags = [:gpu, :amdgpu, :calculus, :AffineAdd] setup = [TestUtils] begin
-    using Pkg, Random, AbstractOperators
-    using AMDGPU
-    if AMDGPU.functional()
-        Random.seed!(0)
-
-        n, m = 5, 6
-        A = randn(n, m)
-        d = randn(n)
-        T = AffineAdd(MatrixOp(AMDGPU.ROCArray(A)), AMDGPU.ROCArray(d))
-        x1 = AMDGPU.ROCArray(randn(m))
-        y1 = T * x1
-        y1_buf = similar(y1)
-        mul!(y1_buf, T, x1)
-        @test collect(y1) ≈ collect(y1_buf)
-
-        r = AMDGPU.ROCArray(randn(n))
+        r = gpu_randn(backend, n)
         r_adj = T' * r
         r_adj2 = similar(r_adj)
         mul!(r_adj2, T', r)

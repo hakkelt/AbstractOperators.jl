@@ -318,48 +318,18 @@ end
     @test S * x ≈ α * (A * x)
 end
 
-@testitem "Scale (GPU)" tags = [:gpu, :calculus, :Scale] setup = [TestUtils, GpuTestUtils] begin
-    using Random, AbstractOperators, JLArrays
-    Random.seed!(0)
+@testitem "Scale (GPU)" tags = [:gpu, :calculus, :Scale] setup = [TestUtils] begin
+    using Random, AbstractOperators, GPUEnv
 
-    # Construct FiniteDiff from GPU array to get GPU storage type
-    m = 8
-    op = Scale(pi, FiniteDiff(jl(zeros(Float64, m))))
-    test_op(op, jl(randn(m)), jl(randn(m - 1)), false)
-
-    n = 4
-    op = Scale(2.0, DiagOp(jl(randn(n))))
-    test_op(op, jl(randn(n)), jl(randn(n)), false)
-end
-
-@testitem "Scale (CUDA)" tags = [:gpu, :cuda, :calculus, :Scale] setup = [TestUtils] begin
-    using Random, AbstractOperators
-    using CUDA
-    if CUDA.functional()
+    for backend in gpu_backends()
         Random.seed!(0)
 
         m = 8
-        op = Scale(pi, FiniteDiff(CUDA.zeros(Float64, m)))
-        test_op(op, CuArray(randn(m)), CuArray(randn(m - 1)), false)
+        op = Scale(pi, FiniteDiff(gpu_zeros(backend, Float64, m)))
+        test_op(op, gpu_randn(backend, m), gpu_randn(backend, m - 1), false)
 
         n = 4
-        op = Scale(2.0, DiagOp(CuArray(randn(n))))
-        test_op(op, CuArray(randn(n)), CuArray(randn(n)), false)
-    end
-end
-
-@testitem "Scale (AMDGPU)" tags = [:gpu, :amdgpu, :calculus, :Scale] setup = [TestUtils] begin
-    using Random, AbstractOperators
-    using AMDGPU
-    if AMDGPU.functional()
-        Random.seed!(0)
-
-        m = 8
-        op = Scale(pi, FiniteDiff(AMDGPU.zeros(Float64, m)))
-        test_op(op, AMDGPU.ROCArray(randn(m)), AMDGPU.ROCArray(randn(m - 1)), false)
-
-        n = 4
-        op = Scale(2.0, DiagOp(AMDGPU.ROCArray(randn(n))))
-        test_op(op, AMDGPU.ROCArray(randn(n)), AMDGPU.ROCArray(randn(n)), false)
+        op = Scale(2.0, DiagOp(gpu_randn(backend, n)))
+        test_op(op, gpu_randn(backend, n), gpu_randn(backend, n), false)
     end
 end

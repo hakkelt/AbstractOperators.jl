@@ -1,4 +1,4 @@
-@testitem "GpuExt Quality" tags = [:quality, :gpu, :jlarray] begin
+@testitem "GpuExt Quality" tags = [:quality, :gpu] begin
     using AbstractOperators, JLArrays, LinearAlgebra
 
     # Loading JLArrays triggers GpuExt (GPUArrays is transitive dep)
@@ -28,8 +28,8 @@
     @test y_alloc isa JLArrays.JLArray
 end
 
-@testitem "GpuExt JET" tags = [:jet, :gpu, :jlarray] begin
-    using AbstractOperators, JLArrays, LinearAlgebra, JET
+@testitem "GpuExt JET" tags = [:jet, :gpu] begin
+    using AbstractOperators, JET, JLArrays
 
     # Verify key GPU-dispatched functions are type-stable (no dynamic dispatch)
     n = 8

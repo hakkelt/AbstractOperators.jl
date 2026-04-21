@@ -134,35 +134,13 @@ end
     end
 end
 
-@testitem "Variation (JLArray)" tags = [:linearoperator, :Variation, :gpu, :jlarray] setup = [TestUtils, GpuTestUtils] begin
-    using Random, AbstractOperators
-    Random.seed!(0)
-    n, m = 10, 5
-    op = Variation(jl(zeros(Float64, n, m)); threaded = false)
-    test_op(op, jl(randn(n, m)), jl(randn(n * m, 2)), false)
-end
+@testitem "Variation (GPU)" tags = [:gpu, :linearoperator, :Variation] setup = [TestUtils] begin
+    using Random, AbstractOperators, GPUEnv
 
-@testitem "Variation (CUDA)" tags = [:gpu, :cuda, :linearoperator, :Variation] setup = [TestUtils] begin
-    using Random, AbstractOperators
-    using CUDA: CuArray
-    using CUDA
-    if CUDA.functional()
+    for backend in gpu_backends()
         Random.seed!(0)
         n, m = 10, 5
-        op = Variation(CUDA.zeros(Float64, n, m); threaded = false)
-        test_op(op, CuArray(randn(n, m)), CuArray(randn(n * m, 2)), false)
-    end
-end
-
-@testitem "Variation (AMDGPU)" tags = [:gpu, :amdgpu, :linearoperator, :Variation] setup = [
-    TestUtils,
-] begin
-    using Random, AbstractOperators
-    using AMDGPU
-    if AMDGPU.functional()
-        Random.seed!(0)
-        n, m = 10, 5
-        op = Variation(AMDGPU.zeros(Float64, n, m); threaded = false)
-        test_op(op, AMDGPU.ROCArray(randn(n, m)), AMDGPU.ROCArray(randn(n * m, 2)), false)
+        op = Variation(gpu_zeros(backend, Float64, n, m); threaded = false)
+        test_op(op, gpu_randn(backend, n, m), gpu_randn(backend, n * m, 2), false)
     end
 end

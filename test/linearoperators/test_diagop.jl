@@ -104,38 +104,15 @@ end
     @test size(op) == ((n,), (n,))
 end
 
-@testitem "DiagOp (GPU)" tags = [:gpu, :jlarray, :linearoperator, :DiagOp] setup = [TestUtils, GpuTestUtils, DiagOpTestHelper] begin
-    using Random, AbstractOperators, JLArrays
-    Random.seed!(0)
-    test_diagop_mul(jl, false, test_op, to_cpu, norm)
-end
+@testitem "DiagOp (GPU)" tags = [:gpu, :linearoperator, :DiagOp] setup = [TestUtils, DiagOpTestHelper] begin
+    using Random, AbstractOperators, GPUEnv
 
-@testitem "DiagOp (CUDA)" tags = [:gpu, :cuda, :linearoperator, :DiagOp] setup = [
-    TestUtils, DiagOpTestHelper,
-] begin
-    using Random, AbstractOperators
-    using CUDA
-    if CUDA.functional()
+    for backend in gpu_backends()
         Random.seed!(0)
-        test_diagop_mul(CuArray, false, test_op, to_cpu, norm)
-        x = CuArray(randn(4))
+        test_diagop_mul(backend, false, test_op, to_cpu, norm)
+        x = gpu_randn(backend, 4)
         op = DiagOp(x)
-        @test domain_storage_type(op) <: CUDA.CuArray
-        @test codomain_storage_type(op) <: CUDA.CuArray
-    end
-end
-
-@testitem "DiagOp (AMDGPU)" tags = [:gpu, :amdgpu, :linearoperator, :DiagOp] setup = [
-    TestUtils, DiagOpTestHelper,
-] begin
-    using Random, AbstractOperators
-    using AMDGPU
-    if AMDGPU.functional()
-        Random.seed!(0)
-        test_diagop_mul(AMDGPU.ROCArray, false, test_op, to_cpu, norm)
-        x = AMDGPU.ROCArray(randn(4))
-        op = DiagOp(x)
-        @test domain_storage_type(op) <: AMDGPU.ROCArray
-        @test codomain_storage_type(op) <: AMDGPU.ROCArray
+        @test domain_storage_type(op) <: backend.array_type
+        @test codomain_storage_type(op) <: backend.array_type
     end
 end
