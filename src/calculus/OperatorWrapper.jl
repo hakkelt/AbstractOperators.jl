@@ -63,8 +63,8 @@ function OperatorWrapper(op::AbstractOperator; array_type::Type = Array)
     T_cod = codomain_type(op)
     N_dom = ndims(dom_buf)
     N_cod = ndims(cod_buf)
-    DS = S{T_dom, N_dom}
-    CS = S{T_cod, N_cod}
+    DS = S{T_dom}
+    CS = S{T_cod}
     return OperatorWrapper{typeof(op), typeof(dom_buf), typeof(cod_buf), DS, CS}(op, dom_buf, cod_buf)
 end
 
