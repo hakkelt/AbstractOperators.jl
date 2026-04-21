@@ -28,8 +28,8 @@ You are a specialist for improving Julia code quality in repositories with long-
    - Constructors for dimension tuple and/or data-driven construction.
    - Forward path `mul!(y, op, x)` and adjoint path dispatch via `AdjointOperator`.
    - Trait and property behavior remains consistent (`is_linear`, `is_diagonal`, rank/invertibility traits).
-   - Storage traits stay valid (`domain_storage_type`, `codomain_storage_type`) for CPU/GPU paths.
-- Prefer `copy_operator(op; storage_type=nothing, threaded=nothing)` behavior when changing copy semantics:
+   - Storage traits stay valid (`domain_array_type`, `codomain_array_type`) for CPU/GPU paths.
+- Prefer `copy_operator(op; array_type=nothing, threaded=nothing)` behavior when changing copy semantics:
    - Deep-copy mutable working buffers only.
    - Share immutable and read-only references.
 - Keep test files standalone-capable and aligned with TestItems setup modules.

@@ -39,8 +39,8 @@ function LinearAlgebra.mul!(y::AbstractArray, L::MyCustomLinOp, x::AbstractArray
     #   - eltype(y) == codomain_type(L)
     #   - size(x) == size(L, 2)
     #   - size(y) == size(L, 1)
-    #   - x isa domain_storage_type(L)
-    #   - y isa codomain_storage_type(L)
+    #   - x isa domain_array_type(L)
+    #   - y isa codomain_array_type(L)
     AbstractOperators.check(y, L, x)
     # Implement your forward operation here
     # Example: y .= some_function(x)
@@ -200,7 +200,7 @@ All custom operators must implement:
 Beyond the mandatory functions, you can optionally define various properties and traits to enable optimizations and provide additional information about your operator. These include:
 
 - **Thread safety**: `is_thread_safe(L::YourOperator) = true`
-- **Storage types**: `domain_storage_type`, `codomain_storage_type`
+- **Storage types**: `domain_array_type`, `codomain_array_type`
 - **Algebraic properties**: `is_diagonal`, `is_symmetric`, `is_invertible`, etc.
 - **Operator norm**: `opnorm(L::YourOperator)`
 - And many more...
@@ -258,7 +258,7 @@ GPU extensions should override `_should_thread(::AbstractGPUArray)=false` to avo
 
 ### Storage-type correctness
 
-When implementing custom operators, define both `domain_storage_type` and `codomain_storage_type` whenever buffers are allocated internally.
+When implementing custom operators, define both `domain_array_type` and `codomain_array_type` whenever buffers are allocated internally.
 This ensures that `op * x` and `allocate_in_*` keep outputs on the same backend (Array, JLArray, CuArray, ROCArray, etc.).
 
 ### Generic FFT backend compatibility

@@ -31,7 +31,7 @@ user-invocable: true
 
 - For honest GPU coverage, keep JLArray checks separate from real device checks and add backend-specific tags such as `:cuda` and `:amdgpu` plus runtime skip guards.
 - In `test/runtests.jl`, filter backend-tagged testitems when the runtime is unavailable, but keep per-test safety checks too.
-- Add explicit tests for `domain_storage_type` and `codomain_storage_type`, and verify that `op * x` allocates on the active backend.
+- Add explicit tests for `domain_array_type` and `codomain_array_type`, and verify that `op * x` allocates on the active backend.
 - When adding CUDA/AMDGPU companion tests, prefer direct backend array construction instead of temporary conversion variables.
 - For GPU `GetIndex` tests, restrict indices to ranges, colons, and scalar integers; bool-mask and integer-vector `view` forms are not universally supported across GPU backends.
 - Migrate GPU-backend storage-type assertions from central quality files into each operator's own CUDA/AMDGPU `@testitem` so they run with the functional tests.

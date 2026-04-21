@@ -28,4 +28,4 @@ applyTo: "test/**/*.jl,docs/**/*.md"
 - When Aqua reports "Unexpected Pass" on a `@test_broken`/`broken=true` check, the underlying issue is now fixed — remove the workaround and use `Aqua.test_all(pkg)` unconditionally.
 - Agent sub-tasks frequently generate `Eye(T, dims, array_type)` (3 positional args) instead of `Eye(T, dims; array_type=...)` (keyword). Always verify agent output for this pattern.
 - Stochastic test assertions `op * randn(n) ≈ other_op * (op * randn(n))` are wrong when the two `randn` calls produce different vectors; always capture into a variable first.
-- When testing GPU storage-type propagation, add `@test domain_storage_type(op) <: CUDA.CuArray` / `<: AMDGPU.ROCArray` assertions directly in the per-operator CUDA/AMDGPU `@testitem`.
+- When testing GPU storage-type propagation, add `@test domain_array_type(op) <: CUDA.CuArray` / `<: AMDGPU.ROCArray` assertions directly in the per-operator CUDA/AMDGPU `@testitem`.

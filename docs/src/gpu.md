@@ -41,19 +41,19 @@ CPU threading (via [Polyester.jl](https://github.com/JuliaSIMD/Polyester.jl)'s `
 
 ## Storage Type Tracking
 
-Every operator tracks its storage type via `domain_storage_type` and `codomain_storage_type`. This enables correct intermediate buffer allocation in composed operators:
+Every operator tracks its storage type via `domain_array_type` and `codomain_array_type`. This enables correct intermediate buffer allocation in composed operators:
 
 ```julia
 using AbstractOperators, CUDA
 
 # Create GPU operators
 D = DiagOp(CuArray(rand(Float32, 5)))
-domain_storage_type(D)     # CuArray{Float32}
-codomain_storage_type(D)   # CuArray{Float32}
+domain_array_type(D)     # CuArray{Float32}
+codomain_array_type(D)   # CuArray{Float32}
 
 # Composition allocates GPU buffers automatically
-F = FiniteDiff(CuArray{Float32}, (10,))  # storage_type-aware FiniteDiff
-domain_storage_type(F)     # CuArray{Float32}
+F = FiniteDiff(CuArray{Float32}, (10,))  # array_type-aware FiniteDiff
+domain_array_type(F)     # CuArray{Float32}
 ```
 
 For operators without an array at construction time, pass a GPU array to the array-based constructor:
@@ -63,10 +63,10 @@ F = FiniteDiff(CuArray(ones(Float32, 5, 4)), 1)  # deduces storage type from inp
 V = Variation(CuArray(ones(Float32, 4, 3)))        # threaded=false automatically
 ```
 
-Or use the `storage_type` keyword argument (for operators that support it):
+Or use the `array_type` keyword argument (for operators that support it):
 
 ```julia
-Z = Zeros(Float32, (4,), Float32, (3,); storage_type=CuArray)
+Z = Zeros(Float32, (4,), Float32, (3,); array_type=CuArray)
 ```
 
 ## GpuExt Extension
@@ -75,7 +75,7 @@ GPU-specific overrides live in `ext/GpuExt/`. The extension is loaded automatica
 
 The extension provides:
 - `_should_thread(::AbstractGPUArray) = false` — disables CPU threading for GPU arrays
-- `storage_type_display_string(::Type{<:AbstractGPUArray}) = "ᵍᵖᵘ"` — shows ᵍᵖᵘ superscript in operator display
+- `array_type_display_string(::Type{<:AbstractGPUArray}) = "ᵍᵖᵘ"` — shows ᵍᵖᵘ superscript in operator display
 - Variation adjoint GPU override — vectorized reshape-based stencil (no scalar indexing)
 - BroadCast threading GPU override — falls back to non-threaded path
 

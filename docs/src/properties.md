@@ -8,8 +8,8 @@ ndims
 ndoms
 domain_type
 codomain_type
-domain_storage_type
-codomain_storage_type
+domain_array_type
+codomain_array_type
 ```
 
 ## Traits
