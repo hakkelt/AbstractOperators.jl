@@ -2,8 +2,6 @@ name: Benchmark this PR
 on:
   pull_request_target:
     branches: [ master ]  # change to your default branch
-permissions:
-  pull-requests: write    # needed to post comments
 
 jobs:
   bench:
@@ -13,3 +11,4 @@ jobs:
         with:
           julia-version: '1'
           extra-pkgs: 'RecursiveArrayTools'
+          job-summary: 'true'
