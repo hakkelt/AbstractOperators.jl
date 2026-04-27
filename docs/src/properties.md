@@ -62,5 +62,4 @@ estimate_opnorm
 
 ```@docs
 copy_operator
-has_mutable_buffers
 ```

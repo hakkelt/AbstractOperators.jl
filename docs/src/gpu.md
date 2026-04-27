@@ -150,7 +150,14 @@ WaveletOperators.jl currently relies on CPU execution. Its operators do not yet 
 
 ## CpuOperatorWrapper
 
-For operators that do not natively support GPU arrays (e.g., FFTWOperators DCT, custom CPU-only operators), use `CpuOperatorWrapper`:
+For operators that do not natively support GPU arrays (e.g., FFTWOperators DCT, custom CPU-only operators), use `CpuOperatorWrapper`. This wrapper preallocates CPU buffers for the operator's domain and codomain, allowing GPU arrays to be passed in and out while the computation happens on CPU.
+
+```@docs
+OperatorWrapper
+OperatorWrapper(::AbstractOperator)
+```
+
+### Example:
 
 ```julia
 using AbstractOperators, CUDA
