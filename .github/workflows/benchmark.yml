@@ -7,7 +7,7 @@ jobs:
   bench:
     runs-on: ubuntu-latest
     steps:
-      - uses: zsoerenm/AirspeedVelocity.jl@ss/fix-sources-resolution
+      - uses: zsoerenm/AirspeedVelocity.jl@ae417519615a552067ef8747ae12a99548ef3b2a
         with:
           julia-version: '1'
           extra-pkgs: 'RecursiveArrayTools'
