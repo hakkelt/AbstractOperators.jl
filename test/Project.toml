@@ -27,7 +27,6 @@ WaveletOperators = "f3582904-6f60-4bbd-985d-55eab799bc9d"
 Wavelets = "29a6e085-ba6d-5f35-a997-948ac2efa89a"
 
 [compat]
-AcceleratedDCTs = "0.4"
 Aqua = "0.8"
 BenchmarkTools = "1"
 Documenter = "1.8"
