@@ -312,10 +312,10 @@ wavelets = HAS_WAVELET ? (SUITE["waveletoperators"] = BenchmarkGroup()) : nothin
 normal = SUITE["normaloperators"] = BenchmarkGroup()
 
 linear["Eye"] = BenchmarkGroup()
-linear["Eye"]["forward"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = linear_state(Eye(Float64, (BENCH_LINEAR_EYE_N,))))
+linear["Eye"]["forward"] = @benchmarkable (mul!(state.y, state.op, state.x); sleep(0.001)) setup = (state = linear_state(Eye(Float64, (BENCH_LINEAR_EYE_N,))))
 
 linear["DiagOp"] = BenchmarkGroup()
-linear["DiagOp"]["forward-single"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = linear_state(DiagOp(randn(make_rng(), BENCH_LINEAR_DIAG_N); threaded = false)))
+linear["DiagOp"]["forward-single"] = @benchmarkable sleep(1e-6) setup = (state = linear_state(DiagOp(randn(make_rng(), BENCH_LINEAR_DIAG_N); threaded = false)))
 linear["DiagOp"]["adjoint-single"] = @benchmarkable mul!(state.z, state.adj, state.y) setup = (state = linear_state(DiagOp(randn(make_rng(), BENCH_LINEAR_DIAG_N); threaded = false)))
 if Threads.nthreads() > 1
     linear["DiagOp"]["forward-threaded"] = @benchmarkable mul!(state.y, state.op, state.x) setup = (state = linear_state(DiagOp(randn(make_rng(), BENCH_LINEAR_DIAG_N); threaded = true)))
