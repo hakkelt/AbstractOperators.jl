@@ -14,10 +14,23 @@ julia> Xcorr(Float64, (10,), [1.0, 0.5, 0.2])
 ◎  ℝ^10 -> ℝ^19
 ```
 """
+# Adjoint FFT state for non-CPU array backends.
+# CPU uses a tiled FIR loop instead; adj_fft is Nothing for CPU arrays.
+struct XcorrAdjFFT{
+        Hc <: AbstractVector, H <: AbstractVector,
+        P3 <: AbstractFFTs.Plan, P4 <: AbstractFFTs.Plan,
+    }
+    fftlen::Int
+    h_fft::Hc    # rfft(h padded)
+    buf::H       # scratch buffer size fftlen
+    buf_c::Hc    # complex scratch buffer
+    R::P3        # rfft/fft plan
+    I::P4        # irfft/ifft plan
+end
+
 struct Xcorr{
         T, H <: AbstractVector{T}, Hc <: AbstractVector,
-        P1 <: AbstractFFTs.Plan, P2 <: AbstractFFTs.Plan,
-        P3 <: AbstractFFTs.Plan, P4 <: AbstractFFTs.Plan,
+        P1 <: AbstractFFTs.Plan, P2 <: AbstractFFTs.Plan, Adj,
     } <: LinearOperator
     dim_in::Tuple{Int}
     h::H
@@ -29,14 +42,13 @@ struct Xcorr{
     buf_fwd_c::Hc    # complex scratch buffer
     R_fwd::P1        # rfft plan, fftlen_fwd
     I_fwd::P2        # irfft plan, fftlen_fwd
-    # Adjoint pass: FFT-based (used for GPU; CPU uses tiled FIR)
-    fftlen_adj::Int
-    h_fft_adj::Hc    # rfft(h padded to fftlen_adj)
-    buf_adj::H       # scratch buffer size fftlen_adj
-    buf_adj_c::Hc    # complex scratch buffer
-    R_adj::P3        # rfft plan, fftlen_adj
-    I_adj::P4        # irfft plan, fftlen_adj
+    # Adjoint: XcorrAdjFFT{...} for GPU backends, Nothing for CPU
+    adj_fft::Adj
 end
+
+# FFT planning flags: FFTW.MEASURE only for CPU Arrays; no flags for GPU backends.
+_xcorr_plan_kwargs(::Type{<:Array}) = (flags = FFTW.MEASURE,)
+_xcorr_plan_kwargs(::Type)          = (;)
 
 # Constructors
 function Xcorr(domain_type::Type, DomainDim::NTuple{N, Int}, h::H) where {H <: AbstractVector, N}
@@ -47,17 +59,18 @@ function Xcorr(domain_type::Type, DomainDim::NTuple{N, Int}, h::H) where {H <: A
     m = length(h)
     padlen = max(n, m)
     outlen = 2 * padlen - 1
+    plan_kw = _xcorr_plan_kwargs(H)
 
     # Forward pass plans
     fftlen_fwd = nextpow(2, outlen)
     buf_fwd = similar(h, fftlen_fwd)
     if domain_type <: Real
-        R_fwd = plan_rfft(buf_fwd; flags = FFTW.MEASURE)
+        R_fwd = plan_rfft(buf_fwd; plan_kw...)
         complex_type = Complex{domain_type}
         buf_fwd_c = similar(h, complex_type, fftlen_fwd ÷ 2 + 1)
-        I_fwd = plan_irfft(buf_fwd_c, fftlen_fwd; flags = FFTW.MEASURE)
+        I_fwd = plan_irfft(buf_fwd_c, fftlen_fwd; plan_kw...)
     else
-        R_fwd = plan_fft(buf_fwd; flags = FFTW.MEASURE)
+        R_fwd = plan_fft(buf_fwd; plan_kw...)
         buf_fwd_c = similar(buf_fwd)
         I_fwd = inv(R_fwd)
     end
@@ -66,32 +79,38 @@ function Xcorr(domain_type::Type, DomainDim::NTuple{N, Int}, h::H) where {H <: A
     h_fft_conj = conj.(R_fwd * buf_fwd)
     fill!(buf_fwd, zero(domain_type))
 
-    # Adjoint pass plans (conv(b, h) where b has length outlen)
-    # Use same FFT length as forward pass — wrap-around from h affects only
-    # positions < m ≤ padlen, safely outside the extracted range.
-    fftlen_adj = fftlen_fwd
-    buf_adj = similar(h, fftlen_adj)
-    if domain_type <: Real
-        R_adj = plan_rfft(buf_adj; flags = FFTW.MEASURE)
-        buf_adj_c = similar(h, Complex{domain_type}, fftlen_adj ÷ 2 + 1)
-        I_adj = plan_irfft(buf_adj_c, fftlen_adj; flags = FFTW.MEASURE)
+    # Adjoint: CPU uses tiled FIR — no FFT state needed.
+    # GPU backends allocate FFT plans; same fftlen as forward pass is correct
+    # (wrap-around from h only affects positions < m ≤ padlen, outside the
+    # extracted range padlen..padlen+n-1).
+    if H <: Array
+        adj_fft = nothing
     else
-        R_adj = plan_fft(buf_adj; flags = FFTW.MEASURE)
-        buf_adj_c = similar(buf_adj)
-        I_adj = inv(R_adj)
+        fftlen_adj = fftlen_fwd
+        buf_adj = similar(h, fftlen_adj)
+        if domain_type <: Real
+            R_adj = plan_rfft(buf_adj; plan_kw...)
+            buf_adj_c = similar(h, Complex{domain_type}, fftlen_adj ÷ 2 + 1)
+            I_adj = plan_irfft(buf_adj_c, fftlen_adj; plan_kw...)
+        else
+            R_adj = plan_fft(buf_adj; plan_kw...)
+            buf_adj_c = similar(buf_adj)
+            I_adj = inv(R_adj)
+        end
+        fill!(buf_adj, zero(domain_type))
+        copyto!(view(buf_adj, 1:m), h)
+        h_fft_adj = R_adj * buf_adj
+        fill!(buf_adj, zero(domain_type))
+        adj_fft = XcorrAdjFFT(fftlen_adj, h_fft_adj, buf_adj, buf_adj_c, R_adj, I_adj)
     end
-    fill!(buf_adj, zero(domain_type))
-    copyto!(view(buf_adj, 1:m), h)
-    h_fft_adj = R_adj * buf_adj
-    fill!(buf_adj, zero(domain_type))
 
     return Xcorr{
         domain_type, typeof(h), typeof(buf_fwd_c),
-        typeof(R_fwd), typeof(I_fwd), typeof(R_adj), typeof(I_adj),
+        typeof(R_fwd), typeof(I_fwd), typeof(adj_fft),
     }(
         DomainDim, h,
         fftlen_fwd, padlen, h_fft_conj, buf_fwd, buf_fwd_c, R_fwd, I_fwd,
-        fftlen_adj, h_fft_adj, buf_adj, buf_adj_c, R_adj, I_adj,
+        adj_fft,
     )
 end
 
@@ -127,19 +146,19 @@ function mul!(y, L::AdjointOperator{<:Xcorr{T, <:Array{T}}}, b) where {T}
     return y
 end
 
-# Generic adjoint fallback (used for GPU arrays): FFT-based conv
-function mul!(y, L::AdjointOperator{<:Xcorr{T}}, b) where {T}
+# GPU adjoint: FFT-based conv via XcorrAdjFFT
+function mul!(y, L::AdjointOperator{<:Xcorr{T, <:Any, <:Any, <:Any, <:Any, <:XcorrAdjFFT}}, b) where {T}
     check(y, L, b)
     A = L.A
+    adj = A.adj_fft
     n = length(y)
     outlen = length(b)
-    fill!(A.buf_adj, zero(T))
-    copyto!(view(A.buf_adj, 1:outlen), b)
-    mul!(A.buf_adj_c, A.R_adj, A.buf_adj)
-    A.buf_adj_c .*= A.h_fft_adj
-    mul!(A.buf_adj, A.I_adj, A.buf_adj_c)
-    padlen = A.padlen
-    y .= @view(A.buf_adj[padlen:(padlen + n - 1)])
+    fill!(adj.buf, zero(T))
+    copyto!(view(adj.buf, 1:outlen), b)
+    mul!(adj.buf_c, adj.R, adj.buf)
+    adj.buf_c .*= adj.h_fft
+    mul!(adj.buf, adj.I, adj.buf_c)
+    y .= @view(adj.buf[A.padlen:(A.padlen + n - 1)])
     return y
 end
 
