@@ -1,14 +1,79 @@
 name: Benchmark this PR
+# Stage 1 (fork-safe): runs with read-only permissions, uploads results as an
+# artifact.  Stage 2 (post_benchmark_comment.yml) picks up the artifact and
+# posts the PR comment with write permissions.
 on:
   pull_request:
-    branches: [ master ]  # change to your default branch
+    branches: [ master ]
+
+# No write permissions needed here – the comment is posted by the separate
+# post_benchmark_comment.yml workflow_run job.
 
 jobs:
   bench:
     runs-on: ubuntu-latest
     steps:
-      - uses: zsoerenm/AirspeedVelocity.jl@ae417519615a552067ef8747ae12a99548ef3b2a
+      # ------------------------------------------------------------------
+      # Check out HEAD commit of the PR (the code under review)
+      # ------------------------------------------------------------------
+      - name: Check out PR head
+        uses: actions/checkout@v4
         with:
-          julia-version: '1'
-          extra-pkgs: 'RecursiveArrayTools'
-          job-summary: 'true'
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: head
+          fetch-depth: 0     # needed so we can also check out base SHA
+
+      # ------------------------------------------------------------------
+      # Check out the merge-base / target branch (master) as "base"
+      # ------------------------------------------------------------------
+      - name: Check out base (master)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+
+      # ------------------------------------------------------------------
+      # Julia + package cache
+      # ------------------------------------------------------------------
+      - name: Set up Julia
+        uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+
+      - name: Cache Julia packages
+        uses: julia-actions/cache@v2
+
+      # ------------------------------------------------------------------
+      # Instantiate the benchmark sub-project (installs all deps declared
+      # in benchmark/Project.toml, including ArgParse and BenchmarkTools).
+      # ------------------------------------------------------------------
+      - name: Instantiate benchmark project
+        shell: bash
+        run: julia --project=head/benchmark -e 'using Pkg; Pkg.instantiate()'
+
+      # ------------------------------------------------------------------
+      # Run the repo-local comparison driver
+      # ------------------------------------------------------------------
+      - name: Run benchmark comparison
+        shell: bash
+        env:
+          JULIA_NUM_THREADS: 2
+        run: |
+          julia --project=head/benchmark head/benchmark/compare.jl \
+            --base-dir  "${{ github.workspace }}/base" \
+            --head-dir  "${{ github.workspace }}/head" \
+            --output-dir artifact \
+            --pr        "${{ github.event.pull_request.number }}" \
+            --julia-version "$(julia -e 'print(VERSION)')"
+
+      # ------------------------------------------------------------------
+      # Upload artifact for stage-2 comment posting
+      # ------------------------------------------------------------------
+      - name: Upload benchmark comment artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-comment-1
+          path: |
+            artifact/body.md
+            artifact/pr_number.txt
+            artifact/julia_version.txt
