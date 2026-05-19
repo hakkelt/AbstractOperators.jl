@@ -29,7 +29,7 @@ struct Xcorr{
     buf_fwd_c::Hc    # complex scratch buffer
     R_fwd::P1        # rfft plan, fftlen_fwd
     I_fwd::P2        # irfft plan, fftlen_fwd
-    # Adjoint pass (conv(b, h) and slice)
+    # Adjoint pass: FFT-based (used for GPU; CPU uses tiled FIR)
     fftlen_adj::Int
     h_fft_adj::Hc    # rfft(h padded to fftlen_adj)
     buf_adj::H       # scratch buffer size fftlen_adj
@@ -52,12 +52,12 @@ function Xcorr(domain_type::Type, DomainDim::NTuple{N, Int}, h::H) where {H <: A
     fftlen_fwd = nextpow(2, outlen)
     buf_fwd = similar(h, fftlen_fwd)
     if domain_type <: Real
-        R_fwd = plan_rfft(buf_fwd)
+        R_fwd = plan_rfft(buf_fwd; flags = FFTW.MEASURE)
         complex_type = Complex{domain_type}
         buf_fwd_c = similar(h, complex_type, fftlen_fwd ÷ 2 + 1)
-        I_fwd = plan_irfft(buf_fwd_c, fftlen_fwd)
+        I_fwd = plan_irfft(buf_fwd_c, fftlen_fwd; flags = FFTW.MEASURE)
     else
-        R_fwd = plan_fft(buf_fwd)
+        R_fwd = plan_fft(buf_fwd; flags = FFTW.MEASURE)
         buf_fwd_c = similar(buf_fwd)
         I_fwd = inv(R_fwd)
     end
@@ -67,23 +67,22 @@ function Xcorr(domain_type::Type, DomainDim::NTuple{N, Int}, h::H) where {H <: A
     fill!(buf_fwd, zero(domain_type))
 
     # Adjoint pass plans (conv(b, h) where b has length outlen)
-    # The adjoint reads conv(b,h) only at positions padlen..padlen+n-1.
-    # Since padlen = max(n,m) ≥ m, circular conv mod fftlen_fwd is exact there:
-    # wrap-around from h affects only positions < m ≤ padlen (never our range).
+    # Use same FFT length as forward pass — wrap-around from h affects only
+    # positions < m ≤ padlen, safely outside the extracted range.
     fftlen_adj = fftlen_fwd
     buf_adj = similar(h, fftlen_adj)
     if domain_type <: Real
-        R_adj = plan_rfft(buf_adj)
+        R_adj = plan_rfft(buf_adj; flags = FFTW.MEASURE)
         buf_adj_c = similar(h, Complex{domain_type}, fftlen_adj ÷ 2 + 1)
-        I_adj = plan_irfft(buf_adj_c, fftlen_adj)
+        I_adj = plan_irfft(buf_adj_c, fftlen_adj; flags = FFTW.MEASURE)
     else
-        R_adj = plan_fft(buf_adj)
+        R_adj = plan_fft(buf_adj; flags = FFTW.MEASURE)
         buf_adj_c = similar(buf_adj)
         I_adj = inv(R_adj)
     end
     fill!(buf_adj, zero(domain_type))
     copyto!(view(buf_adj, 1:m), h)
-    h_fft_adj = R_adj * buf_adj          # rfft(h) — used in adjoint conv(b,h)
+    h_fft_adj = R_adj * buf_adj
     fill!(buf_adj, zero(domain_type))
 
     return Xcorr{
@@ -120,23 +119,62 @@ function mul!(y, A::Xcorr{T}, b) where {T}
     return y
 end
 
+# CPU adjoint: tiled 8-wide FIR (fast for cache-resident accumulators)
+function mul!(y, L::AdjointOperator{<:Xcorr{T, <:Array{T}}}, b) where {T}
+    check(y, L, b)
+    A = L.A
+    _xcorr_fir_adj!(y, b, A.h, A.padlen)
+    return y
+end
+
+# Generic adjoint fallback (used for GPU arrays): FFT-based conv
 function mul!(y, L::AdjointOperator{<:Xcorr{T}}, b) where {T}
     check(y, L, b)
     A = L.A
     n = length(y)
     outlen = length(b)
-    # Adjoint: (A'b)[j] = conv(b, h)[j + padlen - 1]
-    # conv(b, h) = irfft(rfft(b_padded) .* rfft(h_padded))
-    # h_fft_adj stores rfft(h_padded)
     fill!(A.buf_adj, zero(T))
     copyto!(view(A.buf_adj, 1:outlen), b)
     mul!(A.buf_adj_c, A.R_adj, A.buf_adj)
     A.buf_adj_c .*= A.h_fft_adj
     mul!(A.buf_adj, A.I_adj, A.buf_adj_c)
-    # Extract positions padlen..padlen+n-1 from conv(b, h)
     padlen = A.padlen
     y .= @view(A.buf_adj[padlen:(padlen + n - 1)])
     return y
+end
+
+# Tiled FIR adjoint: y[j] = Σ_k h[k] * b[padlen+j-k]  (k = 1..m)
+# Processes 8 output samples per outer iteration to keep accumulators in
+# registers and avoid repeated reads/writes of y.
+function _xcorr_fir_adj!(y, b, h, padlen)
+    m = length(h); n = length(y); T = eltype(y)
+    j = 1
+    @inbounds while j ≤ n - 7
+        a0 = a1 = a2 = a3 = a4 = a5 = a6 = a7 = zero(T)
+        for k in 1:m
+            hk = h[k]
+            base = padlen + j - k
+            a0 = muladd(hk, b[base],     a0)
+            a1 = muladd(hk, b[base + 1], a1)
+            a2 = muladd(hk, b[base + 2], a2)
+            a3 = muladd(hk, b[base + 3], a3)
+            a4 = muladd(hk, b[base + 4], a4)
+            a5 = muladd(hk, b[base + 5], a5)
+            a6 = muladd(hk, b[base + 6], a6)
+            a7 = muladd(hk, b[base + 7], a7)
+        end
+        y[j] = a0; y[j + 1] = a1; y[j + 2] = a2; y[j + 3] = a3
+        y[j + 4] = a4; y[j + 5] = a5; y[j + 6] = a6; y[j + 7] = a7
+        j += 8
+    end
+    @inbounds while j ≤ n
+        acc = zero(T)
+        for k in 1:m
+            acc = muladd(h[k], b[padlen + j - k], acc)
+        end
+        y[j] = acc
+        j += 1
+    end
 end
 
 # Properties
