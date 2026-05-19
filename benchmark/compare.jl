@@ -77,14 +77,13 @@ function run_suite(repo_dir::AbstractString, result_path::AbstractString)
     Pkg.activate($(repr(bench_project)); io = devnull)
     Pkg.instantiate(; io = devnull)
     include($(repr(bench_script)))
-    BenchmarkTools.tune!(SUITE)
-    results = BenchmarkTools.run(SUITE; verbose = false)
+    results = BenchmarkTools.run(SUITE; verbose = true)
     using Serialization
     Serialization.serialize($(repr(result_path)), results)
     """
 
     cmd = `$(Base.julia_cmd()) --startup-file=no --project=$(bench_project) -e $(runner)`
-    @info "Running benchmarks at $repo_dir …"
+    @info "Running benchmarks at $repo_dir"
     run(cmd)
     return result_path
 end
@@ -274,6 +273,60 @@ function build_table(
 end
 
 # ---------------------------------------------------------------------------
+# Summary line
+# ---------------------------------------------------------------------------
+
+function build_summary(
+    base_flat::Dict{String,BenchmarkTools.Trial},
+    head_flat::Dict{String,BenchmarkTools.Trial},
+)
+    common = intersect(keys(base_flat), keys(head_flat))
+
+    time_speedups   = 0
+    time_regressions = 0
+    mem_improvements = 0
+    mem_regressions  = 0
+
+    for k in common
+        r_t, re_t = compute_ratio(base_flat[k], head_flat[k], :time)
+        if isfinite(r_t)
+            r_t - re_t > 1.2 && (time_speedups    += 1)
+            r_t + re_t < 0.8 && (time_regressions += 1)
+        end
+
+        r_m, _ = compute_ratio(base_flat[k], head_flat[k], :memory)
+        if isfinite(r_m)
+            r_m > 1.5 && (mem_improvements += 1)
+            r_m < 0.5 && (mem_regressions  += 1)
+        end
+    end
+
+    parts = String[]
+
+    if time_speedups > 0
+        n = time_speedups
+        push!(parts, "🚀 $n $(n == 1 ? "benchmark" : "benchmarks") improved in time")
+    end
+    if time_regressions > 0
+        n = time_regressions
+        push!(parts, "🐢 $n $(n == 1 ? "time regression" : "time regressions") detected")
+    end
+    if mem_improvements > 0
+        n = mem_improvements
+        push!(parts, "🚀 $n $(n == 1 ? "benchmark" : "benchmarks") use less memory")
+    end
+    if mem_regressions > 0
+        n = mem_regressions
+        push!(parts, "🐢 $n $(n == 1 ? "memory regression" : "memory regressions") detected")
+    end
+
+    if isempty(parts)
+        return "No significant performance or memory regressions detected."
+    end
+    return join(parts, " · ")
+end
+
+# ---------------------------------------------------------------------------
 # Comment body assembly
 # ---------------------------------------------------------------------------
 
@@ -286,9 +339,12 @@ function build_body(
 )
     time_table   = build_table(base_flat, head_flat, :time,   base_label, head_label)
     memory_table = build_table(base_flat, head_flat, :memory, base_label, head_label)
+    summary      = build_summary(base_flat, head_flat)
 
     return """
 ## Benchmark Results (Julia v$(julia_version))
+
+$(summary)
 
 <details open>
 <summary>Time benchmarks</summary>
