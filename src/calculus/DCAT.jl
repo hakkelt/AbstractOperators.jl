@@ -57,6 +57,29 @@ function _compute_dcat_cs(A, idxC)
     return ArrayPartition{T, Tuple{codomain...}}
 end
 
+# Flatten DCAT index structure (tuple of ints/tuples) into a flat tuple of ints.
+# Used in _dcat_apply_invperm to avoid allocating intermediate Vectors.
+@inline _dcat_flatten_idxs(::Tuple{}) = ()
+@inline function _dcat_flatten_idxs(idxs::Tuple)
+    head = first(idxs)
+    tail = _dcat_flatten_idxs(Base.tail(idxs))
+    return head isa Integer ? (Int(head), tail...) : (head..., tail...)
+end
+
+# Linear scan for value v in tuple t, returning its 1-based position.
+@inline _dcat_find_in_tuple(::Tuple{}, ::Int, ::Int) = 0
+@inline function _dcat_find_in_tuple(t::Tuple, v::Int, i::Int = 1)
+    return first(t) == v ? i : _dcat_find_in_tuple(Base.tail(t), v, i + 1)
+end
+
+# Apply the inverse permutation encoded in idxs to natural, using only tuple
+# operations so that no Vector is allocated on the hot path.
+function _dcat_apply_invperm(natural::Tuple, idxs::Tuple)
+    N = length(natural)
+    p = _dcat_flatten_idxs(idxs)
+    return ntuple(j -> natural[_dcat_find_in_tuple(p, j)], Val(N))
+end
+
 # Constructors
 DCAT(A::AbstractOperator) = A
 
@@ -178,13 +201,6 @@ has_optimized_normalop(L::DCAT) = any(has_optimized_normalop.(L.A))
 function get_normal_op(H::DCAT)
     idxs = tuple((1:length(H.A))...)
     return DCAT(tuple([get_normal_op(H.A[i]) for i in eachindex(H.A)]...), idxs, idxs)
-end
-
-# Apply inverse permutation (from DCAT idxs) to a natural-order size/type tuple.
-function _dcat_apply_invperm(natural::Tuple, idxs)
-    p = vcat([[idx...] for idx in idxs]...)
-    ip = invperm(p)
-    return ntuple(j -> natural[ip[j]], Val(length(natural)))
 end
 
 # Properties

@@ -67,7 +67,10 @@ function Xcorr(domain_type::Type, DomainDim::NTuple{N, Int}, h::H) where {H <: A
     fill!(buf_fwd, zero(domain_type))
 
     # Adjoint pass plans (conv(b, h) where b has length outlen)
-    fftlen_adj = nextpow(2, outlen + m - 1)
+    # The adjoint reads conv(b,h) only at positions padlen..padlen+n-1.
+    # Since padlen = max(n,m) ≥ m, circular conv mod fftlen_fwd is exact there:
+    # wrap-around from h affects only positions < m ≤ padlen (never our range).
+    fftlen_adj = fftlen_fwd
     buf_adj = similar(h, fftlen_adj)
     if domain_type <: Real
         R_adj = plan_rfft(buf_adj)
