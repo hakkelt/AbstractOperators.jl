@@ -1,5 +1,22 @@
 export Xcorr
 
+# Adjoint FFT state for non-CPU array backends.
+# CPU uses a tiled FIR loop instead; adj_fft is Nothing for CPU arrays.
+# Hfft and Hc are separate type params because plan_rfft on a CPU-backed GPU
+# mock array (e.g. JLArrays) may return a plain Vector from `R * buf`, while
+# similar(h, Complex{T}, ...) returns the array's own complex type.
+struct XcorrAdjFFT{
+        Hfft <: AbstractVector, H <: AbstractVector, Hc <: AbstractVector,
+        P3 <: AbstractFFTs.Plan, P4 <: AbstractFFTs.Plan,
+    }
+    fftlen::Int
+    h_fft::Hfft  # rfft(h padded); type may differ from buf_c
+    buf::H       # scratch buffer size fftlen
+    buf_c::Hc    # complex scratch buffer
+    R::P3        # rfft/fft plan
+    I::P4        # irfft/ifft plan
+end
+
 """
 	Xcorr([domain_type=Float64::Type,] dim_in::Tuple, h::AbstractVector)
 	Xcorr(x::AbstractVector, h::AbstractVector)
@@ -14,20 +31,6 @@ julia> Xcorr(Float64, (10,), [1.0, 0.5, 0.2])
 ◎  ℝ^10 -> ℝ^19
 ```
 """
-# Adjoint FFT state for non-CPU array backends.
-# CPU uses a tiled FIR loop instead; adj_fft is Nothing for CPU arrays.
-struct XcorrAdjFFT{
-        Hc <: AbstractVector, H <: AbstractVector,
-        P3 <: AbstractFFTs.Plan, P4 <: AbstractFFTs.Plan,
-    }
-    fftlen::Int
-    h_fft::Hc    # rfft(h padded)
-    buf::H       # scratch buffer size fftlen
-    buf_c::Hc    # complex scratch buffer
-    R::P3        # rfft/fft plan
-    I::P4        # irfft/ifft plan
-end
-
 struct Xcorr{
         T, H <: AbstractVector{T}, Hc <: AbstractVector,
         P1 <: AbstractFFTs.Plan, P2 <: AbstractFFTs.Plan, Adj,
