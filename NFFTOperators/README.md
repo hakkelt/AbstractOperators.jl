@@ -19,6 +19,10 @@ NFFTOperators.jl is a **subpackage** of the AbstractOperators.jl ecosystem. Whil
 pkg> add NFFTOperators
 ```
 
+## GPU Support
+
+NFFTOperators.jl supports GPU execution only with CUDA.jl. The GPU implementation relies on CUDA-specific FFT planning, so the package does not currently support AMDGPU.jl, oneAPI.jl, or OpenCL.jl backends.
+
 ## Usage Example
 
 ```julia

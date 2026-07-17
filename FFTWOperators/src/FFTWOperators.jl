@@ -7,14 +7,16 @@ import LinearAlgebra: mul!
 import Base: size, ndims
 
 import AbstractOperators:
+    _normalize_array_type,
+    _array_wrapper_type,
     domain_type,
     codomain_type,
     fun_name,
     get_normal_op,
     allocate_in_domain,
     allocate_in_codomain,
-    domain_storage_type,
-    codomain_storage_type,
+    domain_array_type,
+    codomain_array_type,
     can_be_combined,
     combine,
     is_thread_safe,

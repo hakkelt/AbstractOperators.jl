@@ -19,12 +19,14 @@ end
     for pair in thread_count_functions[]
         pair.second(n)
     end
+    return
 end
 
 @noinline function _restore_thread_counts(prev::Vector)
     for (i, pair) in enumerate(thread_count_functions[])
         pair.second(prev[i])
     end
+    return
 end
 
 function set_thread_counts_expr(thread_count_expr, body_expr)
@@ -57,13 +59,51 @@ macro restrict_threading(expr)
     return set_thread_counts_expr(1, expr)
 end
 
+_storage_parent(a) = a
+_storage_parent(a::SubArray) = _storage_parent(parent(a))
+_storage_parent(a::Base.ReshapedArray) = _storage_parent(parent(a))
+
+_is_storage_compatible(a, ::Type{<:Array}) = _storage_parent(a) isa Array
+_is_storage_compatible(a, ::Type{T}) where {T} = _storage_parent(a) isa T
+
+@generated function _is_storage_compatible(a::ArrayPartition, ::Type{T}) where {T <: ArrayPartition}
+    Tp = T.parameters[2]
+    if !(Tp isa DataType && Tp <: Tuple)
+        return :(a isa T)
+    end
+    types = Tp.parameters
+    checks = [:(a.x[$i] isa $(types[i])) for i in 1:length(types)]
+    cond = isempty(checks) ? :(true) : reduce((x, y) -> :($x && $y), checks)
+    return :(length(a.x) == $(length(types)) && $cond)
+end
+
+function _check_domain_storage(domain_array, op)
+    if !_is_storage_compatible(domain_array, domain_array_type(op))
+        throw(
+            ArgumentError(
+                "Input storage type $(typeof(domain_array)) is not compatible with " *
+                    "operator's expected domain storage $(domain_array_type(op))",
+            ),
+        )
+    end
+    return
+end
+
+function _check_codomain_storage(codomain_array, op)
+    if !_is_storage_compatible(codomain_array, codomain_array_type(op))
+        throw(
+            ArgumentError(
+                "Output storage type $(typeof(codomain_array)) is not compatible with " *
+                    "operator's expected codomain storage $(codomain_array_type(op))",
+            ),
+        )
+    end
+    return
+end
+
 function check(codomain_array, op, domain_array)
-    if domain_array isa AbstractArray === false
-        throw(ArgumentError("Input must be an AbstractArray"))
-    end
-    if codomain_array isa AbstractArray === false
-        throw(ArgumentError("Output must be an AbstractArray"))
-    end
+    _check_domain_storage(domain_array, op)
+    _check_codomain_storage(codomain_array, op)
     if (ndoms(op, 2) > 1) != (domain_array isa ArrayPartition)
         throw(ArgumentError("Input must be an ArrayPartition if and only if operator has multiple input domains"))
     end
@@ -89,7 +129,11 @@ function check(codomain_array, op, domain_array)
         )
     end
     if (ndoms(op, 1) > 1) != (codomain_array isa ArrayPartition)
-        throw(ArgumentError("Output must be an ArrayPartition if and only if operator has multiple output domains"))
+        throw(
+            ArgumentError(
+                "Output must be an ArrayPartition if and only if operator has multiple output domains",
+            ),
+        )
     end
     if codomain_array isa ArrayPartition
         dtype = eltype.(codomain_array.x)
@@ -104,11 +148,12 @@ function check(codomain_array, op, domain_array)
         )
     end
     dim_out = codomain_array isa ArrayPartition ? size.(codomain_array.x) : size(codomain_array)
-    return if !isequal(dim_out, size(op, 1))
+    if !isequal(dim_out, size(op, 1))
         throw(
             DimensionMismatch(
                 "Output size $(dim_out) does not match operator output size $(size(op, 1))",
             ),
         )
     end
+    return nothing
 end

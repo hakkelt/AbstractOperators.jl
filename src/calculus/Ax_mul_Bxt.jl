@@ -95,8 +95,12 @@ function mul!(y::AbstractArray, J::AdjointOperator{<:Ax_mul_BxtJac}, b::Abstract
 end
 
 # Properties
-Base.:(==)(P1::Ax_mul_Bxt{L1, L2, C, D}, P2::Ax_mul_Bxt{L1, L2, C, D}) where {L1, L2, C, D} = P1.A == P2.A && P1.B == P2.B
-Base.:(==)(P1::Ax_mul_BxtJac{L1, L2, C, D}, P2::Ax_mul_BxtJac{L1, L2, C, D}) where {L1, L2, C, D} = P1.A == P2.A && P1.B == P2.B
+function Base.:(==)(P1::Ax_mul_Bxt{L1, L2, C, D}, P2::Ax_mul_Bxt{L1, L2, C, D}) where {L1, L2, C, D}
+    return P1.A == P2.A && P1.B == P2.B
+end
+function Base.:(==)(P1::Ax_mul_BxtJac{L1, L2, C, D}, P2::Ax_mul_BxtJac{L1, L2, C, D}) where {L1, L2, C, D}
+    return P1.A == P2.A && P1.B == P2.B
+end
 
 function size(P::Union{Ax_mul_Bxt, Ax_mul_BxtJac})
     return ((size(P.A, 1)[1], size(P.B, 1)[1]), size(P.A, 2))
@@ -106,8 +110,8 @@ fun_name(L::Union{Ax_mul_Bxt, Ax_mul_BxtJac}) = fun_name(L.A) * "*" * fun_name(L
 
 domain_type(L::Union{Ax_mul_Bxt, Ax_mul_BxtJac}) = domain_type(L.A)
 codomain_type(L::Union{Ax_mul_Bxt, Ax_mul_BxtJac}) = codomain_type(L.A)
-domain_storage_type(L::Union{Ax_mul_Bxt, Ax_mul_BxtJac}) = domain_storage_type(L.A)
-codomain_storage_type(L::Union{Ax_mul_Bxt, Ax_mul_BxtJac}) = codomain_storage_type(L.B)
+domain_array_type(L::Union{Ax_mul_Bxt, Ax_mul_BxtJac}) = domain_array_type(L.A)
+codomain_array_type(L::Union{Ax_mul_Bxt, Ax_mul_BxtJac}) = codomain_array_type(L.B)
 
 # utils
 function permute(

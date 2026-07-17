@@ -19,6 +19,10 @@ DSPOperators.jl is a **subpackage** of the AbstractOperators.jl ecosystem. While
 pkg> add DSPOperators
 ```
 
+## GPU Support
+
+DSPOperators.jl follows the generic GPU-array support provided by AbstractOperators.jl. In practice, its operators are intended to work with CUDA.jl, AMDGPU.jl, oneAPI.jl, and OpenCL.jl when the underlying array operations are GPU-compatible.
+
 ## Usage Example
 
 ```julia

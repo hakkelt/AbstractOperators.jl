@@ -44,8 +44,8 @@ size(L::AdjointOperator) = size(L.A, 2), size(L.A, 1)
 
 domain_type(L::AdjointOperator) = codomain_type(L.A)
 codomain_type(L::AdjointOperator) = domain_type(L.A)
-domain_storage_type(L::AdjointOperator) = codomain_storage_type(L.A)
-codomain_storage_type(L::AdjointOperator) = domain_storage_type(L.A)
+domain_array_type(L::AdjointOperator) = codomain_array_type(L.A)
+codomain_array_type(L::AdjointOperator) = domain_array_type(L.A)
 is_thread_safe(L::AdjointOperator) = is_thread_safe(L.A)
 
 fun_name(L::AdjointOperator) = fun_name(L.A) * "ᵃ"

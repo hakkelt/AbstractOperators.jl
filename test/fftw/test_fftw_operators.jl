@@ -1,4 +1,5 @@
 @testitem "DCT" tags = [:fftw, :DCT] setup = [TestUtils] begin
+    using AbstractOperators
     using FFTW, LinearAlgebra, Random, FFTWOperators
     using AbstractOperators: is_linear, is_null, is_eye, is_diagonal, is_AcA_diagonal, is_AAc_diagonal, is_orthogonal, is_invertible, is_full_row_rank, is_full_column_rank
 
@@ -37,6 +38,7 @@
 end
 
 @testitem "IDCT" tags = [:fftw, :IDCT] setup = [TestUtils] begin
+    using AbstractOperators
     using FFTW, LinearAlgebra, Random, FFTWOperators
     using AbstractOperators: is_linear, is_null, is_eye, is_diagonal, is_AcA_diagonal, is_AAc_diagonal, is_orthogonal, is_invertible, is_full_row_rank, is_full_column_rank
 
@@ -75,6 +77,7 @@ end
 end
 
 @testitem "DFT" tags = [:fftw, :DFT] setup = [TestUtils] begin
+    using AbstractOperators
     using FFTW, LinearAlgebra, Random, FFTWOperators
     using AbstractOperators: is_linear, is_null, is_eye, is_diagonal, is_AcA_diagonal, is_AAc_diagonal, is_orthogonal, is_invertible, is_full_row_rank, is_full_column_rank
 
@@ -175,6 +178,7 @@ end
 end
 
 @testitem "IDFT" tags = [:fftw, :IDFT] setup = [TestUtils] begin
+    using AbstractOperators
     using FFTW, LinearAlgebra, Random, FFTWOperators
     using AbstractOperators: is_linear, is_null, is_eye, is_diagonal, is_AcA_diagonal, is_AAc_diagonal, is_orthogonal, is_invertible, is_full_row_rank, is_full_column_rank
 
@@ -244,6 +248,7 @@ end
 end
 
 @testitem "RDFT" tags = [:fftw, :RDFT] setup = [TestUtils] begin
+    using AbstractOperators
     using FFTW, LinearAlgebra, Random, FFTWOperators
     using AbstractOperators: is_linear, is_null, is_eye, is_diagonal, is_AcA_diagonal, is_AAc_diagonal, is_orthogonal, is_invertible, is_full_row_rank, is_full_column_rank
 
@@ -281,6 +286,7 @@ end
 end
 
 @testitem "IRDFT" tags = [:fftw, :IRDFT] setup = [TestUtils] begin
+    using AbstractOperators
     using FFTW, LinearAlgebra, Random, FFTWOperators
     using AbstractOperators: is_linear, is_null, is_eye, is_diagonal, is_AcA_diagonal, is_AAc_diagonal, is_orthogonal, is_invertible, is_full_row_rank, is_full_column_rank
 
@@ -338,4 +344,73 @@ end
     @test is_invertible(op) == true
     @test is_full_row_rank(op) == true
     @test is_full_column_rank(op) == false
+end
+
+@testitem "DCT/IDCT (GPU)" tags = [:gpu, :fftw, :DCT, :IDCT] setup = [TestUtils] begin
+    using AbstractOperators, FFTW, FFTWOperators, GPUEnv, Random
+    has_accelerated_dcts = Base.find_package("AcceleratedDCTs") !== nothing
+
+    for backend in gpu_backends(; include_jlarrays = false, supports_fftw = true)
+        Random.seed!(0)
+
+        has_accelerated_dcts || continue
+        import AcceleratedDCTs
+
+        dims = (8, 10)
+        x_cpu = randn(Float32, dims...)
+        x_gpu = to_gpu(backend, x_cpu)
+
+        dct_op = DCT(x_gpu)
+        y_gpu = similar(x_gpu)
+        mul!(y_gpu, dct_op, x_gpu)
+        @test y_gpu isa typeof(x_gpu)
+        @test collect(y_gpu) ≈ dct(x_cpu) rtol = 1.0e-4 atol = 1.0e-4
+
+        idct_op = IDCT(x_gpu)
+        x_rec_gpu = similar(x_gpu)
+        mul!(x_rec_gpu, idct_op, y_gpu)
+        @test collect(x_rec_gpu) ≈ x_cpu rtol = 1.0e-4 atol = 1.0e-4
+
+        x_adj_gpu = similar(x_gpu)
+        mul!(x_adj_gpu, dct_op', y_gpu)
+        @test collect(x_adj_gpu) ≈ x_cpu rtol = 1.0e-4 atol = 1.0e-4
+    end
+end
+
+@testitem "DFT/RDFT/IRDFT (GPU)" tags = [:gpu, :fftw, :DFT, :RDFT, :IRDFT] setup = [TestUtils] begin
+    using FFTW, FFTWOperators, GPUEnv, LinearAlgebra, Random, AbstractOperators
+
+    for backend in gpu_backends(supports_fftw = true)
+        Random.seed!(0)
+        n, m = 8, 6
+
+        x_cpu = randn(Float64, n, m)
+        op = DFT(to_gpu(backend, x_cpu))
+        @test op isa DFT
+        x_gpu = to_gpu(backend, x_cpu)
+        y_gpu = similar(x_gpu, Complex{Float64})
+        mul!(y_gpu, op, x_gpu)
+        @test Array(y_gpu) ≈ fft(x_cpu)
+        r_gpu = similar(x_gpu, Float64)
+        mul!(r_gpu, op', y_gpu)
+        @test Array(r_gpu) ≈ real.(bfft(Array(y_gpu)))
+
+        xc_cpu = randn(ComplexF64, n, m)
+        opc = DFT(to_gpu(backend, xc_cpu))
+        @test opc isa DFT
+        xc_gpu = to_gpu(backend, xc_cpu)
+        yc_gpu = similar(xc_gpu)
+        mul!(yc_gpu, opc, xc_gpu)
+        @test Array(yc_gpu) ≈ fft(xc_cpu)
+
+        opr = RDFT(to_gpu(backend, x_cpu))
+        yr_gpu = similar(x_gpu, Complex{Float64}, n ÷ 2 + 1, m)
+        mul!(yr_gpu, opr, x_gpu)
+        @test Array(yr_gpu) ≈ rfft(x_cpu, 1)
+
+        opir = IRDFT(to_gpu(backend, Array(yr_gpu)), n)
+        out_gpu = similar(x_gpu)
+        mul!(out_gpu, opir, yr_gpu)
+        @test Array(out_gpu) ≈ x_cpu rtol = 1.0e-12
+    end
 end

@@ -17,6 +17,8 @@ makedocs(;
         "Calculus rules" => "calculus.md",
         "Properties" => "properties.md",
         "Batch operators" => "batching.md",
+        "GPU Support" => "gpu.md",
+        "Performance" => "performance.md",
         "Custom Operators" => "custom.md",
         "LinearMaps wrapper" => "linearmaps.md",
     ],

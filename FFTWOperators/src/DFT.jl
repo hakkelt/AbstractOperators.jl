@@ -280,12 +280,12 @@ end
 # Properties
 
 size(L::DFT) = (L.dim_in, L.dim_in)
-function domain_storage_type(
+function domain_array_type(
         ::DFT{N, C, D, Dir, S}
     ) where {N, C, D, Dir, S}
     return S{D}
 end
-function codomain_storage_type(
+function codomain_array_type(
         ::DFT{N, C, D, Dir, S}
     ) where {N, C, D, Dir, S}
     return S{C}

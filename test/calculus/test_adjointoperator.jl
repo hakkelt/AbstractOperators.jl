@@ -1,7 +1,6 @@
 @testitem "AdjointOperator" tags = [:calculus, :AdjointOperator] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing AdjointOperator --- ")
 
     m, n = 5, 7
     A1 =
@@ -58,8 +57,8 @@
     @test op2 == opA1
 
     # storage & thread-safety propagation
-    _dst = domain_storage_type(opT)
-    _cst = codomain_storage_type(opT)
+    _dst = domain_array_type(opT)
+    _cst = codomain_array_type(opT)
     @test _dst !== nothing && _cst !== nothing
     @test is_thread_safe(opT) == is_thread_safe(opA1)
 
@@ -88,4 +87,22 @@
     @test occursin("ᵃ", str2)
 
     @test opA1' == opA1'
+end
+
+@testitem "AdjointOperator (GPU)" tags = [:gpu, :calculus, :AdjointOperator] setup = [TestUtils] begin
+    using Random, AbstractOperators, GPUEnv
+
+    for backend in gpu_backends()
+        Random.seed!(0)
+
+        n = 5
+        op = FiniteDiff(gpu_zeros(backend, Float64, n))
+        opT = AdjointOperator(op)
+        test_op(opT, gpu_randn(backend, n - 1), gpu_randn(backend, n), false)
+
+        n = 4
+        op = DiagOp(gpu_randn(backend, n))
+        opT = AdjointOperator(op)
+        test_op(opT, gpu_randn(backend, n), gpu_randn(backend, n), false)
+    end
 end

@@ -1,5 +1,6 @@
 @testitem "Transform Combinations" tags = [:fftw, :CombinationRules] begin
     using FFTWOperators
+    using AbstractOperators
     using AbstractOperators: can_be_combined, combine
 
     n = 8  # Power of 2 for DCT

@@ -1,7 +1,6 @@
 @testitem "Ax_mul_Bx" tags = [:calculus, :Ax_mul_Bx] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing Ax_mul_Bx --- ")
     n = 3
     A, B = Eye(n, n), Eye(n, n)
     P = Ax_mul_Bx(A, B)
@@ -100,4 +99,27 @@
     A, B = MatrixOp(randn(l, n), l), MatrixOp(randn(l, n), l)
     @test Ax_mul_Bx(A, B) == Ax_mul_Bx(A, B)
     @test Jacobian(Ax_mul_Bx(A, B), x) == Jacobian(Ax_mul_Bx(A, B), x)
+end
+
+@testitem "Ax_mul_Bx (GPU)" tags = [:gpu, :calculus, :Ax_mul_Bx] setup = [TestUtils] begin
+    using Random, AbstractOperators, GPUEnv
+
+    for backend in gpu_backends()
+        Random.seed!(0)
+
+        n = 3
+        P = Ax_mul_Bx(
+            Eye(Float64, (n, n); array_type = gpu_wrapper(backend, Float64, n, n)),
+            Eye(Float64, (n, n); array_type = gpu_wrapper(backend, Float64, n, n)),
+        )
+        x = gpu_randn(backend, n, n)
+        r = gpu_randn(backend, n, n)
+        test_NLop_gpu(P, x, r, false)
+
+        n2 = 3
+        P2 = Ax_mul_Bx(Sin(gpu_zeros(backend, Float64, n2, n2)), Cos(gpu_zeros(backend, Float64, n2, n2)))
+        x2 = gpu_randn(backend, n2, n2)
+        r2 = gpu_randn(backend, n2, n2)
+        test_NLop_gpu(P2, x2, r2, false)
+    end
 end

@@ -1,6 +1,5 @@
-@testitem "Jacobian" tags = [:calculus, :Jacobian] setup = [TestUtils] begin
+@testitem "Jacobian: basic HCAT" tags = [:calculus, :Jacobian] setup = [TestUtils] begin
     using AbstractOperators
-    verb && println(" --- Testing Jacobian --- ")
 
     m, n = 3, 5
     x = ArrayPartition(randn(m), randn(n))
@@ -16,8 +15,10 @@
     J = Jacobian(opP, xp)'
     verb && println(size(J, 1))
     y, grad = test_NLop(opP, xp, r, verb)
+end
 
-    # Additional coverage-oriented tests appended (no new testset created)
+@testitem "Jacobian: LinearOperator and Scale paths" tags = [:calculus, :Jacobian] setup = [TestUtils] begin
+    using AbstractOperators
 
     # 1. LinearOperator path (Jacobian of a LinearOperator returns itself)
     n_lin = 6
@@ -35,6 +36,10 @@
     @test JS isa Scale
     @test JS.coeff == 2.5
     @test JS.A == Jacobian(base_op, x_sc)
+end
+
+@testitem "Jacobian: AffineAdd and Transpose paths" tags = [:calculus, :Jacobian] setup = [TestUtils] begin
+    using AbstractOperators
 
     # 3. AffineAdd path (Jacobian should drop displacement)
     n_aff = 4
@@ -49,6 +54,10 @@
     n_tr = 5
     op_tr = Sigmoid(Float64, (n_tr,), 2)
     @test_throws ErrorException op_tr'
+end
+
+@testitem "Jacobian: Compose Sum VCAT paths" tags = [:calculus, :Jacobian] setup = [TestUtils] begin
+    using AbstractOperators
 
     # 5. Compose path (single op) with tuple input to trigger second Compose method
     n_cp = 3
@@ -80,6 +89,10 @@
     JV = Jacobian(Vop, x_v)
     @test JV.A[1] == Jacobian(op_v1, x_v)
     @test JV.A[2] == Jacobian(op_v2, x_v)
+end
+
+@testitem "Jacobian: HCAT and DCAT paths" tags = [:calculus, :Jacobian] setup = [TestUtils] begin
+    using AbstractOperators
 
     # 8. HCAT path with multi-index block (length(idx) > 1) to cover else branch
     m_h1, m_h2 = 3, 2
@@ -104,6 +117,10 @@
     JD = Jacobian(D, xh)
     @test JD.A[1] == Jacobian(op_joint, (xh.x[1], xh.x[2]))
     @test JD.A[2] == Jacobian(Ah1, xh.x[3])
+end
+
+@testitem "Jacobian: Reshape and BroadCast paths" tags = [:calculus, :Jacobian] setup = [TestUtils] begin
+    using AbstractOperators
 
     # 10. Reshape path
     n_rs = 6
@@ -121,6 +138,10 @@
     JBc = Jacobian(Bc, x_bc)
     # ensure repeating structure consistent
     @test size(JBc) == ((n_bc, l_bc), (n_bc,))
+end
+
+@testitem "Jacobian: equality and properties" tags = [:calculus, :Jacobian] setup = [TestUtils] begin
+    using AbstractOperators
 
     # 12. Equality and show output
     n_eq = 4
@@ -140,8 +161,8 @@
     # 13. Type and thread safety properties
     @test domain_type(J1) == domain_type(op_eq)
     @test codomain_type(J1) == codomain_type(op_eq)
-    @test domain_storage_type(J1) == domain_storage_type(op_eq)
-    @test codomain_storage_type(J1) == codomain_storage_type(op_eq)
+    @test domain_array_type(J1) == domain_array_type(op_eq)
+    @test codomain_array_type(J1) == codomain_array_type(op_eq)
     @test !is_thread_safe(J1)
 
     # Direct DCAT + ArrayPartition Jacobian path
@@ -156,4 +177,31 @@
     JJ = Jacobian(Hj, xj)
     @test JJ isa HCAT
     @test length(JJ.A) == 2
+end
+
+@testitem "Jacobian (GPU)" tags = [:gpu, :calculus, :Jacobian] setup = [TestUtils] begin
+    using Random, AbstractOperators, GPUEnv
+
+    for backend in gpu_backends()
+        Random.seed!(0)
+
+        n = 5
+        A = Sin(gpu_zeros(backend, Float64, n))
+        x = gpu_randn(backend, n)
+        J = Jacobian(A, x)
+        y = gpu_randn(backend, n)
+        grad = J' * y
+        grad2 = similar(grad)
+        mul!(grad2, J', y)
+        @test collect(grad) ≈ collect(grad2)
+
+        A2 = Exp(gpu_zeros(backend, Float64, n))
+        x2 = gpu_randn(backend, n)
+        J2 = Jacobian(A2, x2)
+        y2 = gpu_randn(backend, n)
+        grad3 = J2' * y2
+        grad4 = similar(grad3)
+        mul!(grad4, J2', y2)
+        @test collect(grad3) ≈ collect(grad4)
+    end
 end

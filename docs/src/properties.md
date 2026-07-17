@@ -8,8 +8,8 @@ ndims
 ndoms
 domain_type
 codomain_type
-domain_storage_type
-codomain_storage_type
+domain_array_type
+codomain_array_type
 ```
 
 ## Traits
@@ -56,4 +56,10 @@ is_sliced
 remove_slicing
 is_thread_safe
 estimate_opnorm
+```
+
+## Operator Copying
+
+```@docs
+copy_operator
 ```

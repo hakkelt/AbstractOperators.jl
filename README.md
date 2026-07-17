@@ -3,7 +3,7 @@
 [![Build status](https://github.com/kul-optec/AbstractOperators.jl/workflows/CI/badge.svg)](https://github.com/kul-optec/AbstractOperators.jl/actions?query=workflow%3ACI)
 [![codecov](https://codecov.io/gh/kul-optec/AbstractOperators.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/kul-optec/AbstractOperators.jl)
 [![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
-[![code style blue](https://img.shields.io/badge/code%20style-blue-4495d1.svg)](https://github.com/invenia/BlueStyle)
+[![Runic formatter](https://img.shields.io/badge/code_style-%E1%9A%B1%E1%9A%A2%E1%9A%BE%E1%9B%81%E1%9A%B2-black)](https://github.com/fredrikekre/Runic.jl)
 
 [![](https://img.shields.io/badge/docs-stable-blue.svg)](https://kul-optec.github.io/AbstractOperators.jl/stable)
 [![](https://img.shields.io/badge/docs-latest-blue.svg)](https://kul-optec.github.io/AbstractOperators.jl/latest)
@@ -122,6 +122,16 @@ A list of the available `AbstractOperators` and calculus rules can be found in t
 * [JOLI.jl](https://github.com/slimgroup/JOLI.jl) is also a framework for constructing matrix-free linear operators with explicit domain/range type control and applying them in basic algebraic matrix-vector operations.
 
 `AbstractOperators.jl` is distinguished by its support for multi-dimensional array domains and codomains, efficient in-place implementations of both linear and nonlinear operators, and seamless integration with optimization algorithms in related packages: [ProximalOperators.jl](https://github.com/kul-forbes/ProximalOperators.jl), [ProximalAlgorithms.jl](https://github.com/kul-forbes/ProximalAlgorithms.jl), and [StructuredOptimization.jl](https://github.com/kul-forbes/StructuredOptimization.jl). It has built-in threading support for many operators, and partial (and extending) GPU support.
+
+## GPU Support
+
+Most operators in the AbstractOperators.jl ecosystem work with GPU arrays on CUDA.jl, AMDGPU.jl, oneAPI.jl, and OpenCL.jl.
+
+Subpackage-specific exceptions are:
+
+- `NFFTOperators.jl` supports GPU execution only with CUDA.jl
+- `WaveletOperators.jl` currently works on CPU only
+- `DCT` and `IDCT` (in FFTWOperators.jl) use CPU FFTW plans by default, but load `AcceleratedDCTs` to activate GPU support for those operators
 
 ## Credits
 

@@ -1,7 +1,7 @@
-@testitem "Ax_mul_Bxt" tags = [:calculus, :Ax_mul_Bxt] setup = [TestUtils] begin
+@testitem "Ax_mul_Bxt: basic mul" tags = [:calculus, :Ax_mul_Bxt] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing Ax_mul_Bxt --- ")
+
     n = 10
     A, B = Eye(n), Sin(n)
     P = Ax_mul_Bxt(A, B)
@@ -33,6 +33,11 @@
     r = randn(n, n)
     y, grad = test_NLop(P, x, r, verb)
     @test norm((A * x) * (B * x)' - y) < 1.0e-8
+end
+
+@testitem "Ax_mul_Bxt: HCAT and permute" tags = [:calculus, :Ax_mul_Bxt] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
 
     # testing with HCAT
     m, n = 3, 5
@@ -62,6 +67,11 @@
 
     @test_throws Exception Ax_mul_Bxt(Eye(2, 2), Eye(2, 1))
     @test_throws Exception Ax_mul_Bxt(Eye(2, 2, 2), Eye(2, 2, 2))
+end
+
+@testitem "Ax_mul_Bxt: error paths and equality" tags = [:calculus, :Ax_mul_Bxt] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
 
     # ndims==2 branch with mismatched second codomain dimension
     struct AxDummy2D <: AbstractOperator
@@ -71,8 +81,8 @@
     Base.size(op::AxDummy2D) = (op.dim_out, op.dim_in)
     AbstractOperators.domain_type(::AxDummy2D) = Float64
     AbstractOperators.codomain_type(::AxDummy2D) = Float64
-    AbstractOperators.domain_storage_type(::AxDummy2D) = Array{Float64}
-    AbstractOperators.codomain_storage_type(::AxDummy2D) = Array{Float64}
+    AbstractOperators.domain_array_type(::AxDummy2D) = Array{Float64}
+    AbstractOperators.codomain_array_type(::AxDummy2D) = Array{Float64}
 
     struct AxDummyMixed <: AbstractOperator
         dim_out::Tuple{Int}
@@ -81,8 +91,8 @@
     Base.size(op::AxDummyMixed) = (op.dim_out, op.dim_in)
     AbstractOperators.domain_type(::AxDummyMixed) = Float64
     AbstractOperators.codomain_type(::AxDummyMixed) = Float64
-    AbstractOperators.domain_storage_type(::AxDummyMixed) = Array{Float64}
-    AbstractOperators.codomain_storage_type(::AxDummyMixed) = Array{Float64}
+    AbstractOperators.domain_array_type(::AxDummyMixed) = Array{Float64}
+    AbstractOperators.codomain_array_type(::AxDummyMixed) = Array{Float64}
 
     A2d = AxDummy2D((2, 3), (4, 3))
     B2d_bad = AxDummy2D((2, 4), (4, 3))
@@ -93,6 +103,25 @@
     # test equality
     n, m = 3, 4
     A, B = MatrixOp(randn(n, m)), MatrixOp(randn(n, m))
+    # x matches the HCAT ArrayPartition context used in original test
+    x = ArrayPartition(randn(3), randn(5))
     @test Ax_mul_Bxt(A, B) == Ax_mul_Bxt(A, B)
     @test Jacobian(Ax_mul_Bxt(A, B), x) == Jacobian(Ax_mul_Bxt(A, B), x)
+end
+
+@testitem "Ax_mul_Bxt (GPU)" tags = [:gpu, :calculus, :Ax_mul_Bxt] setup = [TestUtils] begin
+    using Random, AbstractOperators, GPUEnv
+
+    for backend in gpu_backends()
+        Random.seed!(0)
+
+        n = 10
+        P = Ax_mul_Bxt(
+            Eye(Float64, (n,); array_type = gpu_wrapper(backend, Float64, n)),
+            Sin(gpu_zeros(backend, Float64, n)),
+        )
+        x = gpu_randn(backend, n)
+        r = gpu_randn(backend, n, n)
+        test_NLop_gpu(P, x, r, false)
+    end
 end

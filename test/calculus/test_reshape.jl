@@ -1,7 +1,6 @@
-@testitem "Reshape" tags = [:calculus, :Reshape] setup = [TestUtils] begin
+@testitem "Reshape: basic 1D->2D" tags = [:calculus, :Reshape] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
-    verb && println(" --- Testing Reshape --- ")
 
     m, n = 8, 4
     dim_out = (2, 2, 2)
@@ -25,6 +24,11 @@
     @test is_invertible(opR) == is_invertible(opA1)
     @test is_full_row_rank(opR) == is_full_row_rank(opA1)
     @test is_full_column_rank(opR) == is_full_column_rank(opA1)
+end
+
+@testitem "Reshape: displacement and storage" tags = [:calculus, :Reshape] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
 
     # testing displacement
     m, n = 8, 4
@@ -42,19 +46,22 @@
     @test norm(y1 - y2) <= 1.0e-12
 
     # fun_name / storage / thread safety / idempotent remove
-    io = IOBuffer(); show(io, opR); s = String(take!(io))
+    io = IOBuffer()
+    show(io, opR)
+    s = String(take!(io))
     @test length(s) > 0
-    _dst = domain_storage_type(opR)
-    _cst = codomain_storage_type(opR)
+    _dst = domain_array_type(opR)
+    _cst = codomain_array_type(opR)
     @test _dst !== nothing && _cst !== nothing
     @test is_thread_safe(opR) == is_thread_safe(opA1)
     rd1 = remove_displacement(opR)
     rd2 = remove_displacement(rd1)
     @test rd1 * x1 == rd2 * x1
+end
 
-    #######################
-    ## test Scale   #######
-    #######################
+@testitem "Reshape: Scale mul" tags = [:calculus, :Reshape] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
 
     m, n = 8, 4
     coeff = pi
@@ -78,8 +85,18 @@
     y1 = test_op(opS, x1, diff(randn(m)), verb)
     y2 = coeff * (diff(x1))
     @test norm(y1 - y2) <= 1.0e-12
+end
 
+@testitem "Reshape: Scale properties" tags = [:calculus, :Reshape] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
+
+    m, n = 8, 4
+    coeff = pi
+    A1 = randn(m, n)
+    opA1 = MatrixOp(A1)
     opS = Scale(coeff, opA1)
+
     @test is_null(opS) == is_null(opA1)
     @test is_eye(opS) == is_eye(opA1)
     @test is_diagonal(opS) == is_diagonal(opA1)
@@ -125,6 +142,11 @@
     y1 = remove_displacement(opS) * x1
     y2 = coeff * (A1 * x1)
     @test norm(y1 - y2) <= 1.0e-12
+end
+
+@testitem "Reshape: equality and adjoint" tags = [:calculus, :Reshape] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
 
     # Equality / inequality
     m, n = 8, 4
@@ -145,11 +167,14 @@
     @test lhs ≈ rhs
 
     # fun_name via show should start with paragraph symbol
-    io = IOBuffer(); show(io, Rf); sR = String(take!(io))
+    io = IOBuffer()
+    show(io, Rf)
+    sR = String(take!(io))
     @test occursin("¶", sR)
 
     # has_optimized_normalop + get_normal_op passthrough (using GetIndex which has optimized normal)
-    nGI = 10; kGI = 7
+    nGI = 10
+    kGI = 7
     GI = GetIndex(Float64, (nGI,), (1:kGI,))  # sliced operator returning size kGI
     RG = Reshape(GI, (kGI, 1))
     normal_RG = AbstractOperators.get_normal_op(RG)
@@ -161,14 +186,22 @@
     @test exprRG == (1:kGI,)
     maskRG = AbstractOperators.get_slicing_mask(GI)
     @test sum(maskRG) == kGI
+end
+
+@testitem "Reshape: permute and nonlinear" tags = [:calculus, :Reshape] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
 
     # permute domain ordering (wrap HCAT to get multi-domain) and ensure same behavior when inputs permuted
-    mH = 6; n1 = 3; n2 = 5
+    mH = 6
+    n1 = 3
+    n2 = 5
     A1p = MatrixOp(randn(mH, n1))
     A2p = MatrixOp(randn(mH, n2))
     H = HCAT(A1p, A2p)
     RH = Reshape(H, (2, 3))  # 6 = 2*3
-    x1p = randn(n1); x2p = randn(n2)
+    x1p = randn(n1)
+    x2p = randn(n2)
     y_orig = RH * ArrayPartition(x1p, x2p)
     p = [2, 1]
     RHp = AbstractOperators.permute(RH, p)
@@ -176,6 +209,10 @@
     @test y_orig ≈ y_perm
 
     # opnorm passthrough
+    m, n = 8, 4
+    dim_out = (2, 2, 2)
+    Aeq = MatrixOp(randn(m, n))
+    R1 = Reshape(Aeq, dim_out)
     @test AbstractOperators.has_fast_opnorm(R1) == AbstractOperators.has_fast_opnorm(Aeq)
     @test opnorm(R1) ≈ opnorm(Aeq)
 
@@ -196,4 +233,22 @@
 
     Y = reshape(opS * x, 2, 2)
     @test norm(Y - y) < 1.0e-8
+end
+
+@testitem "Reshape (GPU)" tags = [:gpu, :calculus, :Reshape] setup = [TestUtils] begin
+    using Random, AbstractOperators, GPUEnv
+
+    for backend in gpu_backends()
+        Random.seed!(0)
+
+        m, n = 8, 4
+        dim_out = (2, 2, 2)
+        A1 = gpu_randn(backend, m, n)
+        opR = Reshape(MatrixOp(A1), dim_out)
+        test_op(opR, gpu_randn(backend, n), gpu_randn(backend, dim_out...), false)
+
+        n2 = 6
+        opR2 = Reshape(DiagOp(gpu_randn(backend, n2)), (2, 3))
+        test_op(opR2, gpu_randn(backend, n2), gpu_randn(backend, 2, 3), false)
+    end
 end

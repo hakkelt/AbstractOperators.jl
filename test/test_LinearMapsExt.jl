@@ -1,5 +1,5 @@
 @testitem "LinearMapsExt" tags = [:misc, :LinearMapsExt] begin
-    using LinearMaps, LinearAlgebra
+    using AbstractOperators, LinearMaps, LinearAlgebra
 
     # Real Diagonal
     d = rand(10, 10)

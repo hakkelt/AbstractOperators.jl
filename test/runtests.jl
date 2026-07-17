@@ -1,13 +1,28 @@
 using TestItemRunner
 
-# Run all tests. Tags enable selective filtering for interactive development:
-#
-#   julia --project=test -e '
-#       using TestItemRunner
-#       TestItemRunner.run_tests(pwd(); filter = ti -> :calculus in ti.tags)
-#   '
-#
-# Available tags: :calculus, :linearoperator, :nonlinearoperator,
-#                 :batching, :misc, :quality, :jet
+const FILTER_PARTS = if length(ARGS) > 0
+    @assert length(ARGS) == 1
+    split(ARGS[1], ",")
+else
+    String[]
+end
+const FILTER_TAGS = map(p -> Symbol(p[2:end]), filter(x -> startswith(x, ":"), FILTER_PARTS))
+const FILTER_NAMES = filter(x -> !startswith(x, ":"), FILTER_PARTS)
 
-@run_package_tests
+const VERB = get(ENV, "ABSTRACTOPERATORS_TEST_VERBOSE", "false") == "true"
+const FILTER = if length(FILTER_PARTS) > 0
+    ti -> begin
+        run_item = any(t -> t in ti.tags, FILTER_TAGS) || any(n -> n == ti.name, FILTER_NAMES)
+        if VERB && run_item
+            println("Running @testitem: ", ti.name)
+        end
+        run_item
+    end
+else
+    ti -> begin
+        VERB && println("Running @testitem: ", ti.name)
+        true
+    end
+end
+
+@run_package_tests filter = FILTER

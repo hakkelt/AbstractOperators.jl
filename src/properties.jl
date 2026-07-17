@@ -1,11 +1,13 @@
 import Base: size, ndims, similar, copy
 import LinearAlgebra: diag, opnorm
 
+export copy_operator
+# _should_thread is internal, not exported
 export ndoms,
     domain_type,
     codomain_type,
-    domain_storage_type,
-    codomain_storage_type,
+    domain_array_type,
+    codomain_array_type,
     is_linear,
     is_eye,
     is_null,
@@ -59,74 +61,82 @@ julia> codomain_type(vcat(Eye(Complex{Float64},(10,)),DiagOp(rand(ComplexF64, 10
 codomain_type
 
 """
-	domain_storage_type(L::AbstractOperator)
+	domain_array_type(L::AbstractOperator)
 
 Returns the type of the storage for the domain of the operator.
 
 ```jldoctest
-julia> domain_storage_type(DiagOp(rand(10)))
+julia> domain_array_type(DiagOp(rand(10)))
 Array{Float64}
 
-julia> domain_storage_type(hcat(Eye(Complex{Float64},(10,)),DiagOp(rand(ComplexF64, 10))))
+julia> domain_array_type(hcat(Eye(Complex{Float64},(10,)),DiagOp(rand(ComplexF64, 10))))
 RecursiveArrayTools.ArrayPartition{ComplexF64, Tuple{Array{ComplexF64}, Array{ComplexF64}}}
 ```
 """
-function domain_storage_type(L::AbstractOperator)
-    dt = domain_type(L)
-    return if dt isa Tuple
-        arrayTypes = Tuple{[Array{t} for t in dt]...}
-        ArrayPartition{promote_type(dt...), arrayTypes}
-    else
-        Array{dt}
-    end
+function domain_array_type(L::AbstractOperator)
+    return _array_type_for_elem(domain_type(L))
 end
 
 """
-	codomain_storage_type(L::AbstractOperator)
+	codomain_array_type(L::AbstractOperator)
 
 Returns the type of the storage of for the codomain of the operator.
 
 ```jldoctest
-julia> codomain_storage_type(DiagOp(rand(ComplexF64,10)))
+julia> codomain_array_type(DiagOp(rand(ComplexF64,10)))
 Array{ComplexF64}
 
-julia> codomain_storage_type(vcat(Eye(Complex{Float64},(10,)),DiagOp(rand(ComplexF64,10))))
+julia> codomain_array_type(vcat(Eye(Complex{Float64},(10,)),DiagOp(rand(ComplexF64,10))))
 RecursiveArrayTools.ArrayPartition{ComplexF64, Tuple{Array{ComplexF64}, Array{ComplexF64}}}
 ```
 """
-function codomain_storage_type(L::AbstractOperator)
-    dt = codomain_type(L)
-    return if dt isa Tuple
-        arrayTypes = Tuple{[Array{t} for t in dt]...}
-        ArrayPartition{promote_type(dt...), arrayTypes}
-    else
-        Array{dt}
-    end
+function codomain_array_type(L::AbstractOperator)
+    return _array_type_for_elem(codomain_type(L))
 end
 
+_array_type_for_elem(T::Type) = Array{T}
+function _array_type_for_elem(dt::Tuple)
+    arrayTypes = Tuple{[Array{t} for t in dt]...}
+    return ArrayPartition{promote_type(dt...), arrayTypes}
+end
+
+# Get the array container type (Array, CuArray, etc.) from an array instance
+_array_wrapper_type(::Type{A}) where {A <: AbstractArray} = Base.typename(A).wrapper
+function _array_wrapper(x::A) where {T, A <: AbstractArray{T}}
+    return _array_wrapper_type(typeof(x isa SubArray ? parent(x) : x))
+end
+function _normalize_array_type(array_type::Type{A}, elem_type::Type{T}) where {A <: AbstractArray, T}
+    return _array_wrapper_type(A){T}
+end
+_storage_eltype(::Type{<:AbstractArray{T}}) where {T} = T
+
 function allocate_in_domain(L::AbstractOperator, dims... = size(L, 2)...)
-    dS = domain_storage_type(L)
+    dS = domain_array_type(L)
     if dS <: ArrayPartition
         S = dS.parameters[2]
         return ArrayPartition([similar(s, d...) for (s, d) in zip(S.parameters, dims)]...)
+    elseif dS <: Array
+        return Array{domain_type(L), length(dims)}(undef, dims...)
     else
         return similar(dS, dims...)
     end
 end
 
 function allocate_in_codomain(L::AbstractOperator, dims... = size(L, 1)...)
-    cS = codomain_storage_type(L)
+    cS = codomain_array_type(L)
     if cS <: ArrayPartition
         S = cS.parameters[2]
         return ArrayPartition([similar(s, d...) for (s, d) in zip(S.parameters, dims)]...)
+    elseif cS <: Array
+        return Array{codomain_type(L), length(dims)}(undef, dims...)
     else
         return similar(cS, dims...)
     end
 end
 
-storage_type_display_string(::Type{T}) where {T <: AbstractArray} = ""
+array_type_display_string(::Type{T}) where {T <: AbstractArray} = ""
 function storage_display_string(L::AbstractOperator)
-    return storage_type_display_string(codomain_storage_type(L))
+    return array_type_display_string(codomain_array_type(L))
 end
 
 """
@@ -162,7 +172,7 @@ size(L::AbstractOperator, i::Int) = size(L)[i]
 
 Returns a `Tuple` with the number of dimensions of the codomain and domain of an `AbstractOperator`.  Type `ndims(A,1)` for the number of dimensions of the codomain and `ndims(A,2)` for the number of dimensions of the codomain.
 
-```jldoctest
+```jldoctest; setup = :(using AbstractOperators)
 julia> V = Variation((2,3,4))
 Ʋ  ℝ^(2, 3, 4) -> ℝ^(24, 3)
 
@@ -289,12 +299,10 @@ remove_displacement(A::AbstractOperator) = A
 
 import Base: convert
 function convert(::Type{T}, dom::Type, dim_in::Tuple, L::T) where {T <: AbstractOperator}
-    domain_type(L) != dom && error(
-        "cannot convert operator with domain $(domain_type(L)) to operator with domain $dom ",
-    )
-    size(L, 1) != dim_in && error(
-        "cannot convert operator with size $(size(L, 1)) to operator with domain $dim_in ",
-    )
+    domain_type(L) != dom &&
+        error("cannot convert operator with domain $(domain_type(L)) to operator with domain $dom ")
+    size(L, 1) != dim_in &&
+        error("cannot convert operator with size $(size(L, 1)) to operator with domain $dim_in ")
     return L
 end
 
@@ -305,7 +313,7 @@ end
 Returns whether the operators `L` and `R` can be merged when they are multiplied.
 
 Examples:
-```jldoctest
+```jldoctest; setup = :(using AbstractOperators)
 julia> AbstractOperators.can_be_combined(DiagOp(rand(10)), FiniteDiff((10,)))
 false
 
@@ -313,7 +321,12 @@ julia> AbstractOperators.can_be_combined(Eye(10), FiniteDiff((11,)))
 true
 ```
 """
-can_be_combined(L, R) = is_eye(L) || is_eye(R) || is_null(L) || (is_null(R) && is_linear(L) && all(displacement(L) .== 0))
+function can_be_combined(L, R)
+    return is_eye(L) ||
+        is_eye(R) ||
+        is_null(L) ||
+        (is_null(R) && is_linear(L) && all(displacement(L) .== 0))
+end
 can_be_combined(L, M, R) = false
 
 """
@@ -321,7 +334,7 @@ can_be_combined(L, M, R) = false
 Returns the combined operator of `L` and `R`. The combined operator is defined as `L * R` where `L` and `R` are the operators to be combined.
 
 Examples:
-```jldoctest
+```jldoctest; setup = :(using AbstractOperators)
 julia> AbstractOperators.combine(Eye(10), DiagOp(rand(10)))
 ╲  ℝ^10 -> ℝ^10
 ```
@@ -471,3 +484,43 @@ function string_dom(dm::Tuple, sz::Tuple)
     s = string_dom.(dm, sz)
     return length(s) > 3 ? s[1] * "..." * s[end] : *(s...)
 end
+
+"""
+    copy_operator(op::AbstractOperator; array_type=nothing, threaded=nothing)
+
+Create a copy of `op` suitable for parallel use.
+
+- Immutable fields (operator arrays, type params) are **shared** (no copy).
+- Mutable buffer fields are **deep-copied**.
+- `array_type`: if provided (e.g., `CuArray`), convert buffer arrays to that storage.
+- `threaded`: if provided (`true`/`false`), toggle threading for operators that support it.
+
+When `array_type` is `nothing` and `threaded` is `nothing`, equivalent to the old `copy_op`
+but more efficient (shares immutable data).
+"""
+function copy_operator(op::AbstractOperator; array_type = nothing, threaded = nothing)
+    if is_thread_safe(op) && threaded === nothing && array_type === nothing
+        return op  # safe to share
+    end
+    return _copy_operator_impl(op; array_type, threaded)
+end
+
+# Default implementation: just deepcopy (fallback)
+function _copy_operator_impl(
+        op::T; array_type = nothing, threaded = nothing
+    ) where {T <: AbstractOperator}
+    return deepcopy(op)
+end
+
+# Helper: convert a buffer array to the target storage type
+function _convert_buffer(buf::AbstractArray, ::Nothing)
+    return similar(buf)  # same type, new allocation
+end
+function _convert_buffer(buf::AbstractArray{T}, array_type::Type) where {T}
+    return similar(array_type{T}, size(buf))
+end
+
+_should_thread(::Number) = false
+_should_thread(d::AbstractArray) = length(d) > 2^16 && Threads.nthreads() > 1
+_should_thread(::Type{<:AbstractArray}) = Threads.nthreads() > 1
+_should_thread(op::AbstractOperator) = _should_thread(domain_array_type(op))

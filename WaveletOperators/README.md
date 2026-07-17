@@ -19,6 +19,10 @@ WaveletOperators.jl is a **subpackage** of the AbstractOperators.jl ecosystem. W
 pkg> add WaveletOperators
 ```
 
+## GPU Support
+
+WaveletOperators.jl is currently CPU-only. Unlike most of the AbstractOperators.jl ecosystem, its operators do not yet support CUDA.jl, AMDGPU.jl, oneAPI.jl, or OpenCL.jl arrays.
+
 ## Usage Example
 
 ```julia

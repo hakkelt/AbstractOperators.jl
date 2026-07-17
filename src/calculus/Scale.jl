@@ -73,7 +73,7 @@ function mul!(y::Tuple, L::Scale{Th}, x::AbstractArray) where {Th}
     for k in eachindex(y)
         @.. thread = Th y[k] *= L.coeff
     end
-    return
+    return y
 end
 
 function mul!(
@@ -92,7 +92,7 @@ function mul!(y::Tuple, S::AdjointOperator{<:Scale{Th}}, x::AbstractArray) where
     for k in eachindex(y)
         @.. thread = Th y[k] .*= L.coeff_conj
     end
-    return
+    return y
 end
 
 has_optimized_normalop(L::Scale) = is_linear(L.A) && has_optimized_normalop(L.A)
@@ -113,8 +113,8 @@ size(L::Scale) = size(L.A)
 
 domain_type(L::Scale) = domain_type(L.A)
 codomain_type(L::Scale) = codomain_type(L.A)
-domain_storage_type(L::Scale) = domain_storage_type(L.A)
-codomain_storage_type(L::Scale) = codomain_storage_type(L.A)
+domain_array_type(L::Scale) = domain_array_type(L.A)
+codomain_array_type(L::Scale) = codomain_array_type(L.A)
 is_thread_safe(L::Scale) = is_thread_safe(L.A)
 
 is_linear(L::Scale) = is_linear(L.A)
