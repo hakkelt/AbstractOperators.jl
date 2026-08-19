@@ -86,11 +86,21 @@ end
     @test size(FiniteDiff(Float64, (3, 4, 5), 2)) == ((3, 3, 5), (3, 4, 5))
 end
 
-@testitem "FiniteDiff (GPU)" tags = [:gpu, :linearoperator, :FiniteDiff] setup = [TestUtils, FiniteDiffTestHelper] begin
+@testitem "FiniteDiff (GPU)" tags = [:gpu, :linearoperator, :FiniteDiff] setup = [TestUtils] begin
     using Random, AbstractOperators, GPUEnv
 
     for backend in gpu_backends()
         Random.seed!(0)
-        test_finitediff_mul(x -> to_gpu(backend, x), false, test_op)
+
+        n = 10
+        op = FiniteDiff(Float64, (n,); array_type = gpu_wrapper(backend, Float64, n))
+        test_op(op, gpu_randn(backend, n), gpu_randn(backend, n - 1), false)
+
+        n, m = 10, 5
+        op = FiniteDiff(Float64, (n, m); array_type = gpu_wrapper(backend, Float64, n, m))
+        test_op(op, gpu_randn(backend, n, m), gpu_randn(backend, n - 1, m), false)
+
+        op2 = FiniteDiff(Float64, (n, m), 2; array_type = gpu_wrapper(backend, Float64, n, m))
+        test_op(op2, gpu_randn(backend, n, m), gpu_randn(backend, n, m - 1), false)
     end
 end

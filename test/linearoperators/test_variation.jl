@@ -1,6 +1,15 @@
 @testitem "Variation: basic mul" tags = [:linearoperator, :Variation] setup = [TestUtils] begin
     using Random, SparseArrays, LinearAlgebra, AbstractOperators
     Random.seed!(0)
+    verb && println(" --- Testing Variation: basic mul --- ")
+
+    function test_variation_mul(conv, verb)
+        n, m = 10, 5
+        op = Variation(conv(zeros(Float64, n, m)); threaded = false)
+        test_op(op, conv(randn(n, m)), conv(randn(n * m, 2)), verb)
+    end
+
+    test_variation_mul(identity, verb)
 
     for threaded in (false, true)
         n, m = 10, 5
@@ -42,6 +51,7 @@ end
 @testitem "Variation: 3D mul and constructors" tags = [:linearoperator, :Variation] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
+    verb && println(" --- Testing Variation: 3D mul and constructors --- ")
 
     for threaded in (false, true)
         n, m, l = 100, 50, 30
@@ -74,6 +84,7 @@ end
 @testitem "Variation: adjoint and properties" tags = [:linearoperator, :Variation] setup = [TestUtils] begin
     using Random, LinearAlgebra, AbstractOperators
     Random.seed!(0)
+    verb && println(" --- Testing Variation: adjoint and properties --- ")
 
     for threaded in (false, true)
         n, m, l = 100, 50, 30
@@ -121,6 +132,22 @@ end
         @test is_full_row_rank(op) == false
         @test is_full_column_rank(op) == false
     end
+end
+
+@testitem "Variation: copy_operator" tags = [:linearoperator, :Variation] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(6)
+
+    n, m = 10, 5
+    op = Variation(zeros(Float64, n, m); threaded = false)
+    op2 = copy_operator(op; threaded = true)
+    @test op2 isa Variation
+    x = randn(n, m)
+    y1 = zeros(n * m, 2)
+    y2 = zeros(n * m, 2)
+    mul!(y1, op, x)
+    mul!(y2, op2, x)
+    @test y1 ≈ y2
 end
 
 @testitem "Variation (GPU)" tags = [:gpu, :linearoperator, :Variation] setup = [TestUtils] begin

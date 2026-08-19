@@ -103,12 +103,36 @@ end
     @test size(op) == ((n,), (n,))
 end
 
+@testitem "DiagOp: copy_operator" tags = [:linearoperator, :DiagOp] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(5)
+
+    n = 6
+    d = randn(n)
+    op = DiagOp(d)
+    op2 = copy_operator(op; threaded = true)
+    @test op2 isa DiagOp
+    # DiagOp's diagonal `d` is treated as read-only data and shared (not deep-copied)
+    # when storage_type is not given, so op2 may be egal to op for these immutable structs.
+    x = randn(n)
+    y1 = zeros(n)
+    y2 = zeros(n)
+    mul!(y1, op, x)
+    mul!(y2, op2, x)
+    @test y1 ≈ y2
+
+    op3 = copy_operator(op; storage_type = Array)
+    @test op3 isa DiagOp
+    @test op3.d !== op.d
+end
+
 @testitem "DiagOp (GPU)" tags = [:gpu, :linearoperator, :DiagOp] setup = [TestUtils, DiagOpTestHelper] begin
     using Random, AbstractOperators, GPUEnv
 
     for backend in gpu_backends()
         Random.seed!(0)
-        test_diagop_mul(x -> to_gpu(backend, x), false, test_op, to_cpu, norm)
+        conv = x -> to_gpu(backend, x)
+        test_diagop_mul(conv, false, test_op, collect, norm)
         x = gpu_randn(backend, 4)
         op = DiagOp(x)
         @test domain_array_type(op) <: backend.array_type

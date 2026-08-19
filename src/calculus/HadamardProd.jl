@@ -112,21 +112,26 @@ function remove_displacement(P::HadamardProd)
     )
 end
 
-function _copy_operator_impl(op::HadamardProd; array_type = nothing, threaded = nothing)
-    new_bufA = _convert_buffer(op.bufA, array_type)
-    new_bufB = _convert_buffer(op.bufB, array_type)
-    new_bufD = _convert_buffer(op.bufD, array_type)
-    new_A = copy_operator(op.A; array_type, threaded)
-    new_B = copy_operator(op.B; array_type, threaded)
+function _copy_operator_impl(op::HadamardProd; storage_type = nothing, threaded = nothing)
+    new_bufA = _convert_buffer(op.bufA, storage_type)
+    new_bufB = _convert_buffer(op.bufB, storage_type)
+    new_bufD = _convert_buffer(op.bufD, storage_type)
+    new_A = copy_operator(op.A; storage_type, threaded)
+    new_B = copy_operator(op.B; storage_type, threaded)
     return HadamardProd(new_A, new_B, new_bufA, new_bufB, new_bufD)
 end
 
-function _copy_operator_impl(op::HadamardProdJac; array_type = nothing, threaded = nothing)
-    new_bufA = _convert_buffer(op.bufA, array_type)
-    new_bufB = _convert_buffer(op.bufB, array_type)
-    new_bufD = _convert_buffer(op.bufD, array_type)
-    new_A = copy_operator(op.A; array_type, threaded)
-    new_B = copy_operator(op.B; array_type, threaded)
+function _copy_operator_impl(op::HadamardProdJac; storage_type = nothing, threaded = nothing)
+    # bufA/bufB hold the Jacobian linearization point (A*x, B*x) shared from the
+    # originating HadamardProd — unlike bufD (pure scratch), their values must be
+    # preserved, not just their shape/eltype.
+    new_bufA = storage_type === nothing ? copy(op.bufA) :
+        copyto!(similar(storage_type{eltype(op.bufA)}, size(op.bufA)), op.bufA)
+    new_bufB = storage_type === nothing ? copy(op.bufB) :
+        copyto!(similar(storage_type{eltype(op.bufB)}, size(op.bufB)), op.bufB)
+    new_bufD = _convert_buffer(op.bufD, storage_type)
+    new_A = copy_operator(op.A; storage_type, threaded)
+    new_B = copy_operator(op.B; storage_type, threaded)
     return HadamardProdJac{typeof(new_A), typeof(new_B), typeof(new_bufA), typeof(new_bufD)}(
         new_A, new_B, new_bufA, new_bufB, new_bufD
     )
