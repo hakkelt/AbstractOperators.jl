@@ -14,9 +14,7 @@ import AbstractOperators:
     fun_name,
     is_thread_safe,
     has_fast_opnorm,
-    _copy_operator_impl,
-    _normalize_array_type,
-    _array_wrapper_type
+    _normalize_array_type
 import OperatorCore:
     is_AcA_diagonal,
     is_AAc_diagonal,
@@ -130,11 +128,6 @@ diag_AcA(::WaveletOp{T}) where {T} = real(T(1))
 diag_AAc(::WaveletOp{T}) where {T} = real(T(1))
 
 AbstractOperators.is_thread_safe(::WaveletOp) = true
-
-function _copy_operator_impl(op::WaveletOp{T, N, W, S}; storage_type = nothing, threaded = nothing) where {T, N, W, S}
-    new_at = storage_type === nothing ? _array_wrapper_type(S) : storage_type
-    return WaveletOp(T, op.wavelet, op.dim_in, op.levels; array_type = new_at)
-end
 
 has_fast_opnorm(::WaveletOp) = true
 has_fast_opnorm(::AdjointOperator{<:WaveletOp}) = true
