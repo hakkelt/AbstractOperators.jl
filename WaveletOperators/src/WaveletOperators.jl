@@ -15,7 +15,8 @@ import AbstractOperators:
     is_thread_safe,
     supports_threading,
     is_threaded,
-    has_fast_opnorm
+    has_fast_opnorm,
+    _normalize_array_type
 import OperatorCore:
     is_AcA_diagonal,
     is_AAc_diagonal,
@@ -47,7 +48,7 @@ julia> W * ones(4)
 
 ```
 """
-struct WaveletOp{T, N, W <: DiscreteWavelet} <: LinearOperator
+struct WaveletOp{T, N, W <: DiscreteWavelet, S <: AbstractArray{T}} <: LinearOperator
     wavelet::W
     dim_in::NTuple{N, Int}
     levels::Int
@@ -55,35 +56,43 @@ end
 
 # Constructors
 
-function WaveletOp(wavelet::DiscreteWavelet, dim_in, levels = nothing)
+function WaveletOp(wavelet::DiscreteWavelet, dim_in, levels = nothing; array_type::Type{<:AbstractArray} = Array{Float64})
     if isnothing(levels)
         levels = get_max_transform_levels(dim_in)
     end
-    return WaveletOp(Float64, wavelet, dim_in, levels)
+    return WaveletOp(Float64, wavelet, dim_in, levels; array_type)
 end
 
 function WaveletOp(A::AbstractArray, wavelet::DiscreteWavelet, levels::Int = get_max_transform_levels(size(A)))
-    return WaveletOp(eltype(A), wavelet, size(A), levels)
+    return WaveletOp(eltype(A), wavelet, size(A), levels; array_type = typeof(A isa SubArray ? parent(A) : A))
 end
 
-function WaveletOp(T::Type, wavelet::DiscreteWavelet, dim_in::Integer, levels::Int = get_max_transform_levels(dim_in))
+function WaveletOp(
+        T::Type, wavelet::DiscreteWavelet, dim_in::Integer, levels::Int = get_max_transform_levels(dim_in);
+        array_type::Type{<:AbstractArray} = Array{T}
+    )
     if isodd(dim_in)
         throw(ArgumentError("The input dimension $dim_in is not suitable for wavelet transform: only even dimensions are allowed."))
     end
     if levels > get_max_transform_levels(dim_in)
         throw(ArgumentError("The number of levels $levels exceeds the maximum allowed for dimension $dim_in: $(get_max_transform_levels(dim_in))."))
     end
-    return WaveletOp{T, 1, typeof(wavelet)}(wavelet, (dim_in,), levels)
+    S = _normalize_array_type(array_type, T)
+    return WaveletOp{T, 1, typeof(wavelet), S}(wavelet, (dim_in,), levels)
 end
 
-function WaveletOp(T::Type, wavelet::DiscreteWavelet, dim_in::NTuple{N, Int}, levels::Int = get_max_transform_levels(dim_in)) where {N}
+function WaveletOp(
+        T::Type, wavelet::DiscreteWavelet, dim_in::NTuple{N, Int}, levels::Int = get_max_transform_levels(dim_in);
+        array_type::Type{<:AbstractArray} = Array{T}
+    ) where {N}
     if any(isodd.(dim_in))
         throw(ArgumentError("The input dimension $dim_in is not suitable for wavelet transform: only even dimensions are allowed."))
     end
     if levels > get_max_transform_levels(dim_in)
         throw(ArgumentError("The number of levels $levels exceeds the maximum allowed for dimensions $dim_in: $(get_max_transform_levels(dim_in))."))
     end
-    return WaveletOp{T, N, typeof(wavelet)}(wavelet, dim_in, levels)
+    S = _normalize_array_type(array_type, T)
+    return WaveletOp{T, N, typeof(wavelet), S}(wavelet, dim_in, levels)
 end
 
 # Mappings
@@ -108,8 +117,8 @@ size(L::WaveletOp) = (L.dim_in, L.dim_in)
 
 domain_type(::WaveletOp{T}) where {T} = T
 codomain_type(::WaveletOp{T}) where {T} = T
-domain_array_type(::WaveletOp{T}) where {T} = Array{T}
-codomain_array_type(::WaveletOp{T}) where {T} = Array{T}
+domain_array_type(::WaveletOp{T, N, W, S}) where {T, N, W, S} = S
+codomain_array_type(::WaveletOp{T, N, W, S}) where {T, N, W, S} = S
 
 is_AcA_diagonal(L::WaveletOp) = true
 is_AAc_diagonal(L::WaveletOp) = true
