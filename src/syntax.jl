@@ -56,6 +56,8 @@ function Base.getindex(A::Compose, idx...)
     if ndoms(A, 2) == 1
         Gout = GetIndex(codomain_type(A), size(A, 1), idx)
         return Gout * A
+    elseif length(idx) == 1 && ndoms(A, 2) == length(idx[1])
+        return permute(A, idx[1])
     else
         error("cannot split operator of type $(typeof(A))")
     end
