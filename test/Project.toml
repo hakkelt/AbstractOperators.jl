@@ -32,6 +32,14 @@ Wavelets = "29a6e085-ba6d-5f35-a997-948ac2efa89a"
 Aqua = "0.8"
 BenchmarkTools = "1"
 Documenter = "1.8"
+# GPUEnv 0.2.1 broke `GPUEnv.activate(; persist = true)` (test/gpu_env_setup.jl) so the
+# active project stays on neither the GPU overlay nor test/Project.toml afterward: every
+# testitem that runs later in the same process (test/dsp/*, test/wavelets/*, and two
+# test_threading_operators.jl items) then fails with "Package AbstractOperators ... does
+# not seem to be installed". Reproduced twice in CI (kul-optec/AbstractOperators.jl run
+# 33018812036) against the registered 0.2.1; pinned below its caching/idempotency rework
+# (github.com/hakkelt/GPUEnv.jl PR #5) until that's fixed upstream.
+GPUEnv = "0.1 - 0.2.0"
 JET = "0.8, 0.9, 0.10, 0.11"
 LinearAlgebra = "1"
 LinearMaps = "3.11.4"
