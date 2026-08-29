@@ -28,16 +28,26 @@ struct AffineAdd{L <: AbstractOperator, D <: Union{AbstractArray, Number}, S} <:
     function AffineAdd(
             A::L, d::D, sign::Bool = true
         ) where {L <: AbstractOperator, D <: AbstractArray}
-        if size(d) != size(A, 1)
+        # `size(d)` is `d`'s flat Base.size, which only matches `size(A, 1)`
+        # (a nested per-block tuple for a multi-domain codomain) when the
+        # codomain is single-block. Compare structurally instead, same as
+        # `check()` in utils.jl does for domain/codomain arrays generally.
+        dim_d = d isa AbstractOperators.ArrayPartition ? size.(d.x) : size(d)
+        if !isequal(dim_d, size(A, 1))
             throw(
                 DimensionMismatch(
-                    "codomain size of $A not compatible with array `d` of size $(size(d))"
+                    "codomain size of $A not compatible with array `d` of size $(dim_d)"
                 ),
             )
         end
-        if eltype(d) != codomain_type(A)
+        # Same structural-vs-flat mismatch as the size check above:
+        # `codomain_type(A)` is a nested Tuple of per-block types for a
+        # multi-domain codomain, while `eltype` of an ArrayPartition is its
+        # single shared scalar type.
+        dtype_d = d isa AbstractOperators.ArrayPartition ? eltype.(d.x) : eltype(d)
+        if !isequal(dtype_d, codomain_type(A))
             error(
-                "cannot tilt opertor having codomain type $(codomain_type(A)) with array of type $(eltype(d))",
+                "cannot tilt opertor having codomain type $(codomain_type(A)) with array of type $(dtype_d)",
             )
         end
         return new{L, D, sign}(A, d)
@@ -129,3 +139,22 @@ displacement(A::AffineAdd{L, D, true}) where {L, D} = A.d .+ displacement(A.A)
 displacement(A::AffineAdd{L, D, false}) where {L, D} = -A.d .+ displacement(A.A)
 
 remove_displacement(A::AffineAdd) = remove_displacement(A.A)
+
+_children(L::AffineAdd) = (L.A,)
+is_threaded(L::AffineAdd) = _is_threaded_from_children(L)
+supports_threading(L::AffineAdd) = _supports_threading_from_children(L)
+
+function _copy_operator_impl(
+        L::AffineAdd{Op, D, S}; storage_type = nothing, threaded = nothing
+    ) where {Op, D, S}
+    new_A = copy_operator(L.A; storage_type, threaded)
+    # `d` is read-only displacement data, shared unless the storage backend must change.
+    new_d = _copy_displacement(L.d, storage_type)
+    return AffineAdd(new_A, new_d, S)
+end
+
+_copy_displacement(d::Number, ::Any) = d
+_copy_displacement(d::AbstractArray, ::Nothing) = d
+function _copy_displacement(d::AbstractArray, storage_type::Type{<:AbstractArray})
+    return copyto!(similar(storage_type{eltype(d)}, size(d)), d)
+end

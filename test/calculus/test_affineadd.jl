@@ -106,6 +106,45 @@ end
     @test N * x ≈ TG.A' * (TG.A * x + TG.d)
 end
 
+@testitem "AffineAdd with multi-domain (ArrayPartition) codomain displacement" tags = [:calculus, :AffineAdd] setup = [TestUtils] begin
+    using Random, AbstractOperators, RecursiveArrayTools
+    Random.seed!(0)
+
+    # HCAT(A, A, ..., A) with the same operator repeated is `is_eye`-adjacent
+    # via HCAT's normal-op fusion (see HCAT.jl): its normal operator has a
+    # multi-domain codomain (an ArrayPartition), which AffineAdd's
+    # constructor previously mis-validated via a flat `size`/`eltype` check
+    # instead of the ArrayPartition-aware structural comparison.
+    n, m = 8, 6
+    A = MatrixOp(randn(n, m))
+    H = HCAT(A, A)
+    @test AbstractOperators.has_optimized_normalop(H)
+    Hn = AbstractOperators.get_normal_op(H)
+
+    d = ArrayPartition(randn(m), randn(m))
+    T = AffineAdd(Hn, d)
+    x = ArrayPartition(randn(m), randn(m))
+    y = T * x
+    expected_each = AbstractOperators.get_normal_op(A) * (x.x[1] + x.x[2])
+    @test y.x[1] ≈ expected_each .+ d.x[1]
+    @test y.x[2] ≈ expected_each .+ d.x[2]
+
+    @test_throws DimensionMismatch AffineAdd(Hn, randn(m + 1, 2))
+    @test_throws ErrorException AffineAdd(Hn, ArrayPartition(im * randn(m), im * randn(m)))
+end
+
+# A distinct-operator HCAT has no normal-op fusion: no false positive, and
+# `is_full_column_rank` defaults safely to `false` (columns from independent
+# blocks stacked into a shared codomain can always cancel).
+@testitem "HCAT: no normal-op fusion or full-column-rank for distinct operators" tags = [:calculus, :HCAT] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
+    H = HCAT(MatrixOp(randn(5, 10)), MatrixOp(randn(5, 10)))
+    @test !AbstractOperators.has_optimized_normalop(H)
+    @test !is_full_column_rank(H)
+    @test !is_full_column_rank(HCAT(Eye(4), Eye(4)))
+end
+
 @testitem "AffineAdd is_thread_safe delegation" tags = [:calculus, :AffineAdd] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
@@ -124,7 +163,7 @@ end
     @test sign(AffineAdd(opA, d, false)) == -1
 end
 
-@testitem "AffineAdd (GPU)" tags = [:gpu, :calculus, :AffineAdd] setup = [TestUtils] begin
+@testitem "AffineAdd (GPU)" tags = [:gpu, :calculus, :AffineAdd] setup = [TestUtils, GpuEnvSetup] begin
     using Random, AbstractOperators, GPUEnv
 
     for backend in gpu_backends()
@@ -164,4 +203,36 @@ end
     op = MatrixOp(randn(n, n))    # codomain_type = Float64
     d = randn(Float32, n)          # eltype = Float32 != Float64
     @test_throws ErrorException AffineAdd(op, d)
+end
+
+@testitem "AffineAdd: threading traits and copy_operator" tags = [:calculus, :AffineAdd] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(1)
+
+    n, m = 5, 6
+    threaded_leaf = FiniteDiff(Float64, (1 << 16,); threaded = true)
+    serial_leaf = FiniteDiff(Float64, (1 << 16,); threaded = false)
+    d1 = randn((1 << 16) - 1)
+    @test is_threaded(AffineAdd(threaded_leaf, d1)) == true
+    @test is_threaded(AffineAdd(serial_leaf, d1)) == false
+    @test supports_threading(AffineAdd(serial_leaf, d1)) == true
+
+    A = randn(n, m)
+    opA = MatrixOp(A)
+    d = randn(n)
+    T = AffineAdd(opA, d)
+    T2 = copy_operator(T; threaded = true)
+    @test T2 isa AffineAdd
+    x = randn(m)
+    @test T * x ≈ T2 * x
+
+    # storage_type request forces the (otherwise shared) displacement array to be copied.
+    T3 = copy_operator(T; storage_type = Array{Float64})
+    @test T3.d !== T.d
+    @test T3.d == T.d
+
+    # Scalar displacement: `_copy_displacement(::Number, ::Any)` shares rather than copies.
+    T_scalar = AffineAdd(opA, pi)
+    T_scalar2 = copy_operator(T_scalar; storage_type = Array{Float64})
+    @test T_scalar2.d === T_scalar.d
 end
