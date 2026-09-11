@@ -161,9 +161,11 @@ function SignAlternation(
         threaded::Bool = true, array_type::Type{<:AbstractArray} = Array{T},
     ) where {T <: Number, N}
     d = _normalize_dirs(dim_in, dirs)
-    threaded = threaded && Threads.nthreads() > 1
     S = _normalize_array_type(array_type, T)
-    return SignAlternation{T, N, length(d), threaded, S}(dim_in, d)
+    # Routed through the shared resolver like every other operator: `false` vetoes, `true`
+    # enables subject to the policy, which also covers the thread count and GPU storage.
+    th = _elementwise_threaded(SignAlternation, threaded, T, dim_in, S)
+    return SignAlternation{T, N, length(d), th, S}(dim_in, d)
 end
 function SignAlternation(
         dim_in::NTuple{N, Int}, dirs;
@@ -287,7 +289,7 @@ julia> M = ones(2,2); alternate_sign!(M, (1, 2))
 ```
 """
 function alternate_sign!(x::AbstractArray, dirs::Int...; threaded::Bool = true)
-    return alternate_sign!(x, tuple(dirs...); threaded)
+    return alternate_sign!(x, dirs; threaded)
 end
 
 function alternate_sign!(
@@ -298,29 +300,73 @@ function alternate_sign!(
 end
 
 function _alternate_sign!(
-        x::AbstractArray, dirs::NTuple{M, Int}; threaded::Bool = true
-    ) where {M}
+        x::AbstractArray{<:Any, N}, dirs::NTuple{M, Int}; threaded::Bool = true
+    ) where {N, M}
     if isempty(dirs)
         return x
     end
-    sz = size(x)
-    if threaded && Threads.nthreads() > 1
-        @inbounds @batch for I in CartesianIndices(sz)
-            flips = sum(iseven(I[d]) ? 1 : 0 for d in dirs)
-            if isodd(flips)
-                x[I] = -x[I]
-            end
+    in1 = 1 in dirs
+    rest_mask = ntuple(k -> (k + 1) in dirs, Val(N - 1))
+    rest_range = CartesianIndices(Base.tail(size(x)))
+    use_threads = threaded && Threads.nthreads() > 1
+    if use_threads && length(rest_range) > 1
+        @inbounds @batch for J in rest_range
+            _alternate_sign_column!(x, in1, rest_mask, J)
         end
-        return x
+    elseif use_threads && size(x, 1) > 1
+        # A single trailing column (a vector, or an `n×1`): the column loop has nothing to
+        # spread across workers, so thread dimension 1 itself rather than run the whole pass
+        # sequentially.
+        _alternate_sign_column!(x, in1, rest_mask, first(rest_range), Val(true))
     else
-        @inbounds for I in CartesianIndices(sz)
-            flips = sum(iseven(I[d]) ? 1 : 0 for d in dirs)
-            if isodd(flips)
-                x[I] = -x[I]
-            end
+        @inbounds for J in rest_range
+            _alternate_sign_column!(x, in1, rest_mask, J)
         end
-        return x
     end
+    return x
+end
+
+# Dimension 1's own alternation, and the parity contribution of dimensions 2:N for one column.
+# `N` is a static type parameter and the dim-1 sign is a predicate, so neither needs a heap array.
+@inline _dim1_sign(in1::Bool, i::Integer) = (in1 && iseven(i)) ? -1 : 1
+
+# Below this many elements, spreading a single column over Polyester workers costs more in
+# fork/join than the multiplies it saves — a 256-point readout is a few hundred nanoseconds of
+# work against microseconds of setup.
+const MIN_ELEMENTS_FOR_COLUMN_THREADING = 4096
+
+@inline function _column_sign(rest_mask::NTuple{K, Bool}, J::CartesianIndex) where {K}
+    Jt = Tuple(J)
+    rest_flips = 0
+    @inbounds for k in 1:K
+        if rest_mask[k] && iseven(Jt[k])
+            rest_flips += 1
+        end
+    end
+    return isodd(rest_flips) ? -1 : 1
+end
+
+# The parity contribution from dims 2:N is loop-invariant across dim 1, so it is computed once
+# per column ("per-slab base parity") and the inner loop over dim 1 — the only dimension that
+# can alternate every element — vectorizes with `@simd`. `Val(true)` spreads that inner loop
+# over workers instead, for the caller that has only one column to work with; the branch is on a
+# type parameter, so the unused loop is compiled away.
+@inline function _alternate_sign_column!(
+        x::AbstractArray, in1::Bool, rest_mask::NTuple{K, Bool}, J::CartesianIndex,
+        ::Val{TH} = Val(false)
+    ) where {K, TH}
+    Jt = Tuple(J)
+    column_sign = _column_sign(rest_mask, J)
+    if TH
+        @inbounds @batch minbatch = MIN_ELEMENTS_FOR_COLUMN_THREADING for i in axes(x, 1)
+            x[i, Jt...] *= column_sign * _dim1_sign(in1, i)
+        end
+    else
+        @inbounds @simd for i in axes(x, 1)
+            x[i, Jt...] *= column_sign * _dim1_sign(in1, i)
+        end
+    end
+    return
 end
 
 """
@@ -348,7 +394,7 @@ julia> alternate_sign!(y, x, (1, 2))
 function alternate_sign!(
         y::AbstractArray, x::AbstractArray, dirs::Int...; threaded::Bool = true
     )
-    return alternate_sign!(y, x, tuple(dirs...); threaded)
+    return alternate_sign!(y, x, dirs; threaded)
 end
 function alternate_sign!(
         y::AbstractArray, x::AbstractArray, dirs::NTuple{M, Int}; threaded::Bool = true
@@ -358,27 +404,49 @@ function alternate_sign!(
 end
 
 function _alternate_sign!(
-        y::AbstractArray, x::AbstractArray, dirs::NTuple{M, Int}; threaded::Bool = true
-    ) where {M}
+        y::AbstractArray{<:Any, N}, x::AbstractArray{<:Any, N}, dirs::NTuple{M, Int}; threaded::Bool = true
+    ) where {N, M}
     size(y) == size(x) || throw(ArgumentError("y and x must have the same size"))
     if isempty(dirs)
         y .= x
         return y
     end
-    sz = size(x)
-    if threaded && Threads.nthreads() > 1
-        @inbounds @batch for I in CartesianIndices(sz)
-            flips = sum(iseven(I[d]) ? 1 : 0 for d in dirs)
-            y[I] = isodd(flips) ? -x[I] : x[I]
+    in1 = 1 in dirs
+    rest_mask = ntuple(k -> (k + 1) in dirs, Val(N - 1))
+    rest_range = CartesianIndices(Base.tail(size(x)))
+    use_threads = threaded && Threads.nthreads() > 1
+    if use_threads && length(rest_range) > 1
+        @inbounds @batch for J in rest_range
+            _alternate_sign_column!(y, x, in1, rest_mask, J)
         end
-        return y
+    elseif use_threads && size(x, 1) > 1
+        # See the in-place variant: a single trailing column leaves the column loop with nothing
+        # to spread, so thread dimension 1 instead.
+        _alternate_sign_column!(y, x, in1, rest_mask, first(rest_range), Val(true))
     else
-        @inbounds for I in CartesianIndices(sz)
-            flips = sum(iseven(I[d]) ? 1 : 0 for d in dirs)
-            y[I] = isodd(flips) ? -x[I] : x[I]
+        @inbounds for J in rest_range
+            _alternate_sign_column!(y, x, in1, rest_mask, J)
         end
     end
     return y
+end
+
+@inline function _alternate_sign_column!(
+        y::AbstractArray, x::AbstractArray, in1::Bool, rest_mask::NTuple{K, Bool}, J::CartesianIndex,
+        ::Val{TH} = Val(false)
+    ) where {K, TH}
+    Jt = Tuple(J)
+    column_sign = _column_sign(rest_mask, J)
+    if TH
+        @inbounds @batch minbatch = MIN_ELEMENTS_FOR_COLUMN_THREADING for i in axes(x, 1)
+            y[i, Jt...] = column_sign * _dim1_sign(in1, i) * x[i, Jt...]
+        end
+    else
+        @inbounds @simd for i in axes(x, 1)
+            y[i, Jt...] = column_sign * _dim1_sign(in1, i) * x[i, Jt...]
+        end
+    end
+    return
 end
 
 """
@@ -565,3 +633,21 @@ function ifftshift_op(
     )
     return _shift_op(IFFTShift, op, domain_shifts, codomain_shifts)
 end
+
+# Sign alternation is a strided in-place multiply by ±1 -- pure data movement, so it sits at
+# the memory-bound threshold.
+threading_threshold(::Type{<:SignAlternation}) = THRESHOLD_MEMORY_BOUND
+is_threaded(::SignAlternation{T, N, M, Th}) where {T, N, M, Th} = Th
+supports_threading(::SignAlternation) = true
+
+function _copy_operator_impl(
+        op::SignAlternation{T, N, M, Th, S}; storage_type = nothing, threaded = nothing
+    ) where {T, N, M, Th, S}
+    new_threaded = threaded === nothing ? Th : threaded
+    new_at = storage_type === nothing ? _array_wrapper_type(S) : storage_type
+    return SignAlternation(T, op.dim_in, op.dirs; threaded = new_threaded, array_type = new_at)
+end
+
+# FFTShift/IFFTShift have no threaded path of their own.
+is_threaded(::ShiftOp) = false
+supports_threading(::ShiftOp) = false
