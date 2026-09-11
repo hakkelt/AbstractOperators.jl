@@ -22,8 +22,14 @@
     # 3D, complex
     test_op(Hankel(ComplexF64, (6, 5, 4), (2, 2, 2)), randn(ComplexF64, 6, 5, 4), randn(ComplexF64, 60, 8), verb)
 
-    # ---- normal operator equals the multiplicity diagonal ----
+    # ---- explicit dot-product adjoint test, ⟨H u, v⟩ == ⟨u, Hᴴ v⟩ ----
+    # `test_op` already asserts adjoint invariance; this states it directly on the
+    # multi-channel complex layout, which is the one the SAKE/LORAKS prox relies on.
     u = randn(ComplexF64, size(Hc, 2)...)
+    v = randn(ComplexF64, size(Hc, 1)...)
+    @test dot(Hc * u, v) ≈ dot(u, Hc' * v)
+
+    # ---- normal operator equals the multiplicity diagonal ----
     Nop = AbstractOperators.get_normal_op(Hc)
     d = AbstractOperators.diag_AcA(Hc)
     @test Hc' * (Hc * u) ≈ d .* u
@@ -33,6 +39,17 @@
     @test all(real.(d) .>= 1)
     # interior elements of the (8,6) grid with window (3,2) appear in 3*2 windows
     @test d[4, 3, 1] == 6
+
+    # `diag_AcA` must be exactly the per-sample multiplicity: the number of Hankel entries
+    # each k-space sample is copied into. Counted here from the dense operator matrix, which
+    # has a single 1 per (window, sample) incidence, so the column sums are the counts.
+    Hs = Hankel(ComplexF64, (5, 4), (2, 3); nchannels = 2)
+    nin = prod(size(Hs, 2))
+    dense = reduce(hcat, [vec(Hs * reshape(ComplexF64.(1:nin .== i), size(Hs, 2)...)) for i in 1:nin])
+    @test vec(real.(AbstractOperators.diag_AcA(Hs))) == vec(sum(abs2, dense; dims = 1))
+    # and the multiplicity weighting is what makes the weighted adjoint a left inverse of H
+    w = randn(ComplexF64, size(Hs, 2)...)
+    @test (Hs' * (Hs * w)) ./ AbstractOperators.diag_AcA(Hs) ≈ w
 
     # ---- opnorm matches the dense operator ----
     Hd = Hankel(ComplexF64, (7,), (3,))
