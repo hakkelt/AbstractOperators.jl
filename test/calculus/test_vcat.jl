@@ -247,3 +247,25 @@ end
     y_generic = copy(yb) .+ (G' * y.x[2])
     @test y_specialized ≈ y_generic
 end
+
+@testitem "VCAT: adjoint of a self-adjoint block does not need an AdjointOperator wrapper" tags = [:calculus, :VCAT] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    using LinearAlgebra: dot
+    Random.seed!(0)
+
+    # `AdjointOperator(::Eye) = L` (Eye.jl) short-circuits construction, so `H.A[i]'` for an
+    # `Eye` block is a bare `Eye`, not an `AdjointOperator{Eye}`. `add_mul!`'s `AdjointOperator`
+    # method does not match that; a bare-operator fallback must, or a VCAT/AffineAdd stack with
+    # an `Eye` block (a plain regularization term next to a linear map, say) fails to construct
+    # its adjoint at all.
+    n = 5
+    opV = VCAT(MatrixOp(randn(3, n)), Eye(n))
+    @test AbstractOperators.is_eye(opV.A[2]')
+
+    x = randn(n)
+    y = opV * x
+    adj = opV' * y
+    @test adj ≈ opV.A[1]' * y.x[1] + y.x[2]
+    b = ArrayPartition(randn(size(y.x[1])...), randn(size(y.x[2])...))
+    @test dot(opV * x, b) ≈ dot(x, opV' * b)
+end
