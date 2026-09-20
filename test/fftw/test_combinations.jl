@@ -98,3 +98,45 @@ end
         @test norm(AHA * x - A' * (A * x)) <= 1.0e-9 * norm(A' * (A * x))
     end
 end
+
+@testitem "SignAlternation is pushed through a batch operator" tags = [:fftw, :CombinationRules, :batching] begin
+    using FFTWOperators
+    using AbstractOperators
+    using AbstractOperators: is_threaded
+
+    T = ComplexF64
+
+    # The alternation's `dirs` are all non-batch dimensions, so it commutes with the batch
+    # loop and lands on the wrapped `DiagOp`, which absorbs it: the composition collapses to
+    # a single batch operator and the sign pass disappears.
+    D = DiagOp(rand(T, 8, 6, 3, 2))
+    B = BatchOp(D, (5,), (:_, :_, :b, :_, :_) => (:_, :_, :b, :_, :_))
+    x = rand(T, size(B, 2)...)
+    for dirs in ((1, 2), (1, 4), (2, 4, 5))
+        S = SignAlternation(T, size(B, 1), dirs; threaded = false)
+        C = S * B
+        @test !(C isa Compose)
+        @test C * x == S * (B * x)          # exact: every factor is ±1
+        C2 = B * S
+        @test !(C2 isa Compose)
+        @test C2 * x == B * (S * x)
+        @test C' * x == B' * (S' * x)
+    end
+
+    # Guards. An alternation over a batch dimension is not constant along the batch loop, and
+    # an inner operator that cannot absorb the signs would only pay them inside the loop.
+    @test SignAlternation(T, size(B, 1), (3,); threaded = false) * B isa Compose
+    @test SignAlternation(T, size(B, 1), (1, 3); threaded = false) * B isa Compose
+    Bv = BatchOp(Variation(8, 8), (3,), (:_, :_, :b) => (:_, :_, :b))
+    @test SignAlternation(Float64, size(Bv, 2), (1,); threaded = false) isa SignAlternation
+    @test Bv * SignAlternation(Float64, size(Bv, 2), (1,); threaded = false) isa Compose
+
+    # The rewritten operator keeps the batch loop's own threading decision.
+    Bt = BatchOp(DiagOp(rand(T, 16, 16, 4)), (8,); threaded = true)
+    St = SignAlternation(T, size(Bt, 1), (1, 2))
+    Ct = St * Bt
+    @test !(Ct isa Compose)
+    @test is_threaded(Ct) == is_threaded(Bt)
+    xt = rand(T, size(Bt, 2)...)
+    @test Ct * xt == St * (Bt * xt)
+end
