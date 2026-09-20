@@ -37,7 +37,6 @@ import AbstractOperators:
     _is_cpu_array,
     _elementwise_threaded,
     threading_threshold,
-    THRESHOLD_MEMORY_BOUND,
     _copy_operator_impl
 
 """

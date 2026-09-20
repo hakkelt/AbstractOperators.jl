@@ -204,6 +204,44 @@ end
     end
 end
 
+@testitem "alternate_sign!: the Cartesian fallback matches the linear kernel" tags = [:fftw, :SignAlternation] setup = [TestUtils] begin
+    using Random, FFTWOperators
+    using LinearAlgebra: mul!
+    Random.seed!(7)
+
+    # The kernel addresses a column by its linear index range, which only holds for an array
+    # that indexes linearly and starts at 1. A strided view does neither, and takes the
+    # Cartesian fallback instead; both must produce the same thing.
+    for sz in ((8, 6), (8, 6, 3), (7, 4))
+        N = length(sz)
+        parent = randn(ComplexF64, (2 .* sz)...)
+        idx = ntuple(k -> 1:2:(2 * sz[k]), N)
+        dense = Array(@view parent[idx...])
+        for dirs in ((1,), (2,), (1, 2)), threaded in (false, true)
+            maximum(dirs) <= N || continue
+            expected = alternate_sign!(copy(dense), dirs...; threaded = false)
+
+            v = @view parent[idx...]
+            v .= dense
+            alternate_sign!(v, dirs...; threaded)
+            @test Array(v) == expected
+
+            out = @view parent[idx...]
+            alternate_sign!(out, dense, dirs...; threaded)
+            @test Array(out) == expected
+        end
+    end
+
+    # An aliased `mul!` is routed to the in-place kernel, which only touches the elements that
+    # flip; it must still be the same operator.
+    x = randn(ComplexF64, 16, 8)
+    S = SignAlternation(ComplexF64, size(x), (1, 2); threaded = false)
+    expected = S * x
+    y = copy(x)
+    mul!(y, S, y)
+    @test y == expected
+end
+
 @testitem "fftshift/ifftshift wrappers" tags = [:fftw, :FFTShift] setup = [TestUtils] begin
     using FFTW, LinearAlgebra, Random, FFTWOperators, AbstractOperators
     # Even length
