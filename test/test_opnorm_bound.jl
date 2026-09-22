@@ -43,9 +43,9 @@ end
     using AbstractOperators
     using AbstractOperators: opnorm_bound, powerit
 
-    # The shape a sensitivity-map operator takes: one image replicated over `nc` channels and
-    # weighted channel by channel. The submultiplicative product overshoots by up to `sqrt(nc)`,
-    # so this pair is folded before the product is taken.
+    # One array replicated into `nc` copies and then weighted entry by entry. The
+    # submultiplicative product overshoots by up to `sqrt(nc)` on this shape, so the pair is
+    # folded before the product is taken.
     Random.seed!(0x5eed)
     nx, ny, nc = 12, 10, 8
     w = randn(ComplexF64, nx, ny, nc)
@@ -118,6 +118,13 @@ end
     @test has_fast_opnorm(D)
     @test estimate_opnorm(D) == opnorm(D)
     @test estimate_opnorm(D; side = :accurate) == opnorm(D)
+
+    # Every operator goes through the one generic method, so the keywords reach every shape.
+    # Per-type `estimate_opnorm` methods used to shadow it and silently rejected them.
+    G = FiniteDiff((16, 16))
+    for L in (2.0 * G, G', DCAT(G, G), BatchOp(G, 3; threaded = false))
+        @test estimate_opnorm(L; rel_margin = 0.05, side = :accurate, maxit = 5) > 0
+    end
 end
 
 @testitem "opnorm_bound: randomized certificate" tags = [:calculus, :OpnormBound] begin
