@@ -62,6 +62,14 @@ end
     chain = GetIndex(ComplexF64, (nx, ny, nc), (1:(nx ÷ 2), 1:ny, 1:nc)) * S
     @test isfinite(opnorm_bound(chain))
     @test opnorm_bound(chain) ≥ powerit(chain; maxit = 2000, rel_margin = 1.0e-14)
+
+    # A `DiagOp` may hold a single number rather than an array, in which case there is nothing to
+    # sum over the broadcast dimensions and the fold declines. The product rule is exact there
+    # anyway, since every copy carries the same weight.
+    scalar = DiagOp(ComplexF64, (nx, ny, nc), 2.0 + 0im) *
+        BroadCast(Eye(ComplexF64, (nx, ny)), (nx, ny, nc))
+    @test opnorm_bound(scalar) ≈ 2 * sqrt(nc)
+    @test opnorm_bound(scalar) ≥ powerit(scalar; maxit = 2000, rel_margin = 1.0e-14)
 end
 
 @testitem "opnorm_bound: a broadcast scales the norm it wraps" tags = [:calculus, :OpnormBound] begin
@@ -125,6 +133,13 @@ end
     for L in (2.0 * G, G', DCAT(G, G), BatchOp(G, 3; threaded = false))
         @test estimate_opnorm(L; rel_margin = 0.05, side = :accurate, maxit = 5) > 0
     end
+
+    # `:upper` is a promise, so the returned value must dominate the iterate it was checked
+    # against even in single precision, where narrowing the `Float64` bound rounds to nearest.
+    w32 = randn(ComplexF32, nx, ny, nc)
+    S32 = DiagOp(w32) * BroadCast(Eye(@view(w32[:, :, 1])), size(w32))
+    @test estimate_opnorm(S32) isa Float32
+    @test estimate_opnorm(S32) >= powerit(S32; maxit = 2000, rel_margin = 1.0f-7)
 end
 
 @testitem "opnorm_bound: randomized certificate" tags = [:calculus, :OpnormBound] begin
