@@ -135,16 +135,19 @@ end
     # The failure mode of a structural bound is a silently dropped factor, which a hand-written
     # case does not catch and a randomized nesting does. Every finite bound must dominate the
     # converged power iteration, which approaches the norm from below.
-    leaves = () -> [
-        DiagOp(randn(8, 8)),
+    # Every draw comes from `rng`, including the entries of the leaves: a `randn()` here would
+    # read the global generator, and then the number of cases with a finite bound — and so the
+    # number of assertions this item runs — would differ from one session to the next.
+    leaves = rng -> [
+        DiagOp(randn(rng, 8, 8)),
         Eye(Float64, (8, 8)),
-        MatrixOp(randn(8, 8), 8),
+        MatrixOp(randn(rng, 8, 8), 8),
         GetIndex(Float64, (8, 8), (1:4, 1:8)),
         Zeros(Float64, (8, 8), Float64, (8, 8)),
     ]
 
     function random_op(depth, rng)
-        depth <= 0 && return rand(rng, leaves())
+        depth <= 0 && return rand(rng, leaves(rng))
         a = random_op(depth - 1, rng)
         k = rand(rng, 1:6)
         k == 1 && return rand(rng) * a
