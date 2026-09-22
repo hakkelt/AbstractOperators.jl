@@ -19,6 +19,7 @@ import AbstractOperators:
     codomain_array_type,
     can_be_combined,
     combine,
+    _slice_operator,
     is_thread_safe,
     is_AcA_diagonal,
     is_AAc_diagonal,
