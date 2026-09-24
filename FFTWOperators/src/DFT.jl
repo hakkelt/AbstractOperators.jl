@@ -401,7 +401,7 @@ serial pass. FastBroadcast falls back to Base broadcasting for storage it cannot
 arrays), so both branches are safe on any storage.
 """
 function _scale_output!(y, scale, threaded::Bool)
-    if threaded && length(y) >= THRESHOLD_MEMORY_BOUND
+    if threaded && length(y) >= AbstractOperators.THRESHOLD_MEMORY_BOUND
         @.. thread = true y = y / scale
     else
         @.. y = y / scale
