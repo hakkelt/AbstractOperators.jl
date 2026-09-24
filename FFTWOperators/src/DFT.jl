@@ -159,7 +159,7 @@ function DFT(
         num_threads = nothing,
         threaded::Bool = true,
     ) where {N, D <: Complex}
-    if x != FFTW.ESTIMATE
+    if flags != FFTW.ESTIMATE
         x = similar(x) # FFTW.MEASURE and FFTW.PATIENT may cause the input array to be modified
     end
     num_threads = _fftw_num_threads(:c2c, num_threads, threaded, length(x))
