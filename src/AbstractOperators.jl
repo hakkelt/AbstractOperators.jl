@@ -50,7 +50,6 @@ include("calculus/Scale.jl")
 
 ## Linear operators
 
-include("linearoperators/MyLinOp.jl")
 include("linearoperators/Zeros.jl")
 include("linearoperators/ZeroPad.jl")
 include("linearoperators/Eye.jl")
