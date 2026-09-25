@@ -133,7 +133,7 @@ end
 # the same in both settings. See `threading_policy.jl` for the policy note.
 function _copy_flat!(_y, _x)
     @inbounds for k in axes(_y, 2)
-        copyto!(view(_y, :, k), _x)
+        copyto!(_y, (k - 1) * length(_x) + 1, _x, 1, length(_x))
     end
     return _y
 end
@@ -146,7 +146,7 @@ function _copy_flat_threaded!(_y, _x)
         k, j = fldmod1(t, per_copy)
         lo, hi = _chunk_range(length(_x), per_copy, j)
         lo > hi && continue
-        @inbounds copyto!(view(_y, lo:hi, k), view(_x, lo:hi))
+        @inbounds copyto!(_y, (k - 1) * length(_x) + lo, _x, lo, hi - lo + 1)
     end
     return _y
 end
@@ -191,7 +191,10 @@ function _chunk_range(len::Int, nchunks::Int, i::Int)
     return (i - 1) * size + 1, min(len, i * size)
 end
 
-_flat_pair(y, x) = (reshape(y, length(x), :), vec(x))
+# The copy count is spelled out rather than left to `:`, which JET's `@test_opt` infers as `Any`;
+# the copies above index the flat layout directly for the same reason, instead of going through
+# a `view` of one column.
+_flat_pair(y, x) = (reshape(y, length(x), length(y) ÷ length(x)), vec(x))
 
 # Kept for callers outside this file (`OperatorBroadCast`), and as the single place the compact
 # layout assumption is written down.
