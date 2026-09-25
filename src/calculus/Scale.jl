@@ -125,9 +125,9 @@ end
 # Rebuilds a `Scale` around new coeffs/wrapped operator, preserving `S`'s own threading flag.
 _rethread_scale(::Scale{Th}, coeff, coeff_conj, A) where {Th} = Scale(coeff, coeff_conj, A; threaded = _fbbool(Th))
 
-has_optimized_normalop(L::Scale) = is_linear(L.A) && has_optimized_normalop(L.A)
+has_optimized_normalop(L::Scale) = is_affine(L.A) && has_optimized_normalop(L.A)
 function get_normal_op(L::Scale)
-    if is_linear(L.A)
+    if is_affine(L.A)
         return _rethread_scale(L, L.coeff * L.coeff_conj, L.coeff * L.coeff_conj, get_normal_op(L.A))
     else
         return L' * L
@@ -148,6 +148,7 @@ codomain_array_type(L::Scale) = codomain_array_type(L.A)
 is_thread_safe(L::Scale) = is_thread_safe(L.A)
 
 is_linear(L::Scale) = is_linear(L.A)
+is_affine(L::Scale) = is_affine(L.A)
 is_sliced(L::Scale) = is_sliced(L.A)
 get_slicing_expr(L::Scale) = get_slicing_expr(L.A)
 get_slicing_mask(L::Scale) = get_slicing_mask(L.A)
