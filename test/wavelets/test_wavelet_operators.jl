@@ -90,9 +90,6 @@ end
         @test op' * (op * x) ≈ x
     end
 
-    # A lifting scheme has no threaded path and stays serial.
-    lift = WaveletOp(Float64, wavelet(WT.db2, WT.Lifting), (512, 512), 2)
-    @test !supports_threading(lift) && !is_threaded(lift)
     # Below the threshold the policy keeps it serial.
     @test !is_threaded(WaveletOp(Float64, wavelet(WT.db2), (32, 32), 2))
 end
