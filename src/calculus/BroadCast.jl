@@ -243,8 +243,103 @@ has_fast_opnorm(R::OperatorBroadCast{T, N, M, true}) where {T, N, M} = has_fast_
 function LinearAlgebra.opnorm(R::NoOperatorBroadCast{T, N, M}) where {T, N, M}
     return real(T)(sqrt(prod(R.dim_out[d] for d in 1:M if R.dim_out[d] != R.reshaped_dim_in[d])))
 end
-LinearAlgebra.opnorm(R::OperatorBroadCast{T, N, M, false}) where {T, N, M} = LinearAlgebra.opnorm(R.A)
-LinearAlgebra.opnorm(R::OperatorBroadCast{T, N, M, true}) where {T, N, M} = LinearAlgebra.opnorm(R.A[1])
+function LinearAlgebra.opnorm(R::OperatorBroadCast{T, N, M, false}) where {T, N, M}
+    return _replication_factor(R) * LinearAlgebra.opnorm(R.A)
+end
+function LinearAlgebra.opnorm(R::OperatorBroadCast{T, N, M, true}) where {T, N, M}
+    return _replication_factor(R) * LinearAlgebra.opnorm(R.A[1])
+end
+
+function opnorm_bound(R::OperatorBroadCast{T, N, M, false}) where {T, N, M}
+    return _replication_factor(R) * opnorm_bound(R.A)
+end
+function opnorm_bound(R::OperatorBroadCast{T, N, M, true}) where {T, N, M}
+    return _replication_factor(R) * opnorm_bound(R.A[1])
+end
+
+"""
+	_replication_factor(R::OperatorBroadCast)
+
+How much a broadcast scales the norm of what it replicates: `sqrt` of the number of copies each
+entry of the inner operator's output is written to.
+
+Replicating a vector `c` times multiplies its 2-norm by exactly `sqrt(c)`, so this factor is
+exact rather than an inequality. Leaving it out — which `opnorm(::OperatorBroadCast)` did, by
+forwarding straight to the inner operator — under-reports the norm by `sqrt(c)`, and an
+under-reported norm is the direction that breaks a Lipschitz constant.
+"""
+function _replication_factor(R::OperatorBroadCast{T}) where {T}
+    # `idxs` is built by the constructor as the Cartesian range of exactly the broadcast
+    # dimensions, so its length is the number of copies with nothing left to re-derive.
+    return real(T)(sqrt(length(R.idxs)))
+end
+
+"""
+	_fused_pair_opnorm(B::NoOperatorBroadCast, D::DiagOp)
+
+Exact `‖D ∘ B‖` for a `DiagOp` applied on top of a replicating `BroadCast`.
+
+`D ∘ B` is block diagonal with one single-column block per input position, so its norm is the
+largest block norm [1, §2.1] — that is, `max_r sqrt(sum_c |d[r, c]|²)` over the broadcast
+positions `c`. The submultiplicative product gives `maximum(abs, d) * sqrt(c)` instead, which
+overshoots by up to the square root of the number of copies.
+
+## References
+
+1. Horn, Johnson, "Topics in Matrix Analysis", Cambridge (1991).
+"""
+function _fused_pair_opnorm(B::NoOperatorBroadCast{T, N, M}, D::DiagOp) where {T, N, M}
+    size(D, 2) == B.dim_out || return nothing
+    # A `DiagOp` may hold a single number instead of an array, and then every copy is weighted
+    # the same, which is the one case the submultiplicative product already gets exactly right.
+    D.d isa AbstractArray || return nothing
+    bdims = Tuple(d for d in 1:M if B.reshaped_dim_in[d] != B.dim_out[d])
+    isempty(bdims) && return nothing
+    return float(sqrt(maximum(sum(abs2, D.d; dims = bdims))))
+end
+
+"""
+	_fused_pair_opnorm(B::NoOperatorBroadCast, S::SpreadingBatchOp)
+
+Upper bound on `‖S ∘ B‖` when `B` replicates its input along exactly the spreading dimensions of
+`S` and every block of `S` starts with an array-valued `DiagOp`, `S[k] = P[k] ∘ D[k]`.
+
+Every block then receives the same input `x`, so
+
+    ‖(S ∘ B) x‖² = Σₖ ‖P[k] D[k] x‖² ≤ maxₖ ‖P[k]‖² Σₖ ‖D[k] x‖² ≤ maxₖ ‖P[k]‖² maxᵢ Σₖ |d[k][i]|² ‖x‖²,
+
+which is `maxₖ opnorm_bound(P[k])` times the `DiagOp`-on-`BroadCast` norm of the stacked
+diagonals. The submultiplicative product gives `maxₖ ‖P[k]‖ maxₖ |d[k]|∞ sqrt(K)` instead, which
+overshoots by up to `sqrt(K)` when the diagonals peak at different positions.
+"""
+function _fused_pair_opnorm(B::NoOperatorBroadCast{T, N, M}, S::SpreadingBatchOp) where {T, N, M}
+    size(S, 2) == B.dim_out || return nothing
+    bdims = Tuple(d for d in 1:M if B.reshaped_dim_in[d] != B.dim_out[d])
+    isempty(bdims) && return nothing
+    batch_positions = Tuple(d for d in 1:M if get_domain_batch_dim_mask(typeof(S))[d])
+    spreading_positions = map(s -> batch_positions[s], get_spreading_dims(typeof(S)))
+    bdims == spreading_positions || return nothing
+    blocks = _block_operators(S)
+    diags = map(_leading_diagonal, blocks)
+    any(isnothing, diags) && return nothing
+    all(d -> size(d) == size(first(diags)), diags) || return nothing
+    weight = zeros(real(eltype(first(diags))), size(first(diags)))
+    for d in diags
+        weight .+= abs2.(d)
+    end
+    rest = maximum(_bound_after_leading_diagonal, blocks)
+    isfinite(rest) || return nothing
+    return float(sqrt(maximum(weight))) * rest
+end
+
+# The array a block's first applied factor multiplies by, or `nothing` when that factor is not an
+# array-valued `DiagOp`.
+_leading_diagonal(A) = nothing
+_leading_diagonal(D::DiagOp) = D.d isa AbstractArray ? D.d : nothing
+_leading_diagonal(C::Compose) = _leading_diagonal(first(C.A))
+
+_bound_after_leading_diagonal(::DiagOp) = 1.0
+_bound_after_leading_diagonal(C::Compose) = _chain_opnorm_bound(Base.tail(C.A))
 
 # utils
 
