@@ -248,3 +248,29 @@ for Op in (:FFTShift, :IFFTShift)
         return $Op(T, slice_dim_in, slice_dirs; array_type = S)
     end
 end
+
+# SignAlternation ∘ (any square diagonal) ∘ SignAlternation
+#
+# A `SignAlternation` is a real ±1 diagonal and is its own inverse, and diagonals commute,
+# so `± M ± = M M±± = M` exactly, for any square diagonal `M` carrying the same `dirs`.
+#
+# This is what un-fuses the encoding operator's normal operator: with
+# `𝒜 = 𝒫 ∘ ± ∘ ℱ ∘ 𝒮`, `𝒜ᴴ𝒜` folds `𝒫ᴴ𝒫` into a single diagonal mask and leaves
+# `(…, ℱ, ±, 𝒫ᴴ𝒫, ±, ℱᴴ, …)` — a `±` pair the pairwise cancellation cannot see because
+# the mask sits between them. Every normal-operator application would otherwise pay two
+# full sign passes it does not owe.
+#
+# `L.dirs == R.dirs` is the guard that matters: two alternations over different dimension
+# sets do not cancel (their product is the alternation over the symmetric difference).
+function can_be_combined(L::SignAlternation, M::AbstractOperator, R::SignAlternation)
+    return L.dirs == R.dirs && L.dim_in == R.dim_in &&
+        is_linear(M) && is_diagonal(M) && size(M, 1) == size(M, 2)
+end
+combine(::SignAlternation, M::AbstractOperator, ::SignAlternation) = M
+
+# `c2-cancel-sign-alternation-pair` also pushed a `SignAlternation` into a `SimpleBatchOp`
+# directly, through a `_push_sign_into_batch` helper. `_slice_operator` above subsumes it: the
+# generic batch rules in `AbstractOperators/src/combination_rules.jl` apply to both batch
+# families and to every operator that declares a slice factor, not to `SignAlternation` and
+# `SimpleBatchOp` alone. The narrower methods would shadow the general ones, so they are dropped
+# here.
