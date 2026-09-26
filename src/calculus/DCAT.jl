@@ -338,6 +338,7 @@ is_thread_safe(H::DCAT) = all(is_thread_safe.(H.A))
 
 is_eye(L::DCAT) = all(is_eye.(L.A))
 is_linear(L::DCAT) = all(is_linear.(L.A))
+is_affine(L::DCAT) = all(is_affine.(L.A))
 is_diagonal(L::DCAT) = all(is_diagonal.(L.A))
 is_AcA_diagonal(L::DCAT) = all(is_AcA_diagonal.(L.A))
 is_AAc_diagonal(L::DCAT) = all(is_AAc_diagonal.(L.A))
