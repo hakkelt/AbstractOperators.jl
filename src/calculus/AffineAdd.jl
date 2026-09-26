@@ -28,16 +28,26 @@ struct AffineAdd{L <: AbstractOperator, D <: Union{AbstractArray, Number}, S} <:
     function AffineAdd(
             A::L, d::D, sign::Bool = true
         ) where {L <: AbstractOperator, D <: AbstractArray}
-        if size(d) != size(A, 1)
+        # `size(d)` is `d`'s flat Base.size, which only matches `size(A, 1)`
+        # (a nested per-block tuple for a multi-domain codomain) when the
+        # codomain is single-block. Compare structurally instead, same as
+        # `check()` in utils.jl does for domain/codomain arrays generally.
+        dim_d = d isa AbstractOperators.ArrayPartition ? size.(d.x) : size(d)
+        if !isequal(dim_d, size(A, 1))
             throw(
                 DimensionMismatch(
-                    "codomain size of $A not compatible with array `d` of size $(size(d))"
+                    "codomain size of $A not compatible with array `d` of size $(dim_d)"
                 ),
             )
         end
-        if eltype(d) != codomain_type(A)
+        # Same structural-vs-flat mismatch as the size check above:
+        # `codomain_type(A)` is a nested Tuple of per-block types for a
+        # multi-domain codomain, while `eltype` of an ArrayPartition is its
+        # single shared scalar type.
+        dtype_d = d isa AbstractOperators.ArrayPartition ? eltype.(d.x) : eltype(d)
+        if !isequal(dtype_d, codomain_type(A))
             error(
-                "cannot tilt opertor having codomain type $(codomain_type(A)) with array of type $(eltype(d))",
+                "cannot tilt opertor having codomain type $(codomain_type(A)) with array of type $(dtype_d)",
             )
         end
         return new{L, D, sign}(A, d)

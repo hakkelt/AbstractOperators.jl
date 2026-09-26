@@ -233,9 +233,14 @@ end
     xin = ArrayPartition(randn(2), randn(3))
     @test Cdiag[[2, 1]] * ArrayPartition(xin.x[2], xin.x[1]) ≈ Cdiag * xin
 
-    # Compose getindex error path for non-diagonal tail
+    # Compose getindex with non-diagonal tail: full-length permutation now
+    # distributes over the HCAT factor via `permute` instead of erroring.
     Cnondiag = MatrixOp(randn(4, 4)) * Hbase
-    @test_throws ErrorException Cnondiag[[2, 1]]
+    xnondiag = ArrayPartition(randn(2), randn(3))
+    @test Cnondiag[[2, 1]] * ArrayPartition(xnondiag.x[2], xnondiag.x[1]) ≈ Cnondiag * xnondiag
+
+    # strict-subset indices on a Compose still error (not a permutation)
+    @test_throws ErrorException Cnondiag[[1]]
 end
 
 @testitem "Syntax: Getindex VCAT" tags = [:misc, :Syntax] setup = [TestUtils] begin
@@ -498,17 +503,21 @@ end
     @test_throws ErrorException Scale(1.0im, op)
 end
 
-@testitem "Syntax: Compose getindex with multi-domain errors (line 62)" tags = [:misc, :Syntax] setup = [TestUtils] begin
-    using AbstractOperators, RecursiveArrayTools
-    # Compose with ndoms>1 cannot be split (error branch)
+@testitem "Syntax: Compose getindex distributes over multi-domain factor (line 62)" tags = [:misc, :Syntax] setup = [TestUtils] begin
+    using AbstractOperators
+    ArrayPartition = AbstractOperators.ArrayPartition
     # diagonal * HCAT always simplifies to HCAT via combination rules,
-    # so any Compose with ndoms>1 has a non-diagonal tail and hits the error.
+    # so any Compose with ndoms>1 has a non-diagonal tail.
     n = 4
     M = MatrixOp(randn(n, n))
     H = HCAT(DiagOp(randn(n)), DiagOp(randn(n)))
     C = M * H   # non-diagonal outer: Compose with ndoms>1 and non-diagonal tail
     @test ndoms(C, 2) == 2
-    @test_throws ErrorException C[1:2]
+    # full-length permutation is distributed via `permute`, not rejected
+    x = ArrayPartition(randn(n), randn(n))
+    @test C[[2, 1]] * ArrayPartition(x.x[2], x.x[1]) ≈ C * x
+    # a strict-subset index still errors: it isn't a permutation
+    @test_throws ErrorException C[[1]]
 end
 
 @testitem "copy_operator: fast path, slow path, default fallback" tags = [:misc, :Syntax] setup = [TestUtils] begin
