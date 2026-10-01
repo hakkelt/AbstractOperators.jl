@@ -66,3 +66,14 @@ function mul!(
     view(y, Lc.A.idx...) .= b
     return y
 end
+
+# The additive adjoint as one broadcast into the selected samples. The generic form gathers them
+# with `getindex`, which on a device allocates the gathered copy and checks its indices with a
+# reduction read back to the host, on every call of a `VCAT` adjoint.
+function AbstractOperators.add_mul!(
+        y::AbstractGPUArray, Lc::AdjointOperator{<:GetIndex{I}}, b::AbstractGPUArray, ::AbstractArray
+    ) where {K, I <: NTuple{K, Any}}
+    check(y, Lc, b)
+    view(y, Lc.A.idx...) .+= b
+    return y
+end
