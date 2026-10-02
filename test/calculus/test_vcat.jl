@@ -164,6 +164,21 @@ end
         A2 = gpu_randn(backend, m2, n)
         opV2 = VCAT(MatrixOp(A1), MatrixOp(A2))
         test_op(opV2, gpu_randn(backend, n), ArrayPartition(gpu_randn(backend, m1), gpu_randn(backend, m2)), false)
+
+        # Blocks of `GetIndex`es, whose adjoint accumulates through `add_mul!`.
+        x = gpu_zeros(backend, Float64, 6, 3)
+        g1 = GetIndex(x, (1:2:5, :))
+        g2 = GetIndex(x, (2:3, 2))
+        opG = VCAT(g1, g2)
+        yh = ArrayPartition(randn(3, 3), randn(2))
+        y = ArrayPartition(to_gpu(backend, yh.x[1]), to_gpu(backend, yh.x[2]))
+        hg1 = GetIndex(zeros(6, 3), (1:2:5, :))
+        hg2 = GetIndex(zeros(6, 3), (2:3, 2))
+        @test Array(opG' * y) ≈ hg1' * yh.x[1] .+ hg2' * yh.x[2]
+        z = to_gpu(backend, ones(6, 3))
+        AbstractOperators.add_mul!(z, g2', y.x[2], similar(z))
+        @test Array(z) ≈ ones(6, 3) .+ hg2' * yh.x[2]
+        test_op(opG, gpu_randn(backend, 6, 3), y, false)
     end
 end
 
@@ -207,4 +222,65 @@ end
     # Verify independence: forward into opV2 alone
     x2 = randn(n)
     @test collect(opV2 * x2) ≈ collect(opV * x2)
+end
+
+@testitem "VCAT: adjoint accumulates without a full-domain buffer per block" tags = [:calculus, :VCAT, :GetIndex] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    using LinearAlgebra: dot
+    Random.seed!(0)
+
+    # A stack of `GetIndex`es over disjoint parts of one domain -- the per-frame subsampling
+    # shape. Each block's adjoint touches only its own samples, so `add_mul!` accumulates into
+    # `y` directly instead of writing a full-domain buffer and adding it; the generic path made
+    # this loop quadratic in the number of blocks.
+    n, T = 16, 6
+    masks = [BitVector(mod(i + f, 3) == 0 for i in 1:n) for f in 1:T]
+    dom = (n, n, T)
+    blocks = [GetIndex(Float64, dom, (Colon(), masks[f], f)) for f in 1:T]
+    opV = VCAT(blocks...)
+
+    x = randn(dom...)
+    y = opV * x
+    @test all(y.x[f] ≈ x[:, masks[f], f] for f in 1:T)
+
+    # the adjoint is the scatter of every block, summed
+    ref = zeros(dom...)
+    for f in 1:T
+        ref[:, masks[f], f] .+= y.x[f]
+    end
+    adj = opV' * y
+    @test adj ≈ ref
+    # and it is the mathematical adjoint of the forward map
+    b = ArrayPartition((randn(size(y.x[f])...) for f in 1:T)...)
+    @test dot(opV * x, b) ≈ dot(x, opV' * b)
+
+    # `add_mul!` itself: the specialized path and the generic buffer path must agree
+    G = blocks[2]
+    yb = randn(dom...)
+    y_specialized = copy(yb)
+    AbstractOperators.add_mul!(y_specialized, G', y.x[2], zeros(dom...))
+    y_generic = copy(yb) .+ (G' * y.x[2])
+    @test y_specialized ≈ y_generic
+end
+
+@testitem "VCAT: adjoint of a self-adjoint block does not need an AdjointOperator wrapper" tags = [:calculus, :VCAT] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    using LinearAlgebra: dot
+    Random.seed!(0)
+
+    # `AdjointOperator(::Eye) = L` (Eye.jl) short-circuits construction, so `H.A[i]'` for an
+    # `Eye` block is a bare `Eye`, not an `AdjointOperator{Eye}`. `add_mul!`'s `AdjointOperator`
+    # method does not match that; a bare-operator fallback must, or a VCAT/AffineAdd stack with
+    # an `Eye` block (a plain regularization term next to a linear map, say) fails to construct
+    # its adjoint at all.
+    n = 5
+    opV = VCAT(MatrixOp(randn(3, n)), Eye(n))
+    @test AbstractOperators.is_eye(opV.A[2]')
+
+    x = randn(n)
+    y = opV * x
+    adj = opV' * y
+    @test adj ≈ opV.A[1]' * y.x[1] + y.x[2]
+    b = ArrayPartition(randn(size(y.x[1])...), randn(size(y.x[2])...))
+    @test dot(opV * x, b) ≈ dot(x, opV' * b)
 end
