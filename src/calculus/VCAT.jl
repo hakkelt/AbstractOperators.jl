@@ -198,6 +198,7 @@ domain_array_type(L::VCAT) = domain_array_type.(Ref(L.A[1]))
 codomain_array_type(::VCAT{N, L, P, C, CS}) where {N, L, P, C, CS} = CS
 
 is_linear(L::VCAT) = all(is_linear.(L.A))
+is_affine(L::VCAT) = all(is_affine.(L.A))
 is_AcA_diagonal(L::VCAT) = all(is_AcA_diagonal.(L.A))
 is_AAc_diagonal(L::VCAT) = all(is_AAc_diagonal.(L.A))
 is_full_column_rank(L::VCAT) = any(is_full_column_rank.(L.A))
