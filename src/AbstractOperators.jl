@@ -57,6 +57,7 @@ include("linearoperators/GetIndex.jl")
 include("linearoperators/MatrixOp.jl")
 include("linearoperators/LMatrixOp.jl")
 include("linearoperators/FiniteDiff.jl")
+include("linearoperators/HigherOrderDiff.jl")
 include("linearoperators/Variation.jl")
 include("linearoperators/LBFGS.jl")
 

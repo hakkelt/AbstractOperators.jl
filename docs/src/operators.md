@@ -18,6 +18,7 @@ MyLinOp
 
 ```@docs
 FiniteDiff
+HigherOrderDiff
 Variation
 ```
 
