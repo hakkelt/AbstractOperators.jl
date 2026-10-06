@@ -91,6 +91,41 @@ end
     @test c isa typeof(HigherOrderDiff(Float64, (5, 6, 2), 2, 3; threaded = false))
 end
 
+@testitem "HigherOrderDiff: chained differences combine" tags = [:linearoperator, :HigherOrderDiff, :combination] setup = [
+    TestUtils,
+] begin
+    using Random, LinearAlgebra, AbstractOperators
+    Random.seed!(0)
+
+    F1, F2, F3 = FiniteDiff((12, 5)), FiniteDiff((11, 5)), FiniteDiff((10, 5))
+    @test AbstractOperators.can_be_combined(F2, F1)
+    @test F2 * F1 isa HigherOrderDiff{2, 1, 2}
+    @test F3 * F2 * F1 isa HigherOrderDiff{2, 1, 3}
+    @test F3 * (F2 * F1) isa HigherOrderDiff{2, 1, 3}
+    @test (F3 * F2) * F1 * HigherOrderDiff(Float64, (13, 5), 1, 1) * FiniteDiff((14, 5)) isa HigherOrderDiff{2, 1, 5}
+    @test FiniteDiff((11, 5), 2) * FiniteDiff((11, 6), 2) isa HigherOrderDiff{2, 2, 2}
+
+    # Adjoints: `F1' * F2'` is `(F2 * F1)'`.
+    @test F1' * F2' isa AdjointOperator{<:HigherOrderDiff{2, 1, 2}}
+    @test F1' * F2' * F3' isa AdjointOperator{<:HigherOrderDiff{2, 1, 3}}
+
+    x, y = randn(12, 5), randn(9, 5)
+    @test (F3 * F2 * F1) * x ≈ F3 * (F2 * (F1 * x))
+    @test (F1' * F2' * F3') * y ≈ F1' * (F2' * (F3' * y))
+
+    # Different directions, element types or a normal operator do not combine.
+    @test !AbstractOperators.can_be_combined(FiniteDiff((11, 5), 2), FiniteDiff((12, 5), 1))
+    @test !(FiniteDiff((11, 5), 2) * FiniteDiff((12, 5), 1) isa HigherOrderDiff)
+    @test !AbstractOperators.can_be_combined(FiniteDiff(Float32, (11,)), FiniteDiff(Float64, (12,)))
+    @test !(F1' * F1 isa HigherOrderDiff)
+
+    # The combined operator is threaded when either part was, subject to the policy.
+    n = 1 << 16
+    serial, threaded = FiniteDiff(Float64, (n,); threaded = false), FiniteDiff(Float64, (n - 1,); threaded = true)
+    @test is_threaded(threaded * serial) == is_threaded(threaded)
+    @test !is_threaded(FiniteDiff(Float64, (n - 1,); threaded = false) * serial)
+end
+
 @testitem "HigherOrderDiff (GPU)" tags = [:gpu, :linearoperator, :HigherOrderDiff] setup = [TestUtils, GpuEnvSetup] begin
     using Random, AbstractOperators, GPUEnv
 
@@ -103,5 +138,9 @@ end
 
         op2 = HigherOrderDiff(Float64, (n, m), 2, 3; array_type = gpu_wrapper(backend, Float64, n, m))
         test_op(op2, gpu_randn(backend, n, m), gpu_randn(backend, n, m - 3), false)
+
+        F = FiniteDiff(Float64, (n,); array_type = gpu_wrapper(backend, Float64, n))
+        F2 = FiniteDiff(Float64, (n - 1,); array_type = gpu_wrapper(backend, Float64, n - 1))
+        @test F2 * F isa HigherOrderDiff
     end
 end
