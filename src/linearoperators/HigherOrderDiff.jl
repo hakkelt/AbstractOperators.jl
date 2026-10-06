@@ -13,11 +13,13 @@ y_i = \\sum_{j=0}^{K} (-1)^{K-j} \\binom{K}{j} x_{i+j}, \\qquad i = 1, \\dots, n
 
 with `K = order` and `n = size(x, direction)`. It equals `order` chained [`FiniteDiff`](@ref)s
 along the same direction, computed in a single pass over the array and without the
-intermediate arrays. Order 1 is `FiniteDiff` itself, bit for bit.
+intermediate arrays, and it is what multiplying such a chain builds: `FiniteDiff`s and
+`HigherOrderDiff`s along one direction, with the same element and storage type, combine into
+one, and so do their adjoints. Order 1 is `FiniteDiff` itself, bit for bit.
 
-The single pass sums the stencil in another order than the chain does, so it differs from the
-chain applied step by step by rounding: at most a few `K * eps` relative to the input's
-largest entry.
+The single pass sums the stencil in another order than the chain does, so a combined chain
+differs from the chain applied step by step by rounding: at most a few `K * eps` relative to
+the input's largest entry.
 
 ```jldoctest
 julia> HigherOrderDiff(Float64, (10,), 1, 2)
@@ -25,6 +27,9 @@ julia> HigherOrderDiff(Float64, (10,), 1, 2)
 
 julia> HigherOrderDiff((3, 6), 2, 3)
 δy³  ℝ^(3, 6) -> ℝ^(3, 3)
+
+julia> FiniteDiff((10,)) * FiniteDiff((11,))
+δx²  ℝ^11 -> ℝ^9
 
 julia> HigherOrderDiff(Float64, (5,), 1, 2) * collect(1.0:5.0) .^ 2
 3-element Vector{Float64}:
