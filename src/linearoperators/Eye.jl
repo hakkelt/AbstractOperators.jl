@@ -55,6 +55,11 @@ function mul!(y::AbstractArray, L::Eye, b::AbstractArray)
     return y
 end
 
+function mul!(y::AbstractArray, L::Eye, b::AbstractArray, α::Number, β::Number)
+    check(y, L, b)
+    return _store!(y, b, α, β)
+end
+
 # Properties
 diag(::Eye) = 1.0
 diag_AcA(::Eye) = 1.0
