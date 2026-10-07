@@ -157,13 +157,16 @@ end
 function mul!(y::AbstractArray, L::GetIndex, b::AbstractArray, α::Number, β::Number)
     check(y, L, b)
     src = view(b, L.idx...)
+    k = 0
     if iszero(β)
-        @inbounds for (j, v) in zip(eachindex(y), src)
-            y[j] = α * v
+        @inbounds for v in src
+            k += 1
+            y[k] = α * v
         end
     else
-        @inbounds for (j, v) in zip(eachindex(y), src)
-            y[j] = α * v + β * y[j]
+        @inbounds for v in src
+            k += 1
+            y[k] = α * v + β * y[k]
         end
     end
     return y
@@ -175,8 +178,10 @@ function mul!(y::AbstractArray, L::AdjointOperator{<:GetIndex}, b::AbstractArray
     check(y, L, b)
     _scale_output!(y, β)
     dst = view(y, L.A.idx...)
-    @inbounds for (j, v) in zip(eachindex(dst), b)
-        dst[j] += α * v
+    k = 0
+    @inbounds for j in eachindex(dst)
+        k += 1
+        dst[j] += α * b[k]
     end
     return y
 end
