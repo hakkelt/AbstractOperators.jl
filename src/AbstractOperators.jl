@@ -82,6 +82,7 @@ include("calculus/Ax_mul_Bxt.jl")
 include("calculus/Ax_mul_Bx.jl")
 include("calculus/HadamardProd.jl")
 include("calculus/OperatorWrapper.jl")
+include("operator_pool.jl")
 
 # Non-Linear operators
 include("nonlinearoperators/Pow.jl")
