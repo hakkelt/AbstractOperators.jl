@@ -378,6 +378,7 @@ domain_array_type(::HCAT{N, L, P, C, DS}) where {N, L, P, C, DS} = DS
 codomain_array_type(L::HCAT) = codomain_array_type.(Ref(L.A[1]))
 
 is_linear(L::HCAT) = all(is_linear.(L.A))
+is_affine(L::HCAT) = all(is_affine.(L.A))
 is_AAc_diagonal(L::HCAT) = all(is_AAc_diagonal.(L.A))
 is_full_row_rank(L::HCAT) = any(is_full_row_rank.(L.A))
 # Columns come from independent blocks stacked side-by-side into a shared
