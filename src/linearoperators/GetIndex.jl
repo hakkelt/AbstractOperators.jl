@@ -157,13 +157,46 @@ function mul!(y::AbstractArray, L::AdjointOperator{<:GetIndex}, b::AbstractArray
     return y
 end
 
-# Additive adjoint: touch only the selected samples instead of writing a full-domain buffer and
-# adding it. Gather-add-scatter rather than a broadcast into a `view`, so the index forms this
-# operator accepts on a GPU backend stay exactly the ones `mul!` above accepts (`view` with a
-# Bool mask or an integer vector is not universally supported). `buf` is unused.
-function add_mul!(y::AbstractArray, L::AdjointOperator{<:GetIndex}, b::AbstractArray, ::AbstractArray)
+# The selected samples read through a `view`, which has the shape of `y`. A `view` through a mask
+# collects its indices, so a mask is walked as the 3-argument kernel does.
+function mul!(y::AbstractArray, L::GetIndex{I}, b::AbstractArray, α::Number, β::Number) where {I}
     check(y, L, b)
-    @inbounds setindex!(y, getindex(y, L.A.idx...) .+ b, L.A.idx...)
+    I <: Tuple{AbstractArray{Bool}} && return _getindex_mask_mul!(y, L, b, α, β)
+    return _store!(y, view(b, L.idx...), α, β)
+end
+
+function _getindex_mask_mul!(y, L::GetIndex, b, α, β)
+    a, c = _coefficient(y, α), _coefficient(y, β)
+    mask = L.idx[1]
+    k = 0
+    if iszero(c)
+        @inbounds for j in eachindex(IndexLinear(), mask)
+            mask[j] || continue
+            k += 1
+            y[k] = a * b[j]
+        end
+    else
+        @inbounds for j in eachindex(IndexLinear(), mask)
+            mask[j] || continue
+            k += 1
+            y[k] = a * b[j] + c * y[k]
+        end
+    end
+    return y
+end
+
+# Additive adjoint: touch only the selected samples instead of writing a full-domain buffer and
+# adding it. A sample selected more than once receives the sum of its entries of `b`.
+function mul!(y::AbstractArray, L::AdjointOperator{<:GetIndex}, b::AbstractArray, α::Number, β::Number)
+    check(y, L, b)
+    _scale_output!(y, β)
+    dst = view(y, L.A.idx...)
+    a = _coefficient(y, α)
+    k = 0
+    @inbounds for j in eachindex(dst)
+        k += 1
+        dst[j] += a * b[k]
+    end
     return y
 end
 
