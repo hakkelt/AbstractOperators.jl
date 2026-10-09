@@ -380,6 +380,34 @@ codomain_array_type(L::HCAT) = codomain_array_type.(Ref(L.A[1]))
 is_linear(L::HCAT) = all(is_linear.(L.A))
 is_AAc_diagonal(L::HCAT) = all(is_AAc_diagonal.(L.A))
 is_full_row_rank(L::HCAT) = any(is_full_row_rank.(L.A))
+# Columns come from independent blocks stacked side-by-side into a shared
+# codomain: their sum can always cancel (e.g. HCAT(Eye,Eye) has [1,-1] in its
+# kernel), so the safe answer is `false` unless proven otherwise upstream.
+is_full_column_rank(L::HCAT) = false
+
+# HCAT(A, A, ..., A) with the *same* operator repeated (the shared-encoding-
+# operator multi-component reconstruction case, e.g. HCAT(𝒜, 𝒜) for
+# 𝒜*(x+y)) has AᴴA = Bᴴ * get_normal_op(A) * B, where B = HCAT(Eye,...,Eye)
+# sums the blocks and Bᴴ = VCAT(Eye,...,Eye) broadcasts the result back out —
+# reusing A's own fast normal operator (e.g. a Toeplitz-embedded NFFT AᴴA)
+# instead of applying A and Aᴴ once per block. Only safe when every block is
+# provably the same operator; a generic HCAT of distinct operators has no
+# such fusion (and its off-diagonal AᴴA cross terms are, in general, not
+# cheap to form), so it keeps the `false` fallback of `has_optimized_normalop`.
+function has_optimized_normalop(H::HCAT)
+    A1 = H.A[1]
+    return all(==(A1), H.A) && has_optimized_normalop(A1)
+end
+
+function get_normal_op(H::HCAT)
+    A1 = H.A[1]
+    n = length(H.A)
+    AtA_fast = get_normal_op(A1)
+    block_eye = Eye(domain_type(A1), size(A1, 2))
+    sum_op = HCAT(ntuple(_ -> block_eye, n)...)      # ArrayPartition -> sum of blocks
+    broadcast_op = VCAT(ntuple(_ -> block_eye, n)...) # single block -> broadcast to ArrayPartition
+    return broadcast_op * AtA_fast * sum_op
+end
 
 is_sliced(L::HCAT) = any(is_sliced.(L.A))
 function get_slicing_expr(L::HCAT)
