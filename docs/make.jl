@@ -22,7 +22,9 @@ makedocs(;
         "Custom Operators" => "custom.md",
         "LinearMaps wrapper" => "linearmaps.md",
     ],
-    checkdocs = :exports
+    checkdocs = :exports,
+    # An integration branch collects work in progress; its docs deploy even while incomplete.
+    warnonly = Symbol.(split(get(ENV, "DOCUMENTER_WARNONLY", ""), ','; keepempty = false)),
 )
 
 # A fork deploys to its own GitHub Pages; its workflow names the branch to deploy as `dev`.
