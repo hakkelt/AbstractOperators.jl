@@ -25,4 +25,9 @@ makedocs(;
     checkdocs = :exports
 )
 
-deploydocs(; repo = "github.com/kul-optec/AbstractOperators.jl", target = "build")
+# A fork deploys to its own GitHub Pages; its workflow names the branch to deploy as `dev`.
+deploydocs(;
+    repo = "github.com/" * get(ENV, "GITHUB_REPOSITORY", "kul-optec/AbstractOperators.jl"),
+    devbranch = get(ENV, "DOCUMENTER_DEVBRANCH", "master"),
+    target = "build",
+)
