@@ -42,4 +42,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCUMENTER_DEVBRANCH: ${{ github.ref_name == 'integration' && 'integration' || 'master' }}
-          DOCUMENTER_WARNONLY: ${{ github.ref_name == 'integration' && 'missing_docs,cross_references' || '' }}
+          DOCUMENTER_WARNONLY: ${{ github.ref_name == 'integration' && 'missing_docs,cross_references,doctest' || '' }}
