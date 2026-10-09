@@ -844,3 +844,166 @@ end
     @test estimate_opnorm(L) <= exact * (1 + 1.0e-8)
     @test isapprox(powerit(L; maxit = 500, rel_margin = 1.0e-12), exact, rtol = 1.0e-6)
 end
+
+@testitem "CR: two batches over the same batching collapse into one" tags = [
+    :calculus, :CombinationRules, :batching,
+] begin
+    using LinearAlgebra, Random
+    using AbstractOperators
+    using AbstractOperators: can_be_combined, is_threaded
+
+    Random.seed!(11)
+    d1, d2 = randn(ComplexF64, 4, 6), randn(ComplexF64, 4, 6)
+    B1 = BatchOp(DiagOp(d1; threaded = false), (5,); threaded = false)
+    B2 = BatchOp(DiagOp(d2; threaded = false), (5,); threaded = false)
+    x = randn(ComplexF64, 4, 6, 5)
+    y = randn(ComplexF64, 4, 6, 5)
+
+    @test can_be_combined(B1, B2)
+    C = B1 * B2
+    @test C isa AbstractOperators.SimpleBatchOp
+    @test C * x ≈ B1 * (B2 * x)
+    @test C' * y ≈ B2' * (B1' * y)
+
+    # The same batch size but a batch dimension in a different position is a different batching.
+    Bm = BatchOp(DiagOp(randn(ComplexF64, 6, 5); threaded = false), (4,), (:b, :_, :_); threaded = false)
+    @test !can_be_combined(Bm, B2)
+    @test Bm * B2 isa Compose
+    @test (Bm * B2) * x ≈ Bm * (B2 * x)
+
+    # A `SpreadingBatchOp` combines slice for slice with a batch over the same batching, the
+    # single operator of the simple side pairing with each of its own.
+    ops = [DiagOp(randn(ComplexF64, 4, 6); threaded = false) for _ in 1:5]
+    SP = BatchOp(ops, (:_, :_, :s); threaded = false)
+    @test can_be_combined(SP, B2)
+    @test SP * B2 isa AbstractOperators.SpreadingBatchOp
+    @test (SP * B2) * x ≈ SP * (B2 * x)
+    @test (B2 * SP) * x ≈ B2 * (SP * x)
+    @test (SP * B2)' * y ≈ B2' * (SP' * y)
+end
+
+@testitem "CR: two spreading batches combine slice for slice" tags = [
+    :calculus, :CombinationRules, :batching,
+] begin
+    using LinearAlgebra, Random
+    using AbstractOperators
+    using AbstractOperators: can_be_combined, get_spreading_dims
+
+    Random.seed!(31)
+    mk() = [DiagOp(randn(ComplexF64, 4, 6); threaded = false) for _ in 1:5]
+    S1 = BatchOp(mk(), (:_, :_, :s); threaded = false)
+    S2 = BatchOp(mk(), (:_, :_, :s); threaded = false)
+    x = randn(ComplexF64, 4, 6, 5)
+    y = randn(ComplexF64, 4, 6, 5)
+
+    @test can_be_combined(S1, S2)
+    C = S1 * S2
+    @test C isa AbstractOperators.SpreadingBatchOp
+    @test get_spreading_dims(typeof(C)) == get_spreading_dims(typeof(S1))
+    @test C * x ≈ S1 * (S2 * x)
+    @test C' * y ≈ S2' * (S1' * y)
+
+    # Two batches that spread over different dimensions have no common grid of operators, so
+    # there is no slice-for-slice pairing to make and they stay apart.
+    Random.seed!(41)
+    As = BatchOp(mk(), (5,), (:_, :_, :s, :b); threaded = false)
+    At = BatchOp(mk(), (5,), (:_, :_, :b, :s); threaded = false)
+    @test get_spreading_dims(typeof(As)) != get_spreading_dims(typeof(At))
+    @test !can_be_combined(As, At)
+    @test As * At isa Compose
+    x4 = randn(ComplexF64, 4, 6, 5, 5)
+    @test (As * At) * x4 ≈ As * (At * x4)
+end
+
+@testitem "CR: the threading strategy of a spreading batch survives" tags = [
+    :calculus, :CombinationRules, :batching,
+] begin
+    using LinearAlgebra, Random
+    using AbstractOperators
+    using AbstractOperators: ThreadingStrategy
+
+    Random.seed!(62)
+    n = 512
+    x = randn(ComplexF64, n, 4)
+    strategies = (
+        ThreadingStrategy.COPYING, ThreadingStrategy.LOCKING, ThreadingStrategy.FIXED_OPERATOR,
+    )
+    for strategy in strategies
+        # A `Compose` owns buffers, so it is not thread safe and the strategy actually matters.
+        inner() = DiagOp(randn(ComplexF64, n, n); threaded = false) *
+            BroadCast(Eye(zeros(ComplexF64, n)), (n, n); threaded = false)
+        G = BatchOp(
+            [inner() for _ in 1:4], (:_, :s) => (:_, :_, :s);
+            threaded = true, threading_strategy = strategy,
+        )
+        D = BatchOp(
+            [DiagOp(randn(ComplexF64, n, n); threaded = false) for _ in 1:4], (:_, :_, :s);
+            threaded = true, threading_strategy = strategy,
+        )
+        C = D * G
+        @test C isa AbstractOperators.SpreadingBatchOp
+        @test typeof(C).name.wrapper === typeof(G).name.wrapper
+        @test C * x ≈ D * (G * x)
+    end
+end
+
+@testitem "CR: what counts as separable over the batch dimensions" tags = [
+    :calculus, :CombinationRules, :batching,
+] begin
+    using LinearAlgebra, Random
+    using AbstractOperators
+    using AbstractOperators: _slice_operator
+
+    Random.seed!(71)
+    mask = (false, false, true)
+
+    # A diagonal that repeats along the batch dimension weights every slice the same way; one
+    # that varies along it does not, and must not be folded in.
+    repeated = DiagOp(repeat(randn(ComplexF64, 4, 6), 1, 1, 5); threaded = false)
+    varying = DiagOp(randn(ComplexF64, 4, 6, 5); threaded = false)
+    @test _slice_operator(repeated, mask) isa DiagOp
+    @test _slice_operator(varying, mask) === nothing
+    @test _slice_operator(DiagOp(ComplexF64, (4, 6, 5), 2.0 + 0im; threaded = false), mask) isa DiagOp
+
+    # Scaling, adjoining and summing all act within a slice, so each is separable exactly when
+    # what it wraps is.
+    @test _slice_operator(3.0 * repeated, mask) !== nothing
+    @test _slice_operator(repeated', mask) !== nothing
+    @test _slice_operator(repeated + repeated, mask) !== nothing
+    @test _slice_operator(3.0 * varying, mask) === nothing
+    @test _slice_operator(varying', mask) === nothing
+    @test _slice_operator(repeated + varying, mask) === nothing
+
+    # And the folding is correct in both directions, not merely permitted.
+    B = BatchOp(DiagOp(randn(ComplexF64, 4, 6); threaded = false), (5,); threaded = false)
+    x = randn(ComplexF64, 4, 6, 5)
+    y = randn(ComplexF64, 4, 6, 5)
+    for L in (repeated, 3.0 * repeated, repeated')
+        @test (L * B) * x ≈ L * (B * x)
+        @test (B * L) * x ≈ B * (L * x)
+        @test (L * B)' * y ≈ B' * (L' * y)
+    end
+    @test repeated * B isa AbstractOperators.SimpleBatchOp
+    @test varying * B isa Compose
+    @test (varying * B) * x ≈ varying * (B * x)
+end
+
+@testitem "CR: batch threading survives a combination" tags = [
+    :calculus, :CombinationRules, :batching,
+] begin
+    using LinearAlgebra, Random
+    using AbstractOperators
+    using AbstractOperators: is_threaded
+
+    Random.seed!(12)
+    # Large enough that the threading policy actually says yes, so the assertion is about the
+    # combination preserving the answer rather than about the policy declining twice.
+    B1 = BatchOp(DiagOp(randn(ComplexF64, 256, 256); threaded = false), (8,); threaded = true)
+    B2 = BatchOp(DiagOp(randn(ComplexF64, 256, 256); threaded = false), (8,); threaded = true)
+    x = randn(ComplexF64, 256, 256, 8)
+
+    C = B1 * B2
+    @test C isa AbstractOperators.SimpleBatchOp
+    @test is_threaded(C) == (is_threaded(B1) || is_threaded(B2))
+    @test C * x ≈ B1 * (B2 * x)
+end
