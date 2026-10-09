@@ -203,6 +203,35 @@ function tbroadcast!(y, x)
     return _copy_flat_threaded!(_y, _x)
 end
 
+# A broadcast is an expansion into copies, and its adjoint the sum of those copies, so both join
+# a pointwise run of a `Compose` when the broadcast axes are adjacent.
+_pw_kind(::Type{<:NoOperatorBroadCast{T, N, M, Th, S}}) where {T, N, M, Th, S} =
+    S <: Array ? PwExpandKind() : PwNoneKind()
+_pw_kind(::Type{<:AdjointOperator{<:NoOperatorBroadCast{T, N, M, Th, S}}}) where {T, N, M, Th, S} =
+    S <: Array ? PwReduceKind() : PwNoneKind()
+_pw_layout(A::AdjointOperator{<:NoOperatorBroadCast}) = _pw_layout(A.A)
+function _pw_layout(A::NoOperatorBroadCast)
+    r, o = A.reshaped_dim_in, A.dim_out
+    first_axis, last_axis = 0, 0
+    for d in eachindex(o)
+        if r[d] != o[d]
+            first_axis == 0 && (first_axis = d)
+            last_axis = d
+        end
+    end
+    first_axis == 0 && return (prod(o), 1)
+    inner, K = 1, 1
+    for d in eachindex(o)
+        if d < first_axis
+            inner *= o[d]
+        elseif d <= last_axis
+            r[d] == 1 || return nothing
+            K *= o[d]
+        end
+    end
+    return inner, K
+end
+
 # NoOperatorBroadCast
 function mul!(y, A::NoOperatorBroadCast{T, N, M, false, S, false}, b) where {T, N, M, S}
     check(y, A, b)
