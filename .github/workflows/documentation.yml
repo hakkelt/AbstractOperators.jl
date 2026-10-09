@@ -29,7 +29,7 @@ jobs:
           forks = [
                 ("OperatorCore", "OperatorCore.jl", nothing),
           ]
-          own = Pkg.project().name
+          own = Pkg.TOML.parsefile("Project.toml")["name"]
           for env in (".", "docs")
               Pkg.activate(env)
               env == "docs" && own in keys(Pkg.project().dependencies) && Pkg.rm(own)
