@@ -77,3 +77,25 @@ end
         end
     end
 end
+
+@testitem "SignAlternation joins a pointwise run on device arrays" tags = [:gpu, :fftw, :pointwise] setup = [TestUtils, GpuEnvSetup] begin
+    using GPUEnv, Random, AbstractOperators, FFTWOperators
+    const AO = AbstractOperators
+
+    for backend in gpu_backends()
+        Random.seed!(0)
+        T = ComplexF32
+        dev(a) = to_gpu(backend, a)
+        for n in ((8, 6, 4), (7, 5, 3)), dirs in ((1,), (2, 3), (1, 2, 3))
+            x = randn(T, n[1:2])
+            S, hS = SignAlternation(T, n, dirs; array_type = typeof(dev(zeros(T, n)))), SignAlternation(T, n, dirs)
+            @test AO._pw_kind(S) isa AO.PwMapKind
+            E, hE = BroadCast(Eye(dev(zeros(T, n[1:2]))), n), BroadCast(Eye(T, n[1:2]), n)
+            C, hC = S * E, hS * hE
+            @test C isa Compose
+            @test AO._pw_run_length(C.A) == 2
+            @test Array(C * dev(x)) == hC * x
+            @test Array(C' * dev(hC * x)) ≈ hC' * (hC * x)
+        end
+    end
+end
