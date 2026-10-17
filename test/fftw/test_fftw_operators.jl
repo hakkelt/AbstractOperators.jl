@@ -80,7 +80,6 @@ end
     using AbstractOperators
     using FFTW, LinearAlgebra, Random, FFTWOperators
     using AbstractOperators: is_linear, is_null, is_eye, is_diagonal, is_AcA_diagonal, is_AAc_diagonal, is_orthogonal, is_invertible, is_full_row_rank, is_full_column_rank
-    using AbstractOperators: get_normal_op, domain_type, codomain_type
 
     n, m = 4, 7
 
@@ -176,10 +175,16 @@ end
     y1 = op * x1
     @test norm(op' * (op * x1) - diag_AcA(op) * x1) <= 1.0e-12
     @test norm(op * (op' * y1) - diag_AAc(op) * y1) <= 1.0e-12
+end
+
+@testitem "DFT normal operators" tags = [:fftw, :DFT] begin
+    using AbstractOperators, FFTWOperators
+    using AbstractOperators: get_normal_op, domain_type, codomain_type
 
     # The normal operators act on (and keep) the domain's element type. They used to be a bare
     # `Eye(size)`, a Float64 operator that rejected the complex image of a complex DFT (and the
     # complex codomain of a real one), so ADMM's `BᴴB` failed on `L1TemporalFourier`.
+    n, m = 4, 7
     for (T, x) in ((ComplexF64, randn(ComplexF64, n, m)), (Float64, randn(n, m)))
         op = DFT(T, n, m)
         N = get_normal_op(op)
