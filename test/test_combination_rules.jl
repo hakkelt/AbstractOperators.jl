@@ -238,6 +238,40 @@ end
     @test combined_diag.A ≈ A * Diagonal(d)
 end
 
+@testitem "CR: MatrixOp does not absorb a matrix-valued diagonal" tags = [
+    :calculus, :CombinationRules,
+] begin
+    using LinearAlgebra, Random
+    using AbstractOperators
+    using AbstractOperators: can_be_combined
+
+    # A `MatrixOp` with a multi-dimensional domain applies its matrix column by column, so a
+    # `DiagOp` whose diagonal is a matrix weights each column by a different diagonal. No single
+    # matrix represents that, and folding it anyway used to yield the ordinary matrix product
+    # `M * d`, which agrees with the composition nowhere.
+    Random.seed!(3)
+    n = 8
+    M = MatrixOp(randn(n, n), n)
+    W = DiagOp(randn(n, n))
+    x = randn(n, n)
+
+    @test !can_be_combined(M, W)
+    @test !can_be_combined(W, M)
+    @test (M * W) * x ≈ M * (W * x)
+    @test (W * M) * x ≈ W * (M * x)
+    @test !can_be_combined(M', W')
+    @test !can_be_combined(W', M')
+
+    # A vector diagonal is still folded, in both orders, and still correctly.
+    v = DiagOp(randn(n))
+    Mv = MatrixOp(randn(n, n))
+    y = randn(n)
+    @test can_be_combined(Mv, v)
+    @test Mv * v isa MatrixOp
+    @test (Mv * v) * y ≈ Mv * (v * y)
+    @test (v * Mv) * y ≈ v * (Mv * y)
+end
+
 @testitem "CR: Scale+Eye/DiagOp Combinations" tags = [:calculus, :CombinationRules] begin
     using LinearAlgebra
     using AbstractOperators

@@ -261,27 +261,53 @@ function combine(T1::AdjointOperator{<:Scale}, T2::AdjointOperator{<:DiagOp})
     end
 end
 
-can_be_combined(T1::DiagOp, T2::MatrixOp) = codomain_type(T1) == domain_type(T2)
-can_be_combined(T1::MatrixOp, T2::DiagOp) = codomain_type(T1) == domain_type(T2)
+"""
+	_has_matrix_diagonal(L)
+
+Whether `L` is a `DiagOp` whose diagonal is not a vector, i.e. one that scales a multi-dimensional
+array elementwise.
+
+Such a `DiagOp` cannot be folded into a neighbouring `MatrixOp`. A `MatrixOp` with a
+multi-dimensional domain applies its matrix to every column of the input independently, so
+`x -> M * (d .* x)` weights each column by a *different* diagonal; that is block diagonal with
+unequal blocks, and no single matrix represents it. Folding it anyway silently produced a
+different operator — `M * d` as an ordinary matrix product — which agreed with the composition on
+nothing.
+"""
+_has_matrix_diagonal(L::DiagOp) = !(L.d isa AbstractVector)
+_has_matrix_diagonal(L::AdjointOperator{<:DiagOp}) = _has_matrix_diagonal(L.A)
+
+function _matrix_diag_combinable(T1, T2)
+    return codomain_type(T1) == domain_type(T2) &&
+        !_has_matrix_diagonal(T1) &&
+        !_has_matrix_diagonal(T2)
+end
+_has_matrix_diagonal(::MatrixOp) = false
+_has_matrix_diagonal(::AdjointOperator{<:MatrixOp}) = false
+
+can_be_combined(T1::DiagOp, T2::MatrixOp) = _matrix_diag_combinable(T1, T2)
+can_be_combined(T1::MatrixOp, T2::DiagOp) = _matrix_diag_combinable(T1, T2)
 function can_be_combined(T1::AdjointOperator{<:DiagOp}, T2::MatrixOp)
-    return codomain_type(T1) == domain_type(T2)
+    return _matrix_diag_combinable(T1, T2)
 end
 function can_be_combined(T1::DiagOp, T2::AdjointOperator{<:MatrixOp})
-    return codomain_type(T1) == domain_type(T2)
+    return _matrix_diag_combinable(T1, T2)
 end
 function can_be_combined(T1::MatrixOp, T2::AdjointOperator{<:DiagOp})
-    return codomain_type(T1) == domain_type(T2)
+    return _matrix_diag_combinable(T1, T2)
 end
 function can_be_combined(T1::AdjointOperator{<:MatrixOp}, T2::DiagOp)
-    return codomain_type(T1) == domain_type(T2)
+    return _matrix_diag_combinable(T1, T2)
 end
 function can_be_combined(T1::AdjointOperator{<:DiagOp}, T2::AdjointOperator{<:MatrixOp})
-    return codomain_type(T1) == domain_type(T2)
+    return _matrix_diag_combinable(T1, T2)
 end
 function can_be_combined(T1::AdjointOperator{<:MatrixOp}, T2::AdjointOperator{<:DiagOp})
-    return codomain_type(T1) == domain_type(T2)
+    return _matrix_diag_combinable(T1, T2)
 end
-combine_matrix(L::AbstractMatrix, R::AbstractMatrix) = L * R
+# Only a vector diagonal turns into a matrix factor. The `(AbstractMatrix, AbstractMatrix)`
+# method that used to sit here existed solely to serve a matrix-valued diagonal, which
+# `_has_matrix_diagonal` now keeps out of `combine` altogether.
 combine_matrix(L::AbstractMatrix, R::AbstractVector) = L * Diagonal(R)
 combine_matrix(L::AbstractVector, R::AbstractMatrix) = Diagonal(L) * R
 function combine(T1::DiagOp, T2::MatrixOp)
