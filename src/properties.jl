@@ -9,6 +9,7 @@ export ndoms,
     domain_array_type,
     codomain_array_type,
     is_linear,
+    is_affine,
     is_eye,
     is_null,
     is_diagonal,
@@ -227,7 +228,40 @@ function ndoms(L::AbstractOperator)
 end
 ndoms(L::AbstractOperator, i::Int) = ndoms(L)[i]
 
+"""
+	is_linear(A::AbstractOperator)
+
+Returns true if `A` is linear: `A * (αx + βy) = α(A * x) + β(A * y)`, so `A * 0 = 0`. An
+operator with a displacement (`AffineAdd`, or any combination containing one) is not linear;
+see [`is_affine`](@ref). Every `LinearOperator` is linear; a combination is linear when all of
+its parts are.
+
+```jldoctest
+julia> is_linear(DiagOp(rand(3)))
+true
+
+julia> is_linear(AffineAdd(DiagOp(rand(3)), rand(3)))
+false
+```
+"""
 is_linear(L::LinearOperator) = true
+
+"""
+	is_affine(A::AbstractOperator)
+
+Returns true if `A` is affine: `A * x = Aₗ * x + d` for a linear `Aₗ` and a fixed displacement
+`d` (see [`displacement`](@ref) and [`remove_displacement`](@ref)). Every linear operator is
+affine; `AffineOperator` is the supertype of the operators that are affine by construction.
+
+```jldoctest
+julia> is_affine(AffineAdd(DiagOp(rand(3)), rand(3)))
+true
+
+julia> is_affine(Sin(3))
+false
+```
+"""
+is_affine(L::AffineOperator) = true
 
 """
 	is_sliced(A)
@@ -348,7 +382,7 @@ function can_be_combined(L, R)
     return _is_removable_eye(L) ||
         _is_removable_eye(R) ||
         is_null(L) ||
-        (is_null(R) && is_linear(L) && all(displacement(L) .== 0))
+        (is_null(R) && is_linear(L))
 end
 
 """
@@ -384,7 +418,7 @@ function combine(L, R)
         else
             return Zeros(domain_type(R), size(R, 2), codomain_type(L), size(L, 1))
         end
-    elseif is_null(R) && is_linear(L) && all(displacement(L) .== 0)
+    elseif is_null(R) && is_linear(L)
         if size(L, 1) == size(L, 2) && domain_type(L) == codomain_type(L)
             return R
         else

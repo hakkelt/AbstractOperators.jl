@@ -69,6 +69,7 @@ codomain_array_type(R::Reshape) = codomain_array_type(R.A)
 is_thread_safe(R::Reshape) = is_thread_safe(R.A)
 
 is_linear(R::Reshape) = is_linear(R.A)
+is_affine(R::Reshape) = is_affine(R.A)
 is_sliced(R::Reshape) = is_sliced(R.A)
 get_slicing_expr(R::Reshape) = get_slicing_expr(R.A)
 get_slicing_mask(R::Reshape) = get_slicing_mask(R.A)
