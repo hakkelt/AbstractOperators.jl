@@ -322,10 +322,10 @@ _supports_threading_from_children(L::AbstractOperator) = any(supports_threading,
 # `DiagOp` and `Scale` keep FastBroadcast's singleton thread flag as their type parameter.
 # These convert between that encoding and the plain `Bool` used everywhere else.
 
-@inline _fbthread(b::Bool) = b ? FastBroadcast.True() : FastBroadcast.False()
+@inline _fbthread(b::Bool) = b ? FastBroadcast.Threaded() : FastBroadcast.Serial()
 
-@inline _fbbool(::FastBroadcast.True) = true
-@inline _fbbool(::FastBroadcast.False) = false
+@inline _fbbool(::FastBroadcast.Threaded) = true
+@inline _fbbool(::FastBroadcast.Serial) = false
 
 # ─── BLAS bridge ───────────────────────────────────────────────────────────────
 #
