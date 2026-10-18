@@ -106,6 +106,45 @@ end
     @test N * x ≈ TG.A' * (TG.A * x + TG.d)
 end
 
+@testitem "AffineAdd with multi-domain (ArrayPartition) codomain displacement" tags = [:calculus, :AffineAdd] setup = [TestUtils] begin
+    using Random, AbstractOperators, RecursiveArrayTools
+    Random.seed!(0)
+
+    # HCAT(A, A, ..., A) with the same operator repeated is `is_eye`-adjacent
+    # via HCAT's normal-op fusion (see HCAT.jl): its normal operator has a
+    # multi-domain codomain (an ArrayPartition), which AffineAdd's
+    # constructor previously mis-validated via a flat `size`/`eltype` check
+    # instead of the ArrayPartition-aware structural comparison.
+    n, m = 8, 6
+    A = MatrixOp(randn(n, m))
+    H = HCAT(A, A)
+    @test AbstractOperators.has_optimized_normalop(H)
+    Hn = AbstractOperators.get_normal_op(H)
+
+    d = ArrayPartition(randn(m), randn(m))
+    T = AffineAdd(Hn, d)
+    x = ArrayPartition(randn(m), randn(m))
+    y = T * x
+    expected_each = AbstractOperators.get_normal_op(A) * (x.x[1] + x.x[2])
+    @test y.x[1] ≈ expected_each .+ d.x[1]
+    @test y.x[2] ≈ expected_each .+ d.x[2]
+
+    @test_throws DimensionMismatch AffineAdd(Hn, randn(m + 1, 2))
+    @test_throws ErrorException AffineAdd(Hn, ArrayPartition(im * randn(m), im * randn(m)))
+end
+
+# A distinct-operator HCAT has no normal-op fusion: no false positive, and
+# `is_full_column_rank` defaults safely to `false` (columns from independent
+# blocks stacked into a shared codomain can always cancel).
+@testitem "HCAT: no normal-op fusion or full-column-rank for distinct operators" tags = [:calculus, :HCAT] setup = [TestUtils] begin
+    using Random, AbstractOperators
+    Random.seed!(0)
+    H = HCAT(MatrixOp(randn(5, 10)), MatrixOp(randn(5, 10)))
+    @test !AbstractOperators.has_optimized_normalop(H)
+    @test !is_full_column_rank(H)
+    @test !is_full_column_rank(HCAT(Eye(4), Eye(4)))
+end
+
 @testitem "AffineAdd is_thread_safe delegation" tags = [:calculus, :AffineAdd] setup = [TestUtils] begin
     using Random, AbstractOperators
     Random.seed!(0)
