@@ -110,7 +110,7 @@ end
     using AbstractOperators, NFFTOperators, NFFT, GPUEnv, LinearAlgebra, Random
     using AbstractOperators: get_normal_op
 
-    for backend in gpu_backends(; include_jlarrays = false, supports_fftw = true)
+    for backend in gpu_backends(; include_cpu_backends = false, supports_fftw = true)
         Random.seed!(0)
         traj = Float32.(rand(2, 64, 20) .- 0.5)
         dcf = rand(Float32, 64, 20)
