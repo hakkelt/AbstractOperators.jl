@@ -302,3 +302,39 @@ end
         @test x_back ≈ A' * dropdims(sum(y_test, dims = 2), dims = 2)
     end
 end
+
+@testitem "BroadCast: threaded forward keeps the operator's threading" tags = [
+    :calculus, :BroadCast, :threading,
+] setup = [TestUtils] begin
+    using AbstractOperators, LinearAlgebra, Random
+    const AO = AbstractOperators
+    Random.seed!(0)
+    n = 1 << 16
+    A = FiniteDiff((n,))
+    R = BroadCast(A, (n - 1, 3))
+    Rs = BroadCast(A, (n - 1, 3); threaded = false)
+    if Threads.nthreads() > 1
+        @test AO.is_block_threaded(R)
+        # The forward pass runs the operator as given, which may thread itself; only the
+        # adjoint loop needs serial per-thread instances, and at most one per slice.
+        @test R.Af === A
+        @test length(R.A) == min(Threads.nthreads(), 3)
+        @test all(!is_threaded, R.A)
+        @test is_threaded(R)
+    end
+    x = randn(n)
+    b = randn(n - 1, 3)
+    @test R * x ≈ Rs * x
+    # The per-thread sums and their reduction give the serial adjoint, also when the slices do
+    # not divide evenly among the threads and when there are fewer slices than threads.
+    @test R' * b ≈ Rs' * b
+    for k in (1, 2, 5, 7)
+        Rk = BroadCast(A, (n - 1, k))
+        bk = randn(n - 1, k)
+        @test Rk' * bk ≈ BroadCast(A, (n - 1, k); threaded = false)' * bk
+    end
+    # Structural transforms and copies rebuild from the operator as given.
+    @test AO.remove_displacement(R) * x ≈ Rs * x
+    @test copy_operator(R) * x ≈ Rs * x
+    @test copy_operator(R; threaded = false)' * b ≈ Rs' * b
+end

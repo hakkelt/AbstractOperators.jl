@@ -93,11 +93,8 @@ end
 Jacobian(T::Transpose{<:AbstractOperator}, ::AbstractArray) = T
 #Jacobian of BroadCast
 Jacobian(L::NoOperatorBroadCast, ::AbstractArray) = L
-function Jacobian(B::OperatorBroadCast{T, N, M, false}, x::AbstractArray) where {T, N, M}
-    return OperatorBroadCast(Jacobian(B.A, x), B.dim_out; threaded = false)
-end
-function Jacobian(B::OperatorBroadCast{T, N, M, true}, x::AbstractArray) where {T, N, M}
-    return OperatorBroadCast(Jacobian(B.A[1], x), B.dim_out; threaded = true)
+function Jacobian(B::OperatorBroadCast{T, N, M, Th}, x::AbstractArray) where {T, N, M, Th}
+    return OperatorBroadCast(Jacobian(B.Af, x), B.dim_out; threaded = Th)
 end
 #Jacobian of AffineAdd
 Jacobian(B::AffineAdd, x) = Jacobian(B.A, x)
