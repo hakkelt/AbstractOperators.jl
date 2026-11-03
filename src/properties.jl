@@ -1046,17 +1046,19 @@ function _should_thread(op::AbstractOperator, storage_type = nothing)
 end
 
 """
-	_should_thread(op::AbstractOperator, batch_length::Integer)
+	_should_thread_batch(op::AbstractOperator, batch_length::Integer)
 
-Whether a batch loop of `batch_length` calls to `op` should thread.
+Whether a batch loop of `batch_length` calls to `op` should thread. Named apart from
+`_should_thread(op, storage_type)`, whose second argument is a storage type, so neither can be
+called by mistake for the other.
 
-Besides the per-item condition above, a batch with fewer items than threads stays serial
-when `op` threads itself: the loop could keep only `batch_length` threads busy, while each
-call can use all of them. For two frames of a 2-D wavelet transform (db2, 3 levels,
+Besides the per-item condition of `_should_thread(op)`, a batch with fewer items than threads
+stays serial when `op` threads itself: the loop could keep only `batch_length` threads busy,
+while each call can use all of them. For two frames of a 2-D wavelet transform (db2, 3 levels,
 ComplexF32, 128² to 512², one EPYC 7763 NUMA domain), threading inside each frame took
 0.39-0.63 of the time of threading across the frames at 8 threads, and 0.26-0.57 at 16.
 """
-function _should_thread(op::AbstractOperator, batch_length::Integer)
+function _should_thread_batch(op::AbstractOperator, batch_length::Integer)
     _should_thread(op) || return false
     return batch_length >= Threads.nthreads() || !is_threaded(op)
 end

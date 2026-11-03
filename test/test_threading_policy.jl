@@ -135,7 +135,7 @@ end
     :misc, :threading,
 ] setup = [TestUtils] begin
     using AbstractOperators
-    using AbstractOperators: _should_thread, MIN_BATCH_WORK_FOR_PARALLEL
+    using AbstractOperators: _should_thread, _should_thread_batch, MIN_BATCH_WORK_FOR_PARALLEL
     using Random
     Random.seed!(0)
 
@@ -151,6 +151,21 @@ end
     if Threads.nthreads() > 1
         @test _should_thread(Eye(MIN_BATCH_WORK_FOR_PARALLEL)) == true
     end
+
+    # The batch decision adds the item count: fewer items than threads leave the threads to
+    # an operator that threads itself, but not to one that does not.
+    @test _should_thread_batch(Eye(4), 1000) == false
+    if Threads.nthreads() > 1
+        big = MIN_BATCH_WORK_FOR_PARALLEL
+        @test _should_thread_batch(Eye(big), Threads.nthreads()) == true
+        @test _should_thread_batch(Eye(big), 1) == !is_threaded(Eye(big))
+        serial = DiagOp(randn(big); threaded = false)
+        threaded = DiagOp(randn(big); threaded = true)
+        @test _should_thread_batch(serial, 1) == true
+        @test _should_thread_batch(threaded, 1) == !is_threaded(threaded)
+    end
+    # A storage type is not a batch count: the storage form keeps its own meaning.
+    @test _should_thread(Eye(4), Array{Float64}) == false
 
     # Scale's threading threshold sits at its measured 2^22 crossover, so a 1e5-element
     # operator (well below that) must stay serial.
