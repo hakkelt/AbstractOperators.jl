@@ -265,9 +265,17 @@ go through `NestedThreading`, so the request is clamped by any outer budget: an 
 constructed with `threaded = true` that ends up being called from inside a saturated batch
 loop stays single-threaded, and the save/restore bookkeeping is refcounted rather than
 per-call.
+
+The threaded path first parks Polyester's workers (`quiesce_foreign_pools`): after any
+`@batch` kernel they keep spinning for a while, and NFFT's task-based threads would wait
+for them. A 64² forward NFFT (256 × 64 samples, 4 threads) took 2.2-2.4 ms right after a
+threaded `Sin` and 1.0 ms with the workers parked, as it does on its own.
 """
-with_nfft_threading(f::F, threaded::Bool) where {F} =
-    threaded ? with_full_threads(f) : with_restricted_threads(f)
+function with_nfft_threading(f::F, threaded::Bool) where {F}
+    threaded || return with_restricted_threads(f)
+    quiesce_foreign_pools()
+    return with_full_threads(f)
+end
 
 
 # The number of images in the stack, and of frames among them, and the size of one image. A
