@@ -9,7 +9,8 @@ using RecursiveArrayTools: ArrayPartition
 
 abstract type AbstractOperator end
 
-abstract type LinearOperator <: AbstractOperator end
+abstract type AffineOperator <: AbstractOperator end
+abstract type LinearOperator <: AffineOperator end
 abstract type NonLinearOperator <: AbstractOperator end
 
 import LinearAlgebra: mul!
@@ -18,6 +19,7 @@ import Base.Threads: @spawn, nthreads
 
 import OperatorCore:
     is_linear,
+    is_affine,
     is_eye,
     is_null,
     is_diagonal,
@@ -33,7 +35,7 @@ import OperatorCore:
     is_positive_definite,
     is_positive_semidefinite
 
-export LinearOperator, NonLinearOperator, AbstractOperator
+export LinearOperator, AffineOperator, NonLinearOperator, AbstractOperator
 export mul!
 
 const DEBUG_COMPOSE = Ref{Bool}(false)

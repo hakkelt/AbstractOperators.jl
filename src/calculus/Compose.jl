@@ -247,6 +247,7 @@ domain_array_type(L::Compose) = domain_array_type(L.A[1])
 codomain_array_type(L::Compose) = codomain_array_type(L.A[end])
 
 is_linear(L::Compose) = all(is_linear.(L.A))
+is_affine(L::Compose) = all(is_affine.(L.A))
 function is_diagonal(L::Compose)
     return all(is_diagonal.(L.A[is_sliced(L) ? (2:end) : (1:end)]))
 end
