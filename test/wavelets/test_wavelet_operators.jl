@@ -37,6 +37,24 @@ end
     end
 end
 
+@testitem "WaveletOp: normal operator is the identity for orthogonal families" tags = [:wavelet, :WaveletOp] setup = [TestUtils] begin
+    using Wavelets, LinearAlgebra, Random, AbstractOperators, WaveletOperators
+    Random.seed!(1)
+
+    n = 8
+    op = WaveletOp(Float64, wavelet(WT.db4), (n,))
+
+    @test AbstractOperators.has_optimized_normalop(op)
+    Wop = AbstractOperators.get_normal_op(op)
+    @test Wop isa Eye
+
+    x = randn(n)
+    @test norm(op' * (op * x) .- x) <= 1.0e-12
+    @test norm(Wop * x .- x) <= 1.0e-12
+    # Every family `WaveletOp` accepts is an orthogonal filter bank; the lifting-scheme ones,
+    # biorthogonal CDF among them, are rejected by the constructor (tested below).
+end
+
 @testitem "WaveletOp: copy_operator" tags = [:wavelet, :WaveletOp] setup = [TestUtils] begin
     using Wavelets, LinearAlgebra, Random, AbstractOperators, WaveletOperators
     Random.seed!(6)
@@ -78,4 +96,27 @@ end
     @test_throws ArgumentError WaveletOp(Float64, wt, (5, 8))
     # ND: too many levels
     @test_throws ArgumentError WaveletOp(Float64, wt, (8, 8), 100)
+end
+
+@testitem "WaveletOp rejects lifting-scheme wavelets" tags = [:wavelet, :WaveletOp] setup = [TestUtils] begin
+    using Wavelets, WaveletOperators, AbstractOperators, LinearAlgebra
+
+    # Wavelets.jl defines the level-taking `dwt!`/`idwt!` only for an `OrthoFilter`, so a `GLS`
+    # operator could be constructed but never applied -- it raised a `MethodError` from inside
+    # Wavelets on first use. Reject it where the message can explain why.
+    for class in (WT.db2, WT.haar, WT.cdf97)
+        gls = wavelet(class, WT.Lifting)
+        @test gls isa WT.GLS
+        @test_throws ArgumentError WaveletOp(Float64, gls, (8, 8))
+    end
+
+    # The filter-bank form of the same orthogonal class is unaffected, and still gets the
+    # identity fast paths.
+    op = WaveletOp(Float64, wavelet(WT.db2), (8, 8))
+    @test AbstractOperators.has_fast_opnorm(op)
+    @test opnorm(op) == 1
+    @test AbstractOperators.get_normal_op(op) isa Eye
+    @test is_AcA_diagonal(op)
+    x = randn(8, 8)
+    @test op' * (op * x) ≈ x
 end
