@@ -508,3 +508,30 @@ end
         @test is_threaded(IRDFT(xc, n)) == false
     end
 end
+
+@testitem "FFTW planning honours an enclosing thread restriction" tags = [
+    :fftw, :DFT, :threading,
+] setup = [TestUtils] begin
+    using AbstractOperators, FFTWOperators, FFTW, NestedThreading
+    x = randn(ComplexF64, 1 << 17)
+    before = FFTW.get_num_threads()
+    free = DFT(x)
+    # A restriction open around the constructor bounds the plan, and the operator records the
+    # threads its plan really has, so `is_threaded` tells the truth about it.
+    restricted = with_restricted_threads(() -> DFT(x))
+    @test restricted.num_threads == 1
+    @test !is_threaded(restricted)
+    @test FFTW.get_num_threads() == before
+    if Threads.nthreads() > 1
+        @test free.num_threads == Threads.nthreads()
+        @test is_threaded(free)
+    end
+    @test restricted * x ≈ free * x
+    for op in (
+            with_restricted_threads(() -> RDFT(randn(1 << 19))),
+            with_restricted_threads(() -> IRDFT(randn(ComplexF64, (1 << 18) + 1), 1 << 19)),
+            with_restricted_threads(() -> DCT(randn(1 << 17))),
+        )
+        @test !is_threaded(op)
+    end
+end

@@ -637,6 +637,26 @@ function _blas_threaded(threaded::Bool, ::Type{S}) where {S <: AbstractArray}
     end
 end
 
+"""
+	_with_fftw_plan_threads(f, num_threads, get_num_threads) -> (f(), threads)
+
+Run the FFTW planning callable `f` with FFTW at `num_threads` threads, and return its result
+with the thread count FFTW actually planned with, read by `get_num_threads()` inside the scope
+(FFTWOperators and DSPOperators pass `FFTW.get_num_threads`; this package does not load FFTW).
+
+The count is set through NestedThreading (`with_thread_budget`, FFTW only) rather than a raw
+`FFTW.set_num_threads` save and restore. FFTW's count is process-global, so a raw restore
+could undo a restriction another task opened meanwhile, and a raw set ignored a restriction
+already open around the constructor: inside a saturated batch loop an operator was planned
+with every thread. Now an enclosing restriction wins, and the returned count reflects it, so
+an operator records -- and `is_threaded` reports -- the threads its plan really has.
+"""
+function _with_fftw_plan_threads(f::F, num_threads::Int, get_num_threads::G) where {F, G}
+    return with_thread_budget(num_threads; only = (:fftw,)) do
+        f(), Int(get_num_threads())
+    end
+end
+
 # ─── adapt_operator ───────────────────────────────────────────────────────────
 
 """

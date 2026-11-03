@@ -62,12 +62,12 @@ function Conv(
     if isTypeReal(domain_type)
         buf_size = ntuple(d -> d == 1 ? size(buf, d) >> 1 + 1 : size(buf, d), Val(N))
         buf_c1 = similar(h, Complex{domain_type}, buf_size)
-        R, I = _dsp_with_fftw_threads(nthr) do
+        (R, I), nthr = _dsp_with_fftw_threads(nthr) do
             plan_rfft(buf), plan_irfft(buf_c1, size(buf, 1))
         end
     else
         buf_c1 = similar(buf)
-        R = _dsp_with_fftw_threads(() -> plan_fft(buf), nthr)
+        R, nthr = _dsp_with_fftw_threads(() -> plan_fft(buf), nthr)
         I = inv(R)
     end
     buf_c2 = similar(buf_c1)

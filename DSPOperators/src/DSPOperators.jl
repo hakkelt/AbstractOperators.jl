@@ -22,6 +22,7 @@ import AbstractOperators:
     is_threaded,
     _resolve_threaded,
     _is_cpu_array,
+    _with_fftw_plan_threads,
     _copy_operator_impl
 
 # ─── Threading ────────────────────────────────────────────────────────────────
@@ -69,15 +70,9 @@ function _dsp_fftw_num_threads(num_threads, threaded::Bool, n::Int, ref::Abstrac
     return use ? Threads.nthreads() : 1
 end
 
-function _dsp_with_fftw_threads(f, num_threads::Int)
-    prev = FFTW.get_num_threads()
-    FFTW.set_num_threads(num_threads)
-    try
-        return f()
-    finally
-        FFTW.set_num_threads(prev)
-    end
-end
+# Plans with `f` at `num_threads` FFTW threads, returning the plans and the thread count they
+# really have; see `AbstractOperators._with_fftw_plan_threads`.
+_dsp_with_fftw_threads(f, num_threads::Int) = _with_fftw_plan_threads(f, num_threads, FFTW.get_num_threads)
 
 include("Conv.jl")
 include("Filt.jl")

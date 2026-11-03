@@ -139,7 +139,7 @@ function DFT(
     ) where {N, D <: Real}
     x = similar(x, Complex{D})
     num_threads = _fftw_num_threads(:c2c, num_threads, threaded, x)
-    A, At = _with_fftw_threads(num_threads) do
+    (A, At), num_threads = _with_fftw_threads(num_threads) do
         plan_fft(x, dims; flags, timelimit), plan_bfft(x, dims; flags, timelimit)
     end
     S = typeof(x isa SubArray ? parent(x) : x).name.wrapper
@@ -163,7 +163,7 @@ function DFT(
         x = similar(x) # FFTW.MEASURE and FFTW.PATIENT may cause the input array to be modified
     end
     num_threads = _fftw_num_threads(:c2c, num_threads, threaded, x)
-    A, At = _with_fftw_threads(num_threads) do
+    (A, At), num_threads = _with_fftw_threads(num_threads) do
         plan_fft(x, dims; flags, timelimit), plan_bfft(x, dims; flags, timelimit)
     end
     S = typeof(x isa SubArray ? parent(x) : x).name.wrapper

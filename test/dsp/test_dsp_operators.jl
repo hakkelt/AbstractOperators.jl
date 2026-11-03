@@ -411,3 +411,18 @@ end
     xcorr_copy2 = copy_operator(xcorr_op; storage_type = Array{Float64}, threaded = true)
     @test xcorr_copy2 * x ≈ y_xcorr
 end
+
+@testitem "DSP planning honours an enclosing thread restriction" tags = [
+    :dsp, :Conv, :Xcorr, :threading,
+] setup = [TestUtils] begin
+    using AbstractOperators, DSPOperators, NestedThreading
+    h = randn(64)
+    for make in (() -> Conv(Float64, (1 << 19,), h), () -> Xcorr(Float64, (1 << 19,), h))
+        free = make()
+        restricted = with_restricted_threads(make)
+        @test restricted.num_threads == 1
+        @test !is_threaded(restricted)
+        x = randn(1 << 19)
+        @test restricted * x ≈ free * x
+    end
+end

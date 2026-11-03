@@ -88,12 +88,12 @@ function Xcorr(
     if domain_type <: Real
         complex_type = Complex{domain_type}
         buf_fwd_c = similar(h, complex_type, fftlen_fwd ÷ 2 + 1)
-        R_fwd, I_fwd = _dsp_with_fftw_threads(nthr) do
+        (R_fwd, I_fwd), nthr = _dsp_with_fftw_threads(nthr) do
             plan_rfft(buf_fwd; plan_kw...), plan_irfft(buf_fwd_c, fftlen_fwd; plan_kw...)
         end
     else
         buf_fwd_c = similar(buf_fwd)
-        R_fwd = _dsp_with_fftw_threads(() -> plan_fft(buf_fwd; plan_kw...), nthr)
+        R_fwd, nthr = _dsp_with_fftw_threads(() -> plan_fft(buf_fwd; plan_kw...), nthr)
         I_fwd = inv(R_fwd)
     end
 
@@ -102,12 +102,12 @@ function Xcorr(
     buf_adj = similar(h, fftlen_adj)
     if domain_type <: Real
         buf_adj_c = similar(h, Complex{domain_type}, fftlen_adj ÷ 2 + 1)
-        R_adj, I_adj = _dsp_with_fftw_threads(nthr) do
+        (R_adj, I_adj), nthr = _dsp_with_fftw_threads(nthr) do
             plan_rfft(buf_adj; plan_kw...), plan_irfft(buf_adj_c, fftlen_adj; plan_kw...)
         end
     else
         buf_adj_c = similar(buf_adj)
-        R_adj = _dsp_with_fftw_threads(() -> plan_fft(buf_adj; plan_kw...), nthr)
+        R_adj, nthr = _dsp_with_fftw_threads(() -> plan_fft(buf_adj; plan_kw...), nthr)
         I_adj = inv(R_adj)
     end
 

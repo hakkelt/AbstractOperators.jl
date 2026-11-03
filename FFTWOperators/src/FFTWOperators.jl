@@ -37,6 +37,7 @@ import AbstractOperators:
     supports_threading,
     _resolve_threaded,
     _is_cpu_array,
+    _with_fftw_plan_threads,
     _elementwise_threaded,
     threading_threshold,
     _copy_operator_impl
@@ -118,24 +119,12 @@ function _fftw_num_threads(kind::Symbol, num_threads, threaded::Bool, x::Abstrac
 end
 
 """
-	_with_fftw_threads(f, num_threads)
+	_with_fftw_threads(f, num_threads) -> (f(), threads)
 
-Run the planning callable `f` with FFTW's global thread count temporarily set to
-`num_threads`, restoring the previous value afterwards.
-
-FFTW's thread count is process-global state consulted at *plan* time, so it has to be set
-around planning and put back; forgetting the restore would silently change the thread count
-of every plan built later in the session.
+Plan with `f` at `num_threads` FFTW threads, returning the plans and the thread count they
+really have; see `AbstractOperators._with_fftw_plan_threads`.
 """
-function _with_fftw_threads(f, num_threads::Int)
-    prev = FFTW.get_num_threads()
-    FFTW.set_num_threads(num_threads)
-    try
-        return f()
-    finally
-        FFTW.set_num_threads(prev)
-    end
-end
+_with_fftw_threads(f, num_threads::Int) = _with_fftw_plan_threads(f, num_threads, FFTW.get_num_threads)
 
 include("DFT.jl")
 include("RDFT.jl")
