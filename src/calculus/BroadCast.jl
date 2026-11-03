@@ -54,9 +54,10 @@ struct OperatorBroadCast{T, N, M, Threaded, Compact, Imask, L, C, D, K, F, S} <:
         compact = all(Imask[1:N])
         bufC = allocate_in_codomain(A)
         if threaded
-            # The adjoint loop runs on at most one thread per slice.
+            # The adjoint loop runs on at most one thread per slice; a thread needs scratch
+            # only when it sums more than one slice.
             k = min(Threads.nthreads(), length(idxs))
-            bufD = [allocate_in_domain(A) for _ in 1:k]
+            bufD = [allocate_in_domain(A) for _ in 1:(length(idxs) > k ? k : 0)]
             bufS = [allocate_in_domain(A) for _ in 2:k]
             # Nesting safety: the adjoint loop below threads over `idxs` and calls the
             # wrapped operator inside it, so every per-thread instance -- including the

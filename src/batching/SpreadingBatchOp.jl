@@ -528,12 +528,9 @@ end
 
 function mul!(out::AbstractArray, op::SpreadingBatchOpLocking, inp::AbstractArray)
     check(out, op, inp)
-    # Not a plain `for` loop shape, so this uses the function form rather than
-    # `@budgeted_threads`; the budget scope covers the whole `@sync` block. As
-    # `@budgeted_threads` does, it first parks Polyester's spinning workers, which the
-    # spawned tasks would otherwise wait for.
-    quiesce_foreign_pools()
-    with_restricted_threads() do
+    # Not a plain `for` loop shape, so this uses a function-form scope rather than
+    # `@budgeted_threads`; the scope covers the whole `@sync` block.
+    _with_restricted_tasks() do
         @sync for idx in op.batch_indices
             op_lock = get_lock(op, idx)
             @spawn begin
@@ -558,8 +555,7 @@ function mul!(
     )
     check(out, op, inp)
     op = op.A
-    quiesce_foreign_pools()
-    with_restricted_threads() do
+    _with_restricted_tasks() do
         @sync for idx in op.batch_indices
             op_lock = get_lock(op, idx)
             @spawn begin

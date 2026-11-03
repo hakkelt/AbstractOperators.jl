@@ -298,14 +298,11 @@ parallel layer, and copied when a block shares an operator that is not thread-sa
 another block (`DCAT(C, C)`, `DCAT(C, 2 * C)`). Other blocks stay the caller's objects, so
 state the caller updates (e.g. `update!` on an `LBFGS`) still reaches them.
 """
-function _block_loop_operators(blocks::Tuple)
-    nodes = map(b -> _thread_unsafe_nodes!(Base.IdSet{Any}(), b), blocks)
-    counts = IdDict{Any, Int}()
-    for ns in nodes, o in ns
-        counts[o] = get(counts, o, 0) + 1
-    end
-    return map(blocks, nodes) do b, ns
-        if any(o -> counts[o] > 1, ns)
+function _block_loop_operators(blocks::NTuple{N, Any}) where {N}
+    groups = _shared_node_groups(blocks)
+    return ntuple(Val(N)) do i
+        b = blocks[i]
+        if count(==(groups[i]), groups) > 1
             copy_operator(b; threaded = false)
         else
             adapt_operator(b; threaded = false)
@@ -335,6 +332,15 @@ function _shared_node_groups(ops)
         ri == rj || (parent[ri] = rj)
     end
     return map(root, 1:length(ops))
+end
+
+# The scope of a task-based threaded region (`@sync`/`@spawn`) that cannot use
+# `@budgeted_threads`: it parks Polyester's spinning workers first, as `@budgeted_threads`
+# does, since the spawned tasks would otherwise wait for them, and restricts the nested
+# pools for the whole region.
+function _with_restricted_tasks(f::F) where {F}
+    quiesce_foreign_pools()
+    return with_restricted_threads(f)
 end
 
 """

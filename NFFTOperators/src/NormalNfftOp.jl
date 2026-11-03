@@ -74,8 +74,18 @@ records no FFTW flags (a GPU plan) gets `ESTIMATE`.
 """
 function _planner_rigor(plan)
     fft = hasproperty(plan, :forwardFFT) ? plan.forwardFFT : nothing
-    fft isa FFTW.FFTWPlan || return FFTW.ESTIMATE
-    return fft.flags & (FFTW.ESTIMATE | FFTW.PATIENT | FFTW.EXHAUSTIVE | FFTW.WISDOM_ONLY)
+    return fft isa FFTW.FFTWPlan ? _rigor_flags(fft) : FFTW.ESTIMATE
+end
+
+_rigor_flags(fft::FFTW.FFTWPlan) =
+    fft.flags & (FFTW.ESTIMATE | FFTW.PATIENT | FFTW.EXHAUSTIVE | FFTW.WISDOM_ONLY)
+
+# The embedding's in-place forward and inverse FFT plans over `region` of `buf`, which they
+# leave zeroed (planning with a rigor above `ESTIMATE` overwrites it).
+function _embedding_fft_plans(buf, region, kw)
+    plans = FFTW.plan_fft!(buf, region; kw...), FFTW.plan_bfft!(buf, region; kw...)
+    fill!(buf, 0)
+    return plans
 end
 
 # The planner keywords of the embedding's FFTs: FFTW's planner rigor on the host, none for a
@@ -106,9 +116,7 @@ function _get_normal_op(op::NFFTOp{T, D, N}) where {T, D, N}
     λ = reshape(λ, shape_ext..., map(_ -> 1, stack[1:(end - op.nframe)])..., frame_size...)
     buf = similar(op.ksp_buffer, (shape_ext..., stack...))
     kw = _embedding_fft_kwargs(op)
-    fftplan = FFTW.plan_fft!(buf, 1:D; kw...)
-    ifftplan = FFTW.plan_bfft!(buf, 1:D; kw...)
-    fill!(buf, 0)
+    fftplan, ifftplan = _embedding_fft_plans(buf, 1:D, kw)
     xbuf = op.img_buffer === nothing ? nothing : similar(op.img_buffer)
     return NfftNormalOp(
         domain_array_type(op), op.dim_in, λ, fftplan, ifftplan, buf,
@@ -160,35 +168,23 @@ is_threaded(op::NfftNormalOp) = op.threaded
 supports_threading(::NfftNormalOp) = true
 is_thread_safe(::NfftNormalOp) = false
 
-# The planner keywords that reproduce `plan`'s rigor: FFTW's flags on the host, none for a
-# device FFT, which takes no flags.
-_rigor_kwargs(plan::FFTW.FFTWPlan) =
-    (flags = plan.flags & (FFTW.ESTIMATE | FFTW.PATIENT | FFTW.EXHAUSTIVE | FFTW.WISDOM_ONLY),)
-_rigor_kwargs(_) = NamedTuple()
-
 function _copy_operator_impl(
         op::NfftNormalOp{N, T}; storage_type = nothing, threaded = nothing
     ) where {N, T}
-    new_threaded = if threaded === nothing
-        op.threaded
-    else
-        _nfft_threaded(threaded, storage_type === nothing ? _array_wrapper_type(T) : storage_type)
-    end
     if storage_type === nothing
         array_type, λ = op.array_type, op.λ
-        buf = similar(op.buf)
-        xbuf = op.xbuf === nothing ? nothing : similar(op.xbuf)
+        # The copy plans as carefully as the original; a device FFT takes no flags.
+        kw = op.fftplan isa FFTW.FFTWPlan ? (flags = _rigor_flags(op.fftplan),) : NamedTuple()
     else
         array_type = storage_type{eltype(T)}
         λ = copyto!(similar(storage_type{eltype(op.λ)}, size(op.λ)), op.λ)
-        buf = similar(storage_type{eltype(op.buf)}, size(op.buf))
-        xbuf = op.xbuf === nothing ? nothing : similar(storage_type{eltype(op.xbuf)}, size(op.xbuf))
+        kw = NamedTuple()
     end
-    region = FFTW.fftdims(op.fftplan)
-    kw = storage_type === nothing ? _rigor_kwargs(op.fftplan) : NamedTuple()
+    new_threaded = threaded === nothing ? op.threaded : _nfft_threaded(threaded, _array_wrapper_type(array_type))
+    buf = AbstractOperators._convert_buffer(op.buf, storage_type)
+    xbuf = op.xbuf === nothing ? nothing : AbstractOperators._convert_buffer(op.xbuf, storage_type)
     fftplan, ifftplan = with_nfft_threading(new_threaded) do
-        FFTW.plan_fft!(buf, region; kw...), FFTW.plan_bfft!(buf, region; kw...)
+        _embedding_fft_plans(buf, FFTW.fftdims(op.fftplan), kw)
     end
-    fill!(buf, 0)
     return NfftNormalOp(array_type, op.shape, λ, fftplan, ifftplan, buf, op.perm, xbuf, new_threaded)
 end
