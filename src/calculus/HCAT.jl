@@ -518,4 +518,5 @@ block_threading_threshold(::Type{<:HCAT}) = 2^17
 
 _self_threaded(::HCAT{N, L, P, C, DS, Th}) where {N, L, P, C, DS, Th} = Th
 _children(L::HCAT) = L.A
+_scratch_buffers(L::HCAT) = (L.buf,)
 supports_threading(::HCAT) = true

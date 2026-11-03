@@ -315,4 +315,5 @@ block_threading_threshold(::Type{<:VCAT}) = THRESHOLD_BLOCK_PARALLEL
 
 _self_threaded(::VCAT{N, L, P, C, CS, Th}) where {N, L, P, C, CS, Th} = Th
 _children(L::VCAT) = L.A
+_scratch_buffers(L::VCAT) = (L.buf,)
 supports_threading(::VCAT) = true

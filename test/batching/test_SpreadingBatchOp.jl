@@ -458,3 +458,31 @@ end
     @test S1 != S2
     @test S1 == BatchOp(ops, 4, (:_, :s, :b))
 end
+
+@testitem "Locking shares a lock between operators with shared state" tags = [:batching, :SpreadingBatchOp, :threading] setup = [TestUtils, SpreadingBatchOpHelpers] begin
+    using Random, AbstractOperators
+    const AO = AbstractOperators
+    Random.seed!(0)
+    n = 8192
+    inner = DiagOp(rand(n - 1)) * FiniteDiff((n,))
+    # Scaling a Compose gives a new Compose that writes the same buffer as `inner`, so `a`
+    # and `b` must never run concurrently although neither is the other.
+    a, b = Scale(2.0, inner), Scale(3.0, inner)
+    c = DiagOp(rand(n - 1)) * FiniteDiff((n,))
+    @test a !== b
+    @test AO._shared_node_groups([a, b, c]) == [1, 1, 3]
+    # A node nested in two operators links them as well, and the link is transitive.
+    @test AO._shared_node_groups([inner, c, Scale(5.0, inner)]) == [1, 2, 1]
+    if Threads.nthreads() > 1
+        ops = [a, b, c]
+        bop = BatchOp(ops, 4, (:_, :s, :b); threaded = true, threading_strategy = ThreadingStrategy.LOCKING)
+        @test bop isa AO.SpreadingBatchOpLocking
+        @test bop.locks[1] === bop.locks[2]
+        @test bop.locks[1] !== bop.locks[3]
+        x = rand(n, 3, 4)
+        ref = BatchOp(ops, 4, (:_, :s, :b); threaded = false) * x
+        for _ in 1:5
+            @test bop * x ≈ ref
+        end
+    end
+end

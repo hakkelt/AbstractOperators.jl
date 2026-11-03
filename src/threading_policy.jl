@@ -314,9 +314,48 @@ function _block_loop_operators(blocks::Tuple)
     end
 end
 
-# The operators in the tree of `op` that are not thread-safe.
+"""
+	_shared_node_groups(ops) -> Vector{Int}
+
+A group label for each operator of `ops`, in iteration order. Two operators get the same
+label when their trees share a node that is not thread-safe, directly or through a chain of
+other operators, so a loop that runs different groups concurrently never runs one such node
+on two threads.
+"""
+function _shared_node_groups(ops)
+    parent = collect(1:length(ops))
+    function root(i)
+        while parent[i] != i
+            i = parent[i] = parent[parent[i]]
+        end
+        return i
+    end
+    owner = IdDict{Any, Int}()
+    for (i, op) in enumerate(ops), o in _thread_unsafe_nodes!(Base.IdSet{Any}(), op)
+        ri, rj = root(i), root(get!(owner, o, i))
+        ri == rj || (parent[ri] = rj)
+    end
+    return map(root, 1:length(ops))
+end
+
+"""
+	_scratch_buffers(L::AbstractOperator)
+
+The scratch arrays `L` writes in `mul!` that an operator derived from it may hold too, `()` by
+default. A `Compose`, `VCAT` or `HCAT` built from another one reuses its buffers rather than
+allocating new ones (`a * C` and `b * C` both write `C`'s), so two distinct operators can still
+race on one array; the shared-node checks compare these arrays as well as the operators.
+"""
+_scratch_buffers(::AbstractOperator) = ()
+
+# The operators in the tree of `op` that are not thread-safe, and their scratch arrays.
 function _thread_unsafe_nodes!(nodes::Base.IdSet{Any}, op::AbstractOperator)
-    is_thread_safe(op) || push!(nodes, op)
+    if !is_thread_safe(op)
+        push!(nodes, op)
+        for b in _scratch_buffers(op)
+            b isa AbstractArray && push!(nodes, b)
+        end
+    end
     for c in _children(op)
         _thread_unsafe_nodes!(nodes, c)
     end

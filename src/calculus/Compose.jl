@@ -371,3 +371,4 @@ function _copy_operator_impl(op::Compose; storage_type = nothing, threaded = not
 end
 
 _children(L::Compose) = L.A
+_scratch_buffers(L::Compose) = L.buf

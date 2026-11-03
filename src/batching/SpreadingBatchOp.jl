@@ -381,15 +381,14 @@ function create_threaded_SpreadingBatchOp(
                 operators, sizes..., CartesianIndices(batch_size)
             )
         elseif threading_strategy == ThreadingStrategy.LOCKING
-            d = Dict{eltype(operators), Int}()
+            # Operators whose trees share a non-thread-safe node, directly or through
+            # others, must not run concurrently, so they share one lock. Comparing only the
+            # operators themselves would miss a node nested in two different operators.
+            groups = _shared_node_groups(operators)
+            group_locks = Dict{Int, ReentrantLock}()
             locks = Array{Base.AbstractLock}(undef, size(operators))
-            for i in eachindex(operators)
-                if haskey(d, operators[i])
-                    locks[i] = locks[d[operators[i]]]
-                else
-                    d[operators[i]] = i
-                    locks[i] = ReentrantLock()
-                end
+            for (k, i) in enumerate(eachindex(operators))
+                locks[i] = get!(ReentrantLock, group_locks, groups[k])
             end
             return SpreadingBatchOpLocking{type_args...}(
                 operators, sizes..., CartesianIndices(batch_size), locks
