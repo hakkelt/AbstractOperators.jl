@@ -892,6 +892,4 @@ function _copy_operator_impl(
     return SignAlternation(T, op.dim_in, op.dirs; threaded = new_threaded, array_type = new_at)
 end
 
-# FFTShift/IFFTShift have no threaded path of their own.
-is_threaded(::ShiftOp) = false
-supports_threading(::ShiftOp) = false
+# FFTShift/IFFTShift have no threaded path of their own: the default traits apply.

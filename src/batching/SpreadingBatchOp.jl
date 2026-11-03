@@ -667,14 +667,13 @@ _spreading_operators(L::SpreadingBatchOpCopying) = L.operators[1]
 _batch_size(L::SpreadingBatchOpSingleThreaded) = L.batch_size
 _batch_size(L::SpreadingBatchOp) = size(L.batch_indices)
 
-is_threaded(::SpreadingBatchOp) = true
-# The serial variant is threaded only through its operators.
-is_threaded(L::SpreadingBatchOpSingleThreaded) = _is_threaded_from_children(L)
+# Every variant but the serial one threads its batch loop; the default `is_threaded` adds the
+# operators' own threading through `_children`.
+_self_threaded(::SpreadingBatchOp) = true
+_self_threaded(::SpreadingBatchOpSingleThreaded) = false
 supports_threading(::SpreadingBatchOp) = true
 _children(L::SpreadingBatchOp) = L.operators
 _children(L::SpreadingBatchOpCopying) = Iterators.flatten(L.operators)
-_loop_threaded(::SpreadingBatchOp) = true
-_loop_threaded(::SpreadingBatchOpSingleThreaded) = false
 
 function Base.:(==)(L1::SpreadingBatchOp, L2::SpreadingBatchOp)
     return _spreading_operators(L1) == _spreading_operators(L2) &&
@@ -698,7 +697,7 @@ function _copy_operator_impl(
         op::SpreadingBatchOp; storage_type = nothing, threaded = nothing
     )
     ops = _spreading_operators(op)
-    loop = threaded === nothing ? _loop_threaded(op) : threaded
+    loop = threaded === nothing ? _self_threaded(op) : threaded
     th = _resolve_threaded(() -> _should_thread(ops[1], storage_type), loop)
     # A threaded loop needs serial inner operators, so copy them that way directly.
     inner_threaded = th ? false : threaded

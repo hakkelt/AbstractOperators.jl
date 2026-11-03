@@ -351,9 +351,31 @@ Consequently `is_threaded(copy_operator(L; threaded = true))` is **not** guarant
 `true`; `is_threaded(copy_operator(L; threaded = false))` *is* guaranteed to be `false`,
 which is the direction nesting safety depends on.
 
-Defaults to whether any of `_children(L)` is threaded, so `false` for a leaf.
+Defaults to `_self_threaded(L) || any(is_threaded, _children(L))`: a forwarder is threaded
+if its own loop threads or any child does, and a leaf without a threaded path is not.
 """
-is_threaded(L::AbstractOperator) = _is_threaded_from_children(L)
+is_threaded(L::AbstractOperator) = _self_threaded(L) || any(is_threaded, _children(L))
+
+"""
+	_self_threaded(L::AbstractOperator) -> Bool
+
+Whether `L`'s own loop threads -- a block loop, a batch loop, or a broadcast -- regardless of
+its children. `false` by default. A forwarder with a threaded loop of its own defines this
+instead of `is_threaded`, which adds the children itself.
+
+Structural transforms (slicing, permuting, combining) read it to rebuild a forwarder with the
+same loop threading, which `is_threaded` cannot tell them: that is also true when only a child
+threads.
+"""
+_self_threaded(::AbstractOperator) = false
+
+"""
+	is_block_threaded(L::AbstractOperator) -> Bool
+
+Alias of `_self_threaded` under the name the block combinators (VCAT, HCAT, DCAT) and
+the benchmarks use.
+"""
+is_block_threaded(L::AbstractOperator) = _self_threaded(L)
 
 """
 	_resolve_threaded(policy, threaded::Bool) -> Bool
@@ -405,10 +427,6 @@ threaded. That is a silent nesting bug, not a missing optimization.
 """
 _children(::AbstractOperator) = ()
 
-# A forwarder is threaded if any child is: that is the property callers actually care
-# about ("will running this spawn Julia threads?").
-_is_threaded_from_children(L::AbstractOperator) = any(is_threaded, _children(L))
-
 """
 	supports_threading(L::AbstractOperator) -> Bool
 
@@ -425,8 +443,7 @@ memory-bound `Eye` would copy the `Eye` forever without ever satisfying the cons
 Defaults to whether any of `_children(L)` supports threading, so `false` for a leaf;
 leaf operators with a threaded path override it.
 """
-supports_threading(L::AbstractOperator) = _supports_threading_from_children(L)
-_supports_threading_from_children(L::AbstractOperator) = any(supports_threading, _children(L))
+supports_threading(L::AbstractOperator) = any(supports_threading, _children(L))
 
 # ─── FastBroadcast bridge ─────────────────────────────────────────────────────
 #

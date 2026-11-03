@@ -194,10 +194,9 @@ estimate_opnorm(L::Scale; kwargs...) = abs(L.coeff) * estimate_opnorm(L.A; kwarg
 
 permute(S::Scale, p::AbstractVector{Int}) = _rethread_scale(S, S.coeff, S.coeff_conj, permute(S.A, p))
 
-# Scale's own broadcast threading lives in its FastBroadcast type parameter; it is threaded
-# if either that flag or the wrapped operator says so.
+# Scale's own broadcast threading lives in its FastBroadcast type parameter.
 _children(L::Scale) = (L.A,)
-is_threaded(L::Scale{Th}) where {Th} = _fbbool(Th) || _is_threaded_from_children(L)
+_self_threaded(::Scale{Th}) where {Th} = _fbbool(Th)
 supports_threading(::Scale) = true
 
 function _copy_operator_impl(

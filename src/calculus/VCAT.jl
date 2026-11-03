@@ -313,10 +313,6 @@ end
 # 2^16 -> 1.32/1.74/1.60 (all win). 2^16 is the first size that wins at every block count.
 block_threading_threshold(::Type{<:VCAT}) = THRESHOLD_BLOCK_PARALLEL
 
-is_block_threaded(::VCAT{N, L, P, C, CS, Th}) where {N, L, P, C, CS, Th} = Th
-
+_self_threaded(::VCAT{N, L, P, C, CS, Th}) where {N, L, P, C, CS, Th} = Th
 _children(L::VCAT) = L.A
-# Threaded if the forward block loop threads, or any block does.
-is_threaded(L::VCAT{N, Ls, P, C, CS, Th}) where {N, Ls, P, C, CS, Th} =
-    Th || _is_threaded_from_children(L)
 supports_threading(::VCAT) = true

@@ -89,12 +89,8 @@ include("MIMOFilt.jl")
 include("Xcorr.jl")
 
 # `Filt`/`MIMOFilt` have no threaded path at any level -- see the module docstring above.
-# Declaring `supports_threading = false` is what lets a threaded batch operator wrap them
-# (`threaded = false` then asks nothing of them, so `copy_operator`'s fallback can answer
-# with a plain deepcopy instead of refusing); without it, batching either of them raises.
-for OpType in (:AbstractFilt, :AbstractMIMOFilt)
-    @eval AbstractOperators.is_threaded(::$OpType) = false
-    @eval AbstractOperators.supports_threading(::$OpType) = false
-end
+# The default `supports_threading == false` of a leaf is what lets a threaded batch operator
+# wrap them: `threaded = false` then asks nothing of them, so `copy_operator`'s fallback can
+# answer with a plain deepcopy instead of refusing.
 
 end # module DSPOperators

@@ -562,12 +562,9 @@ adjoint, which cannot act on it separately.
 threading_threshold(::Type{<:AbstractBroadCast}) = 2^16
 supports_threading(::AbstractBroadCast) = true
 
-# The `Threaded` type parameter was already there; without these methods the trait fell
-# through to the `false` default and contradicted the operator's own dispatch.
-is_threaded(::NoOperatorBroadCast{T, N, M, Th}) where {T, N, M, Th} = Th
-# For the operator flavour the wrapped operator can thread independently of the broadcast.
-is_threaded(R::OperatorBroadCast{T, N, M, Th}) where {T, N, M, Th} =
-    Th || any(is_threaded, _broadcast_children(R))
+# The broadcast's own threading is its `Threaded` type parameter; for the operator flavour the
+# default `is_threaded` adds the wrapped operator's through `_children`.
+_self_threaded(::AbstractBroadCast{T, N, M, Th}) where {T, N, M, Th} = Th
 _broadcast_children(R::OperatorBroadCast{T, N, M, false}) where {T, N, M} = (R.A,)
 _broadcast_children(R::OperatorBroadCast{T, N, M, true}) where {T, N, M} = R.A
 _children(R::OperatorBroadCast) = _broadcast_children(R)

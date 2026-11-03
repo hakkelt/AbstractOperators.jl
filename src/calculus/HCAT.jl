@@ -516,9 +516,6 @@ end
 # per-operator function rather than one shared constant.
 block_threading_threshold(::Type{<:HCAT}) = 2^17
 
-is_block_threaded(::HCAT{N, L, P, C, DS, Th}) where {N, L, P, C, DS, Th} = Th
-
+_self_threaded(::HCAT{N, L, P, C, DS, Th}) where {N, L, P, C, DS, Th} = Th
 _children(L::HCAT) = L.A
-is_threaded(L::HCAT{N, Ls, P, C, DS, Th}) where {N, Ls, P, C, DS, Th} =
-    Th || _is_threaded_from_children(L)
 supports_threading(::HCAT) = true
