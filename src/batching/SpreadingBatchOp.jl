@@ -16,43 +16,77 @@ module ThreadingStrategy
     const FIXED_OPERATOR = :fixed_operator
 end
 
-struct SpreadingBatchOpSingleThreaded{dT, cT, dM, cM, sD, N, M, B, opT} <:
+# `K` is `ndims` of the operators array and `I` the type of the batch index range. Both are
+# derived by the outer constructors below, so callers pass the same leading parameters as
+# before and the fields stay concrete: an abstract `Array{opT}` here made every field read
+# (`_children`, the `mul!` loops) a runtime dispatch.
+struct SpreadingBatchOpSingleThreaded{dT, cT, dM, cM, sD, N, M, B, opT, K} <:
     SpreadingBatchOp{dT, cT, dM, cM}
-    operators::Array{opT}
+    operators::Array{opT, K}
     domain_size::NTuple{N, Int}
     codomain_size::NTuple{M, Int}
     batch_size::NTuple{B, Int}
 end
 
-struct SpreadingBatchOpThreadSafe{dT, cT, dM, cM, sD, N, M, opT} <: SpreadingBatchOp{dT, cT, dM, cM}
-    operators::Array{opT}
-    domain_size::NTuple{N, Int}
-    codomain_size::NTuple{M, Int}
-    batch_indices::CartesianIndices
-end
-
-struct SpreadingBatchOpCopying{dT, cT, dM, cM, sD, N, M, opT} <: SpreadingBatchOp{dT, cT, dM, cM}
-    operators::Vector{Array{opT}}
-    domain_size::NTuple{N, Int}
-    codomain_size::NTuple{M, Int}
-    batch_indices::CartesianIndices
-end
-
-struct SpreadingBatchOpLocking{dT, cT, dM, cM, sD, N, M, opT} <: SpreadingBatchOp{dT, cT, dM, cM}
-    operators::Array{opT}
-    domain_size::NTuple{N, Int}
-    codomain_size::NTuple{M, Int}
-    batch_indices::CartesianIndices
-    locks::Array{Base.AbstractLock}
-end
-
-struct SpreadingBatchOpFixedOperator{dT, cT, dM, cM, sD, N, M, opT} <:
+struct SpreadingBatchOpThreadSafe{dT, cT, dM, cM, sD, N, M, opT, K, I <: CartesianIndices} <:
     SpreadingBatchOp{dT, cT, dM, cM}
-    operators::Array{opT}
+    operators::Array{opT, K}
     domain_size::NTuple{N, Int}
     codomain_size::NTuple{M, Int}
-    batch_indices::CartesianIndices
-    operator_indices::CartesianIndices
+    batch_indices::I
+end
+
+struct SpreadingBatchOpCopying{dT, cT, dM, cM, sD, N, M, opT, K, I <: CartesianIndices} <:
+    SpreadingBatchOp{dT, cT, dM, cM}
+    operators::Vector{Array{opT, K}}
+    domain_size::NTuple{N, Int}
+    codomain_size::NTuple{M, Int}
+    batch_indices::I
+end
+
+struct SpreadingBatchOpLocking{dT, cT, dM, cM, sD, N, M, opT, K, I <: CartesianIndices} <:
+    SpreadingBatchOp{dT, cT, dM, cM}
+    operators::Array{opT, K}
+    domain_size::NTuple{N, Int}
+    codomain_size::NTuple{M, Int}
+    batch_indices::I
+    locks::Array{ReentrantLock, K}
+end
+
+struct SpreadingBatchOpFixedOperator{dT, cT, dM, cM, sD, N, M, opT, K, I <: CartesianIndices} <:
+    SpreadingBatchOp{dT, cT, dM, cM}
+    operators::Array{opT, K}
+    domain_size::NTuple{N, Int}
+    codomain_size::NTuple{M, Int}
+    batch_indices::I
+    operator_indices::CartesianIndices{K, NTuple{K, Base.OneTo{Int}}}
+end
+
+function SpreadingBatchOpSingleThreaded{dT, cT, dM, cM, sD, N, M, B, opT}(
+        operators::AbstractArray{<:Any, K}, rest...
+    ) where {dT, cT, dM, cM, sD, N, M, B, opT, K}
+    return SpreadingBatchOpSingleThreaded{dT, cT, dM, cM, sD, N, M, B, opT, K}(
+        operators, rest...
+    )
+end
+for S in (:SpreadingBatchOpThreadSafe, :SpreadingBatchOpLocking, :SpreadingBatchOpFixedOperator)
+    @eval function $S{dT, cT, dM, cM, sD, N, M, opT}(
+            operators::AbstractArray{<:Any, K}, domain_size, codomain_size, batch_indices::I, rest...
+        ) where {dT, cT, dM, cM, sD, N, M, opT, K, I <: CartesianIndices}
+        return $S{dT, cT, dM, cM, sD, N, M, opT, K, I}(
+            operators, domain_size, codomain_size, batch_indices, rest...
+        )
+    end
+end
+function SpreadingBatchOpCopying{dT, cT, dM, cM, sD, N, M, opT}(
+        operators::AbstractVector{<:AbstractArray{<:Any, K}},
+        domain_size,
+        codomain_size,
+        batch_indices::I,
+    ) where {dT, cT, dM, cM, sD, N, M, opT, K, I <: CartesianIndices}
+    return SpreadingBatchOpCopying{dT, cT, dM, cM, sD, N, M, opT, K, I}(
+        operators, domain_size, codomain_size, batch_indices
+    )
 end
 
 # Public constructors
@@ -386,7 +420,7 @@ function create_threaded_SpreadingBatchOp(
             # operators themselves would miss a node nested in two different operators.
             groups = _shared_node_groups(operators)
             group_locks = Dict{Int, ReentrantLock}()
-            locks = Array{Base.AbstractLock}(undef, size(operators))
+            locks = Array{ReentrantLock}(undef, size(operators))
             for (k, i) in enumerate(eachindex(operators))
                 locks[i] = get!(ReentrantLock, group_locks, groups[k])
             end
@@ -837,7 +871,7 @@ function get_normal_op(
     ) where {dT, cT, dM, cM, sD, N, M, opT}
     # One array of operators per thread: each copy gets its own normal operator.
     new_ops = map(ops -> get_normal_op.(ops), L.operators)
-    return SpreadingBatchOpCopying{dT, cT, dM, dM, sD, N, N, eltype(new_ops[1])}(
+    return SpreadingBatchOpCopying{dT, dT, dM, dM, sD, N, N, eltype(new_ops[1])}(
         new_ops, L.domain_size, L.domain_size, L.batch_indices
     )
 end
@@ -845,7 +879,7 @@ function get_normal_op(
         L::SpreadingBatchOpLocking{dT, cT, dM, cM, sD, N, M, opT}
     ) where {dT, cT, dM, cM, sD, N, M, opT}
     new_ops = get_normal_op.(L.operators)
-    return SpreadingBatchOpLocking{dT, cT, dM, dM, sD, N, N, typeof(new_ops[1])}(
+    return SpreadingBatchOpLocking{dT, dT, dM, dM, sD, N, N, typeof(new_ops[1])}(
         new_ops, L.domain_size, L.domain_size, L.batch_indices, L.locks
     )
 end
@@ -853,7 +887,7 @@ function get_normal_op(
         L::SpreadingBatchOpFixedOperator{dT, cT, dM, cM, sD, N, M, opT}
     ) where {dT, cT, dM, cM, sD, N, M, opT}
     new_ops = get_normal_op.(L.operators)
-    return SpreadingBatchOpFixedOperator{dT, cT, dM, dM, sD, N, N, typeof(new_ops[1])}(
+    return SpreadingBatchOpFixedOperator{dT, dT, dM, dM, sD, N, N, typeof(new_ops[1])}(
         new_ops, L.domain_size, L.domain_size, L.batch_indices, L.operator_indices
     )
 end
