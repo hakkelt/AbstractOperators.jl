@@ -52,10 +52,9 @@ end
 # `mul!` is two reductions (the stabilizing `maximum`, then the normalizing `sum`) around
 # an elementwise `exp`, and the Jacobian adjoint has a third (a `dot` product) -- not a
 # plain elementwise map, so the `@..`-based split every other nonlinear operator uses does
-# not apply directly. Polyester's `@batch reduction=((op, var), ...)` (`+`, `max` here) is
-# exactly the "multi-pass rewrite with its own reductions" that used to make this look
-# infeasible: each reduction becomes its own `@batch` loop over a plain local accumulator,
-# isbits and initialized before the loop as the macro requires.
+# not apply directly. Each reduction is a Polyester `@batch reduction=((op, var), ...)` loop
+# (`+`, `max` here) over a plain local accumulator, isbits and initialized before the loop
+# as the macro requires.
 
 function mul!(y::AbstractArray, L::SoftMax{T, N, B, false}, x::AbstractArray) where {T, N, B}
     check(y, L, x)

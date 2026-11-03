@@ -71,9 +71,8 @@ export is_threaded, adapt_operator, supports_threading
 # A `@batch` kernel is silently serial inside any scope that has narrowed the thread budget,
 # because switching Polyester off is how a `GuardedPool` implements a restriction. A caller
 # that wraps a whole solve in one -- MRT does -- therefore never runs the threaded path these
-# thresholds were swept for, whatever they say. That is how `BroadCast`'s threshold came to be
-# 2^18 for a kernel that never ran; it is now `Threads.@threads`, and its sweep was re-run.
-# The same question is open for every other `@batch`/`@..` kernel here.
+# thresholds were swept for, whatever they say. `BroadCast`'s kernels use `Threads.@threads`
+# for that reason; the question is open for every other `@batch`/`@..` kernel here.
 
 """
 Transcendental elementwise kernels (`Sin`, `Cos`, `Exp`, `Atan`, `Tanh`, `Sech`, `Sigmoid`,
@@ -646,7 +645,7 @@ end
 Return an operator equivalent to `op` that satisfies the requested constraints, **without
 copying when `op` already satisfies them**.
 
-This is the counterpart to [`copy_operator`](@ref), which always produces a new object:
+This is the counterpart to [`copy_operator`](@ref), which always produces independent state:
 
 - `adapt_operator` returns `op` itself (`===`) when every requested constraint already
   holds, and delegates to `copy_operator` otherwise.

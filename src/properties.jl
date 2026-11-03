@@ -950,8 +950,13 @@ end
 """
     copy_operator(op::AbstractOperator; storage_type=nothing, threaded=nothing)
 
-Create a copy of `op` suitable for parallel use. **Always returns a new object**; use
-[`adapt_operator`](@ref) when sharing `op` is acceptable provided it meets the constraints.
+Create a copy of `op` suitable for parallel use: one that shares no mutable state with `op`,
+so the two can run concurrently. Use [`adapt_operator`](@ref) when sharing `op` is acceptable
+provided it meets the constraints.
+
+An operator with no mutable state at all (an immutable struct whose fields are read-only, such
+as a `DFT` whose requested threading and storage already match) may come back as `op` itself:
+a copy would be `===` to it anyway. Every operator that owns a buffer returns a new object.
 
 - Immutable fields (operator arrays, type params) are **shared** (no copy).
 - Mutable buffer fields are **deep-copied**.
@@ -966,9 +971,9 @@ could not preserve an explicitly serial operator, since it would re-derive threa
 the policy. As everywhere else, a `threaded = true` request is a permission the policy may
 still decline; `threaded = false` is honoured absolutely.
 
-The "return `op` itself when it is already thread-safe" short-circuit that used to live
-here now lives in `adapt_operator`, so that the two functions have crisp contracts: one
-always copies, the other never copies needlessly.
+Returning `op` merely because it is thread-safe is `adapt_operator`'s job, not this
+function's: `copy_operator` always gives independent state, `adapt_operator` never copies
+needlessly.
 """
 function copy_operator(op::AbstractOperator; storage_type = nothing, threaded = nothing)
     return _copy_operator_impl(op; storage_type = _normalize_storage_request(storage_type), threaded)

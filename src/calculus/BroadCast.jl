@@ -530,11 +530,9 @@ end
 end
 
 """
-Broadcasting is pure data movement, so it used to inherit `THRESHOLD_MEMORY_BOUND` (2^18). That
-constant was swept for `Polyester.@batch` against FastBroadcast; the kernels here now use
-`Threads.@threads` (see the note above `_copy_flat!`), whose crossover is two powers of two
-earlier, and the serial side got faster at the same time, so the sweep was re-run for the pair
-that actually ships.
+Broadcasting is pure data movement, but its kernels use `Threads.@threads` (see the note above
+`_copy_flat!`) rather than `Polyester.@batch`, so it has its own sweep instead of
+`THRESHOLD_MEMORY_BOUND`, which was measured for the latter.
 
 PROVENANCE: measured. AMD EPYC 7352 24-Core, 8 Julia threads, OPENBLAS_NUM_THREADS=1,
 Julia 1.13.0, 2026-09-21, in a process that never runs a `Polyester.@batch` -- an image
