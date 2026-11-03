@@ -171,25 +171,25 @@ end
 
 function mul!(y::AbstractArray, L::MatrixOp, b::AbstractArray, α::Number, β::Number)
     check(y, L, b)
-    return _with_blas_threading(L.threaded) do
+    return _with_blas_threading(L.threaded, domain_array_type(L)) do
         mul!(y, L.A, b, _coefficient(y, α), _coefficient(y, β))
     end
 end
 function mul!(y::AbstractArray, L::MatrixOp{<:Any, <:Any, <:Any, 1}, b::AbstractArray, α::Number, β::Number)
-    return _with_blas_threading(L.threaded) do
+    return _with_blas_threading(L.threaded, domain_array_type(L)) do
         mul!(y, L.A, b, _coefficient(y, α), _coefficient(y, β))
     end
 end
 function mul!(y::AbstractArray, L::AdjointOperator{<:MatrixOp}, b::AbstractArray, α::Number, β::Number)
     check(y, L, b)
-    return _with_blas_threading(L.A.threaded) do
+    return _with_blas_threading(L.A.threaded, domain_array_type(L.A)) do
         mul!(y, L.A.A', b, _coefficient(y, α), _coefficient(y, β))
     end
 end
 function mul!(
         y::AbstractArray, L::AdjointOperator{<:MatrixOp{<:Any, <:Any, <:Any, 1}}, b::AbstractArray, α::Number, β::Number
     )
-    return _with_blas_threading(L.A.threaded) do
+    return _with_blas_threading(L.A.threaded, domain_array_type(L.A)) do
         mul!(y, L.A.A', b, _coefficient(y, α), _coefficient(y, β))
     end
 end
@@ -198,7 +198,7 @@ function mul!(
     ) where {D <: Real, T <: Complex}
     check(y, L, b)
     yc = similar(y, T, size(y))
-    _with_blas_threading(L.A.threaded) do
+    _with_blas_threading(L.A.threaded, domain_array_type(L.A)) do
         mul!(yc, L.A.A', b)
     end
     return _store!(y, Broadcast.broadcasted(real, yc), α, β)
@@ -207,7 +207,7 @@ function mul!(
         y::AbstractArray, L::AdjointOperator{<:MatrixOp{D, T, M, 1, <:Any, <:Any}}, b::AbstractArray, α::Number, β::Number
     ) where {D <: Real, T <: Complex, M}
     yc = similar(y, T, size(y))
-    _with_blas_threading(L.A.threaded) do
+    _with_blas_threading(L.A.threaded, domain_array_type(L.A)) do
         mul!(yc, L.A.A', b)
     end
     return _store!(y, Broadcast.broadcasted(real, yc), α, β)
