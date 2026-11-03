@@ -1017,10 +1017,6 @@ function _convert_buffer(buf::AbstractArray{T}, storage_type::Type) where {T}
     return similar(storage_type{T}, size(buf))
 end
 
-_should_thread(::Number) = false
-_should_thread(d::AbstractArray) = length(d) >= THRESHOLD_MEMORY_BOUND && Threads.nthreads() > 1
-_should_thread(S::Type{<:AbstractArray}) = Threads.nthreads() > 1 && _is_cpu_storage(S)
-
 """
 	_should_thread(op::AbstractOperator)
 
@@ -1037,11 +1033,7 @@ only the per-item half of the condition.
 # `storage_type`: the decision for a copy of `op` moved there (`nothing`: unchanged).
 function _should_thread(op::AbstractOperator, storage_type = nothing)
     Threads.nthreads() > 1 || return false
-    if storage_type === nothing
-        _is_cpu_storage(_policy_storage(domain_array_type(op))) || return false
-    else
-        _is_cpu_domain(storage_type) || return false
-    end
+    _is_cpu_domain(storage_type === nothing ? domain_array_type(op) : storage_type) || return false
     return _total_elements(size(op, 2)) >= MIN_BATCH_WORK_FOR_PARALLEL
 end
 

@@ -65,20 +65,16 @@ function _scale_threaded(threaded::Bool, L)
     return _resolve_threaded(threaded) do
         _default_threaded(
             threading_threshold(Scale), codomain_type_for_policy(L),
-            get_output_length(L), codomain_array_type_for_policy(L),
+            get_output_length(L), _policy_storage(codomain_array_type(L)),
         )
     end
 end
 
-# Multi-domain operators report tuples/ArrayPartitions; reduce them to something the size
-# policy can use, falling back to the conservative CPU-array assumption.
+# Multi-domain operators report a tuple of element types; the size policy takes their
+# promotion (and `_policy_storage` reduces the ArrayPartition storage).
 codomain_type_for_policy(L) = _scalar_eltype(codomain_type(L))
 _scalar_eltype(T::Type) = T
 _scalar_eltype(T::Tuple) = promote_type(T...)
-function codomain_array_type_for_policy(L)
-    S = codomain_array_type(L)
-    return S <: ArrayPartition ? Array{codomain_type_for_policy(L)} : S
-end
 
 # Special Constructors
 # scale of scale

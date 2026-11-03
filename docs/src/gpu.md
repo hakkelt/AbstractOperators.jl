@@ -33,11 +33,11 @@ mul!(y_gpu, D, x_gpu)
 
 ## Threading and GPU
 
-CPU threading (via [Polyester.jl](https://github.com/JuliaSIMD/Polyester.jl)'s `@batch`) is automatically disabled when GPU arrays are detected. This happens through the `_should_thread` mechanism:
+CPU threading (via [Polyester.jl](https://github.com/JuliaSIMD/Polyester.jl)'s `@batch`) is automatically disabled when GPU arrays are detected. Every threading decision asks `_is_cpu_storage(S)` of the operator's storage type, which is `true` only for `Array`:
 
-- For operators with array fields (e.g., `DiagOp`), the constructor checks `_should_thread(d)` which returns `false` for `AbstractGPUArray`s.
-- For GPU arrays passed to operators at construction time (e.g., `Variation(gpu_x)`), threading is disabled automatically.
-- The `GpuExt` extension overrides `_should_thread(::AbstractGPUArray) = false`.
+- An operator built on device storage (e.g. `DiagOp(gpu_d)` or `Variation(gpu_x)`) never threads, whatever its `threaded` keyword says.
+- A multi-domain operator threads only when every part of its `ArrayPartition` storage is on the CPU.
+- A new CPU array type opts in by defining `AbstractOperators._is_cpu_storage(::Type{<:MyArray}) = true`; nothing has to opt out.
 
 ## Storage Type Tracking
 
@@ -74,7 +74,6 @@ Z = Zeros(Float32, (4,), Float32, (3,); array_type=CuArray)
 GPU-specific overrides live in `ext/GpuExt/`. The extension is loaded automatically when `GPUArrays.jl` is loaded (directly or via any GPU backend like CUDA.jl).
 
 The extension provides:
-- `_should_thread(::AbstractGPUArray) = false` — disables CPU threading for GPU arrays
 - `array_type_display_string(::Type{<:AbstractGPUArray}) = "ᵍᵖᵘ"` — shows ᵍᵖᵘ superscript in operator display
 - Variation adjoint GPU override — vectorized reshape-based stencil (no scalar indexing)
 - BroadCast threading GPU override — falls back to non-threaded path

@@ -247,8 +247,8 @@ mul!(y_out, L, x)
 
 ### Threading heuristic
 
-`_should_thread(x)` controls whether constructors enable threaded kernels.
-GPU extensions should override `_should_thread(::AbstractGPUArray)=false` to avoid mixing host threading with device arrays.
+`AbstractOperators._is_cpu_storage(S)` decides whether threading is meaningful for storage type `S`.
+It is `true` only for `Array`, so device arrays never get host threading and need no override; a CPU array type of your own opts in with `_is_cpu_storage(::Type{<:MyArray}) = true`.
 
 ### Storage-type correctness
 

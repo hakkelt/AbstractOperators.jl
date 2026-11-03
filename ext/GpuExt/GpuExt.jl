@@ -5,7 +5,7 @@ using KernelAbstractions
 using AbstractOperators
 import LinearAlgebra: mul!, isdiag
 import AbstractOperators:
-    _should_thread, array_type_display_string, check,
+    array_type_display_string, check,
     AdjointOperator, Variation, NoOperatorBroadCast,
     domain_type, allocate_in_domain, allocate_in_codomain,
     GetIndex, ZeroPad, OperatorWrapper, Hankel, _gram_sample_is_diagonal, _isdiag

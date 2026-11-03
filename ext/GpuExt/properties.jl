@@ -1,8 +1,5 @@
 array_type_display_string(::Type{<:AbstractGPUArray}) = "ᵍᵖᵘ"
 
-_should_thread(::AbstractGPUArray) = false
-_should_thread(::Type{<:AbstractGPUArray}) = false
-
 # A `dot` of two views of a device matrix reaches BLAS with device pointers on a backend that
 # defines no `dot` of its own (OpenCL), so the sample is one `k × k` Gram product on the
 # device instead. `isdiag` indexes scalars, so it runs on a host copy of the (small) product.

@@ -363,9 +363,14 @@ function _thread_unsafe_nodes!(nodes::Base.IdSet{Any}, op::AbstractOperator)
 end
 
 # Multi-domain operators report an ArrayPartition, which the size policy cannot use
-# directly; fall back to a plain CPU array of the promoted element type.
+# directly: it becomes a plain array of the promoted element type, `Array` when every part
+# lives on the CPU and the (non-CPU) `AbstractArray` otherwise, so the CPU check gives the
+# same answer as `_is_cpu_domain` on the partition.
 _policy_storage(S::Type{<:AbstractArray}) = S
-_policy_storage(S::Type{<:ArrayPartition}) = Array{_storage_eltype_or_float(S)}
+function _policy_storage(S::Type{<:ArrayPartition})
+    T = _storage_eltype_or_float(S)
+    return _is_cpu_domain(S) ? Array{T} : AbstractArray{T}
+end
 _storage_eltype_or_float(::Type{<:ArrayPartition{T}}) where {T} = T
 _storage_eltype_or_float(::Type) = Float64
 
