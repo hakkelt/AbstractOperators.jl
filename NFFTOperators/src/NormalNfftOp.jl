@@ -149,3 +149,46 @@ domain_array_type(op::NfftNormalOp{N, T}) where {N, T} = op.array_type
 codomain_array_type(op::NfftNormalOp{N, T}) where {N, T} = op.array_type
 is_symmetric(::NfftNormalOp) = true
 AdjointOperator(op::NfftNormalOp) = op
+
+# ─── Threading and copying ────────────────────────────────────────────────────
+#
+# The FFT plans are built under `with_nfft_threading(threaded)`, like the NFFTOp's own, so the
+# operator is threaded exactly when the NFFTOp it came from was. `buf` and `xbuf` are scratch
+# written by every `mul!`, so it is not thread-safe; a copy gets its own buffers and plans
+# for them, and shares the read-only kernel `λ`.
+is_threaded(op::NfftNormalOp) = op.threaded
+supports_threading(::NfftNormalOp) = true
+is_thread_safe(::NfftNormalOp) = false
+
+# The planner keywords that reproduce `plan`'s rigor: FFTW's flags on the host, none for a
+# device FFT, which takes no flags.
+_rigor_kwargs(plan::FFTW.FFTWPlan) =
+    (flags = plan.flags & (FFTW.ESTIMATE | FFTW.PATIENT | FFTW.EXHAUSTIVE | FFTW.WISDOM_ONLY),)
+_rigor_kwargs(_) = NamedTuple()
+
+function _copy_operator_impl(
+        op::NfftNormalOp{N, T}; storage_type = nothing, threaded = nothing
+    ) where {N, T}
+    new_threaded = if threaded === nothing
+        op.threaded
+    else
+        _nfft_threaded(threaded, storage_type === nothing ? _array_wrapper_type(T) : storage_type)
+    end
+    if storage_type === nothing
+        array_type, λ = op.array_type, op.λ
+        buf = similar(op.buf)
+        xbuf = op.xbuf === nothing ? nothing : similar(op.xbuf)
+    else
+        array_type = storage_type{eltype(T)}
+        λ = copyto!(similar(storage_type{eltype(op.λ)}, size(op.λ)), op.λ)
+        buf = similar(storage_type{eltype(op.buf)}, size(op.buf))
+        xbuf = op.xbuf === nothing ? nothing : similar(storage_type{eltype(op.xbuf)}, size(op.xbuf))
+    end
+    region = FFTW.fftdims(op.fftplan)
+    kw = storage_type === nothing ? _rigor_kwargs(op.fftplan) : NamedTuple()
+    fftplan, ifftplan = with_nfft_threading(new_threaded) do
+        FFTW.plan_fft!(buf, region; kw...), FFTW.plan_bfft!(buf, region; kw...)
+    end
+    fill!(buf, 0)
+    return NfftNormalOp(array_type, op.shape, λ, fftplan, ifftplan, buf, op.perm, xbuf, new_threaded)
+end

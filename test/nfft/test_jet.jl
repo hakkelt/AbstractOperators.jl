@@ -26,6 +26,18 @@ end
     @test_opt target_modules = (NFFTOperators,) mul!(img, normal_op, img)
 end
 
+# JET coverage for NfftNormalOp's threading traits and copy
+@testitem "JET NfftNormalOp traits and copy" tags = [:jet, :nfft, :threading] begin
+    using JET, NFFTOperators, AbstractOperators
+    trajectory = Float64.(rand(2, 32, 8) .- 0.5f0)
+    normal_op = AbstractOperators.get_normal_op(NFFTOp((16, 16), trajectory, ones(32, 8)))
+    @test_opt target_modules = (NFFTOperators,) is_threaded(normal_op)
+    @test_opt target_modules = (NFFTOperators,) supports_threading(normal_op)
+    @test_call target_modules = (NFFTOperators,) copy_operator(normal_op)
+    @test_call target_modules = (NFFTOperators,) copy_operator(normal_op; threaded = false)
+    @test_call target_modules = (NFFTOperators,) adapt_operator(normal_op; threaded = false)
+end
+
 # JET call analysis for NFFTOperators constructors
 @testitem "@test_call NFFTOperators" tags = [:jet, :nfft] begin
     using JET, NFFTOperators
