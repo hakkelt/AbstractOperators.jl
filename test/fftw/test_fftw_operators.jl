@@ -360,11 +360,14 @@ end
     @test is_full_column_rank(op) == false
 end
 
-@testitem "DCT/IDCT (GPU)" tags = [:gpu, :fftw, :DCT, :IDCT] setup = [TestUtils] begin
+@testitem "DCT/IDCT (GPU)" tags = [:gpu, :fftw, :DCT, :IDCT] setup = [TestUtils, GpuEnvSetup] begin
     using AbstractOperators, FFTW, FFTWOperators, GPUEnv, Random
     has_accelerated_dcts = Base.find_package("AcceleratedDCTs") !== nothing
+    # TestUtils installs AcceleratedDCTs on Julia 1.11+; without it the loop below would skip every backend.
+    VERSION >= v"1.11" && @test has_accelerated_dcts
 
-    for backend in gpu_backends(; include_jlarrays = false, supports_fftw = true)
+    # AcceleratedDCTs plans do not support JLArrays.
+    for backend in gpu_backends(; include_cpu_backends = false, supports_fftw = true)
         Random.seed!(0)
 
         has_accelerated_dcts || continue
@@ -391,10 +394,10 @@ end
     end
 end
 
-@testitem "DFT/RDFT/IRDFT (GPU)" tags = [:gpu, :fftw, :DFT, :RDFT, :IRDFT] setup = [TestUtils] begin
+@testitem "DFT/RDFT/IRDFT (GPU)" tags = [:gpu, :fftw, :DFT, :RDFT, :IRDFT] setup = [TestUtils, GpuEnvSetup] begin
     using FFTW, FFTWOperators, GPUEnv, LinearAlgebra, Random, AbstractOperators
 
-    for backend in gpu_backends(; include_jlarrays = false, supports_fftw = true)
+    for backend in gpu_backends(; supports_fftw = true)
         Random.seed!(0)
         n, m = 8, 6
 
@@ -426,5 +429,22 @@ end
         out_gpu = similar(x_gpu)
         mul!(out_gpu, opir, yr_gpu)
         @test Array(out_gpu) ≈ x_cpu rtol = 1.0e-12
+    end
+end
+
+@testitem "DFT/RDFT/IRDFT (GPU): never report CPU threads" tags = [
+    :gpu, :fftw, :threading, :DFT, :RDFT, :IRDFT,
+] setup = [TestUtils, GpuEnvSetup] begin
+    using FFTWOperators, GPUEnv, AbstractOperators
+
+    # Above the CPU thread gates; a device plan has no CPU thread count.
+    n = 1 << 16
+    for backend in gpu_backends(; supports_fftw = true)
+        x = to_gpu(backend, zeros(Float32, n))
+        xc = to_gpu(backend, zeros(ComplexF32, n ÷ 2 + 1))
+        @test is_threaded(DFT(x)) == false
+        @test is_threaded(RDFT(x)) == false
+        @test is_threaded(RDFT(x; num_threads = 4)) == false
+        @test is_threaded(IRDFT(xc, n)) == false
     end
 end
