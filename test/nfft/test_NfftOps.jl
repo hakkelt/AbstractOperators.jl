@@ -132,7 +132,7 @@ end
 
     # The device plan builds its interpolation matrix itself; it must be the one NFFT.jl's own
     # GPU plan computes on the host, and the operator must match the host operator.
-    for backend in gpu_backends(; include_jlarrays = false, supports_fftw = true), D in (2, 3)
+    for backend in gpu_backends(; include_cpu_backends = false, supports_fftw = true), D in (2, 3)
         Random.seed!(0)
         n = D == 2 ? 32 : 12
         traj = Float32.(rand(D, 64, 20) .- 0.5)
