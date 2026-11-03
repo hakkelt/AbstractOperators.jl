@@ -54,15 +54,85 @@ end
     mul!(y2, op2, x)
     @test y1 ≈ y2
 
-    # `threaded` is accepted (vacuously, since WaveletOp never has a threaded path).
+    # A 1-D transform has no threaded path, so `threaded` changes nothing.
     op3 = copy_operator(op; threaded = false)
     @test domain_array_type(op3) <: Array{Float64}
+    @test !supports_threading(op3) && !is_threaded(op3)
 
     # `storage_type` rebuilds the storage-tracking type parameter.
     op4 = copy_operator(op; storage_type = Array{Float64})
     @test op4 isa WaveletOp
     @test domain_array_type(op4) <: Array{Float64}
     @test codomain_array_type(op4) <: Array{Float64}
+end
+
+@testitem "WaveletOp: the threaded 2-D and 3-D transforms equal Wavelets.jl's" tags = [:wavelet, :WaveletOp, :Threading] setup = [TestUtils] begin
+    using Wavelets, LinearAlgebra, Random, AbstractOperators, WaveletOperators
+    Random.seed!(7)
+
+    # Sizes above the threading threshold, including a dimension that does not split evenly
+    # across threads; levels up to the maximum.
+    for (T, dims, w, L) in (
+            (Float64, (512, 512), wavelet(WT.db2), 3),
+            (ComplexF32, (512, 1024), wavelet(WT.haar), 9),
+            (ComplexF32, (64, 64, 64), wavelet(WT.db2), 3),
+            (Float64, (64, 96, 64), wavelet(WT.db4), 5),
+        )
+        op = WaveletOp(T, w, dims, L)
+        @test supports_threading(op)
+        @test is_threaded(op) == (Threads.nthreads() > 1)
+        serial = copy_operator(op; threaded = false)
+        @test !is_threaded(serial)
+        x = randn(T, dims)
+        @test op * x == dwt(x, w, L)
+        @test op' * x == idwt(x, w, L)
+        @test serial * x == op * x
+        @test op' * (op * x) ≈ x
+    end
+
+    # Below the threshold the policy keeps it serial.
+    @test !is_threaded(WaveletOp(Float64, wavelet(WT.db2), (32, 32), 2))
+
+    # A serial batch hands each frame to a threaded transform as a view.
+    for (dims, w, L) in (((512, 512), wavelet(WT.db2), 3), ((64, 64, 64), wavelet(WT.db2), 3))
+        op = WaveletOp(ComplexF32, w, dims, L)
+        x = randn(ComplexF32, dims..., 2)
+        y = similar(x)
+        for k in 1:2
+            mul!(view(y, ntuple(_ -> :, length(dims))..., k), op, view(x, ntuple(_ -> :, length(dims))..., k))
+            @test selectdim(y, length(dims) + 1, k) == dwt(selectdim(x, length(dims) + 1, k), w, L)
+        end
+        xa = similar(x)
+        mul!(view(xa, ntuple(_ -> :, length(dims))..., 1), op', view(y, ntuple(_ -> :, length(dims))..., 1))
+        @test selectdim(xa, length(dims) + 1, 1) ≈ selectdim(x, length(dims) + 1, 1)
+        b = BatchOp(op, 2; threaded = false)
+        @test b * x == cat((dwt(selectdim(x, length(dims) + 1, k), w, L) for k in 1:2)...; dims = length(dims) + 1)
+    end
+end
+
+@testitem "WaveletOp: threaded scratch survives garbage collection" tags = [:wavelet, :WaveletOp, :Threading] setup = [TestUtils] begin
+    using Wavelets, LinearAlgebra, Random, WaveletOperators
+    Random.seed!(11)
+
+    # Small transforms, threaded regardless of the size policy, applied often enough that the
+    # collector runs while the line kernels still write through the per-block scratch.
+    for dims in ((64, 64), (32, 32, 32))
+        serial = WaveletOp(ComplexF32, wavelet(WT.db2), dims, 3; threaded = false)
+        P = typeof(serial).parameters
+        threaded = typeof(serial).name.wrapper{P[1:4]..., true}(serial.wavelet, serial.dim_in, serial.levels)
+        x = randn(ComplexF32, dims)
+        y, ys, z, zs = similar(x), similar(x), similar(x), similar(x)
+        mul!(ys, serial, x)
+        mul!(zs, serial', ys)
+        bad = 0
+        for round in 1:300
+            mul!(y, threaded, x)
+            mul!(z, threaded', y)
+            (y == ys && z == zs) || (bad += 1)
+            round % 50 == 0 && GC.gc(false)
+        end
+        @test bad == 0
+    end
 end
 
 @testitem "WaveletOp constructor errors" tags = [:wavelet, :WaveletOp] setup = [TestUtils] begin
