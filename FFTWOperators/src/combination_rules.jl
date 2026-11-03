@@ -208,3 +208,43 @@ end
 function combine(T1::DiagOp, T2::SignAlternation)
     return DiagOp(domain_type(T1), size(T1, 2), T2 * diag(T1))
 end
+
+# Shift operators inside a batch
+#
+# What a `SignAlternation` or a shift does at an index depends only on the coordinates along its
+# `dirs`. Along every other dimension it acts identically, so as long as none of `dirs` is a batch
+# dimension the operator is one and the same pattern applied to each slice, and that pattern is
+# the same operator over the slice's own dimensions. Neither builds a plan, so recognising this
+# stays cheap enough to do while combination rules are only being tried.
+
+# The slice's dimensions, and where each of `dirs` ends up among them, or `nothing` when `dirs`
+# reaches a batch dimension and the operator therefore differs from slice to slice.
+function _sliced_dims_and_dirs(dim_in::NTuple{N, Int}, dirs, batch_dim_mask::NTuple{N, Bool}) where {N}
+    any(d -> batch_dim_mask[d], dirs) && return nothing
+    slice_dim_in = Tuple(dim_in[d] for d in 1:N if !batch_dim_mask[d])
+    slice_position = cumsum(.!batch_dim_mask)
+    return slice_dim_in, Tuple(slice_position[d] for d in dirs)
+end
+
+function _slice_operator(
+        L::SignAlternation{T, N, M, Th, S}, batch_dim_mask::NTuple{N, Bool}
+    ) where {T, N, M, Th, S}
+    sliced = _sliced_dims_and_dirs(L.dim_in, L.dirs, batch_dim_mask)
+    sliced === nothing && return nothing
+    slice_dim_in, slice_dirs = sliced
+    return SignAlternation(
+        T, slice_dim_in, slice_dirs; threaded = is_threaded(L), array_type = S
+    )
+end
+
+# The two shifts differ only in which direction they rotate, which the slice inherits unchanged.
+for Op in (:FFTShift, :IFFTShift)
+    @eval function _slice_operator(
+            L::$Op{T, N, M, S}, batch_dim_mask::NTuple{N, Bool}
+        ) where {T, N, M, S}
+        sliced = _sliced_dims_and_dirs(L.dim_in, L.dirs, batch_dim_mask)
+        sliced === nothing && return nothing
+        slice_dim_in, slice_dirs = sliced
+        return $Op(T, slice_dim_in, slice_dirs; array_type = S)
+    end
+end
