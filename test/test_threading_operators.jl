@@ -813,7 +813,7 @@ end
 
     # `threaded = true` on a copy is a permission. Two blocks are too few for the DCAT
     # block loop, so the threading has to stay inside the blocks.
-    d = DCAT(DFT(ComplexF64, (1 << 15,)), DFT(ComplexF64, (1 << 15,)))
+    d = DCAT(DFT(ComplexF64, (1 << 16,)), DFT(ComplexF64, (1 << 16,)))
     @test is_threaded(copy_operator(d; threaded = true)) == is_threaded(d)
     @test is_threaded(d) == (Threads.nthreads() > 1)
 

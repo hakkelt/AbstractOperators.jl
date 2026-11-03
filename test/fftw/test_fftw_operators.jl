@@ -373,17 +373,20 @@ end
     @test fftw_threading_threshold(:c2c) == fftw_threading_threshold(:r2r) == 2^16
     @test fftw_threading_threshold(:r2c) == 2^18
 
+    # The policy reads only the length and the storage of its array, so a host array of
+    # `Bool` that is never written stands in for a transform of `n` elements.
+    host(n) = Vector{Bool}(undef, n)
     for kind in (:c2c, :r2r, :r2c)
         t0 = fftw_threading_threshold(kind)
         # Below the threshold nothing is threaded, whatever `threaded` says.
-        @test _fftw_num_threads(kind, nothing, true, t0 - 1) == 1
+        @test _fftw_num_threads(kind, nothing, true, host(t0 - 1)) == 1
         # At and above it the whole pool is used -- no intermediate step (see the docstring
         # for the measurements that rejected one).
-        @test _fftw_num_threads(kind, nothing, true, t0) == nt
-        @test _fftw_num_threads(kind, nothing, true, 64 * t0) == nt
+        @test _fftw_num_threads(kind, nothing, true, host(t0)) == nt
+        @test _fftw_num_threads(kind, nothing, true, host(64 * t0)) == nt
         # `threaded = false` still vetoes, and an explicit `num_threads` still wins over both.
-        @test _fftw_num_threads(kind, nothing, false, 4 * t0) == 1
-        @test _fftw_num_threads(kind, 3, false, t0 - 1) == 3
+        @test _fftw_num_threads(kind, nothing, false, host(4 * t0)) == 1
+        @test _fftw_num_threads(kind, 3, false, host(t0 - 1)) == 3
     end
 end
 
