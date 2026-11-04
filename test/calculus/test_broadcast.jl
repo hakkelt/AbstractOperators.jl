@@ -338,3 +338,26 @@ end
     @test copy_operator(R) * x ≈ Rs * x
     @test copy_operator(R; threaded = false)' * b ≈ Rs' * b
 end
+
+@testitem "Threaded OperatorBroadCast adjoint covers every slice" tags = [:calculus, :BroadCast, :threading] setup = [TestUtils] begin
+    using AbstractOperators, LinearAlgebra, Random
+    # The split of slices among loop threads must cover `1:n` exactly for every thread
+    # count, not only the powers of two CI runs with: a floating-point split lost the last
+    # of 15 slices over 11 threads.
+    for n in 1:64, k in 1:n
+        ranges = [AbstractOperators._balanced_range(n, k, t) for t in 1:k]
+        @test reduce(vcat, collect.(ranges)) == 1:n
+        @test all(!isempty, ranges)
+        @test maximum(length, ranges) - minimum(length, ranges) <= 1
+    end
+    # End to end, with a slice count that no thread count divides evenly.
+    rng = Xoshiro(0)
+    A = MatrixOp(randn(rng, 3, 4))
+    for nslices in (5, 15)
+        R = BroadCast(A, (3, nslices); threaded = true)
+        Rs = BroadCast(A, (3, nslices); threaded = false)
+        b = randn(rng, 3, nslices)
+        @test R' * b ≈ Rs' * b
+        @test R' * b ≈ A' * vec(sum(b; dims = 2))
+    end
+end

@@ -335,7 +335,6 @@ function mul!(y, A::AdjointOperator{<:OperatorBroadCast{T, N, M, true}}, b) wher
     check(y, A, b)
     R = A.A
     thread_count = length(R.A)
-    batch_size = length(R.idxs) / thread_count
     # Each loop thread sums its slices into its own accumulator (thread 1 into `y`), and the
     # accumulators are added once at the end, instead of every slice being added to `y`
     # under one lock. `thread_count <= length(R.idxs)`, so no thread's range is empty.
@@ -343,9 +342,9 @@ function mul!(y, A::AdjointOperator{<:OperatorBroadCast{T, N, M, true}}, b) wher
     # BLAS/FFTW, so without budgeting this loop is a genuine oversubscription source.
     @budgeted_threads for t in 1:thread_count
         acc = t == 1 ? y : R.bufS[t - 1]
-        idx_start = max(1, floor(Int, (t - 1) * batch_size + 1))
-        idx_end = min(length(R.idxs), floor(Int, t * batch_size))
-        for i in idx_start:idx_end
+        slices = _balanced_range(length(R.idxs), thread_count, t)
+        idx_start = first(slices)
+        for i in slices
             b_slice = get_input_slice(R, R.idxs[i], b)
             if size(b_slice) != size(R.A[t], 1)
                 b_slice = reshape(b_slice, size(R.A[t], 1))
@@ -360,11 +359,38 @@ function mul!(y, A::AdjointOperator{<:OperatorBroadCast{T, N, M, true}}, b) wher
     return _add_accumulators!(y, R.bufS)
 end
 
+# The `t`-th of `k` contiguous ranges that split `1:n` as evenly as possible: the first
+# `n % k` get one element more. Integer arithmetic, so the ranges always cover `1:n` exactly
+# and none is empty when `k <= n`. The floating-point split this replaces, `floor(t * n / k)`,
+# lost the last slice whenever `n / k * k` rounded below `n` (15 slices over 11 threads, say).
+function _balanced_range(n::Int, k::Int, t::Int)
+    q, r = divrem(n, k)
+    start = (t - 1) * q + min(t - 1, r) + 1
+    return start:(start + q - (t > r))
+end
+
 """
     ACCUMULATOR_THREAD_LENGTH
 
 Length of `y` from which the threaded `OperatorBroadCast` adjoint adds its per-thread
-accumulators into `y` on several threads rather than one.
+accumulators into `y` on several threads rather than one. Each thread takes at least a
+quarter of it (`2^13` elements), so a short `y` is not split into chunks too small to pay
+for their task.
+
+PROVENANCE: measured. `Float64`, `k` accumulators, 4 threads, AMD EPYC 7352, Julia 1.13.1,
+2026-11-04; the old per-accumulator `y .+= acc` against this kernel, serial and threaded:
+
+| length | k  | `.+=` each | blocked, serial | blocked, threaded |
+|--------|----|-----------:|----------------:|------------------:|
+| 2^12   | 15 |    10.6 us |          8.9 us |                 — |
+| 2^14   | 15 |    52.7 us |         47.8 us |                 — |
+| 2^16   | 3  |    40.2 us |         32.9 us |           12.9 us |
+| 2^16   | 15 |     210 us |          167 us |             45 us |
+| 2^18   | 15 |    1957 us |         2158 us |            577 us |
+| 2^20   | 15 |    8938 us |         8242 us |           3197 us |
+
+Threading already wins 2.5x at 2^16, the first length measured past 2^14, so the threshold
+sits between them.
 """
 const ACCUMULATOR_THREAD_LENGTH = 2^15
 
@@ -386,8 +412,8 @@ function _add_accumulators!(y::Array, accs::Vector{<:Array})
         return y
     end
     nchunks = min(Threads.nthreads(), cld(length(y), ACCUMULATOR_THREAD_LENGTH ÷ 4))
-    quiesce_foreign_pools()
-    Threads.@threads for t in 1:nchunks
+    # Budgeted like the slice loop before it, so an enclosing thread budget holds for both.
+    @budgeted_threads for t in 1:nchunks
         lo, hi = _chunk_range(length(y), nchunks, t)
         _add_accumulators_range!(y, accs, lo, hi)
     end
