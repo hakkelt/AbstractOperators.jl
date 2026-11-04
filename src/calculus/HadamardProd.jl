@@ -138,3 +138,7 @@ end
 
 _children(L::HadamardProd) = (L.A, L.B)
 _children(L::HadamardProdJac) = (L.A, L.B)
+
+# Derived operators (Jacobians, nested constructions) reuse these arrays; see `_scratch_buffers`.
+_scratch_buffers(L::HadamardProd) = (L.bufA, L.bufB, L.bufD)
+_scratch_buffers(L::HadamardProdJac) = (L.bufA, L.bufB, L.bufD)

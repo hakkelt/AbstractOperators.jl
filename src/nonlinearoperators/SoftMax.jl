@@ -160,3 +160,6 @@ function _copy_operator_impl(
     new_at = storage_type === nothing ? _array_wrapper_type(B) : storage_type
     return SoftMax(T, op.dim; array_type = new_at, threaded = new_threaded)
 end
+
+# A Jacobian of a SoftMax writes this array too; see `_scratch_buffers`.
+_scratch_buffers(L::SoftMax) = (L.buf,)

@@ -347,9 +347,11 @@ end
 	_scratch_buffers(L::AbstractOperator)
 
 The scratch arrays `L` writes in `mul!` that an operator derived from it may hold too, `()` by
-default. A `Compose`, `VCAT` or `HCAT` built from another one reuses its buffers rather than
-allocating new ones (`a * C` and `b * C` both write `C`'s), so two distinct operators can still
-race on one array; the shared-node checks compare these arrays as well as the operators.
+default. A `Compose`, `VCAT`, `HCAT` or `Sum` built from another one reuses its buffers rather
+than allocating new ones (`a * C` and `b * C` both write `C`'s, `M + S` writes the Sum `S`'s),
+and so does a Jacobian of `Ax_mul_Bx`, `HadamardProd` or `SoftMax`, so two distinct operators
+can still race on one array; the shared-node checks compare these arrays as well as the
+operators. An operator that hands its buffers to the operators derived from it defines this.
 """
 _scratch_buffers(::AbstractOperator) = ()
 
@@ -660,6 +662,11 @@ could undo a restriction another task opened meanwhile, and a raw set ignored a 
 already open around the constructor: inside a saturated batch loop an operator was planned
 with every thread. Now an enclosing restriction wins, and the returned count reflects it, so
 an operator records -- and `is_threaded` reports -- the threads its plan really has.
+
+FFTW's count is one per process, so the restriction that applies is any open in the process,
+not only those around the constructor: an operator built while another task holds a
+restriction is planned serial for good, and reports it. A raw set would instead have raised
+FFTW under that other task. Build threaded FFTW operators outside such regions.
 """
 function _with_fftw_plan_threads(f::F, num_threads::Int, get_num_threads::G) where {F, G}
     return with_thread_budget(num_threads; only = (:fftw,)) do

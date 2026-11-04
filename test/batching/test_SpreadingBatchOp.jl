@@ -473,6 +473,12 @@ end
     @test AO._shared_node_groups([a, b, c]) == [1, 1, 3]
     # A node nested in two operators links them as well, and the link is transitive.
     @test AO._shared_node_groups([inner, c, Scale(5.0, inner)]) == [1, 2, 1]
+    # `M + S` for a Sum `S` is a new, flattened Sum that writes `S`'s buffers, although its
+    # operators are distinct, thread-safe MatrixOps: the buffers alone link the two.
+    S = MatrixOp(randn(4, 4)) + MatrixOp(randn(4, 4))
+    s1, s2 = MatrixOp(randn(4, 4)) + S, MatrixOp(randn(4, 4)) + S
+    @test s1.bufC === s2.bufC
+    @test AO._shared_node_groups([s1, s2, MatrixOp(randn(4, 4)) + MatrixOp(randn(4, 4))]) == [1, 1, 3]
     if Threads.nthreads() > 1
         ops = [a, b, c]
         bop = BatchOp(ops, 4, (:_, :s, :b); threaded = true, threading_strategy = ThreadingStrategy.LOCKING)
