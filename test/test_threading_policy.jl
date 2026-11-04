@@ -135,7 +135,7 @@ end
     :misc, :threading,
 ] setup = [TestUtils] begin
     using AbstractOperators
-    using AbstractOperators: _should_thread, MIN_BATCH_WORK_FOR_PARALLEL
+    using AbstractOperators: _should_thread, _should_thread_batch, MIN_BATCH_WORK_FOR_PARALLEL
     using Random
     Random.seed!(0)
 
@@ -152,6 +152,21 @@ end
         @test _should_thread(Eye(MIN_BATCH_WORK_FOR_PARALLEL)) == true
     end
 
+    # The batch decision adds the item count: fewer items than threads leave the threads to
+    # an operator that threads itself, but not to one that does not.
+    @test _should_thread_batch(Eye(4), 1000) == false
+    if Threads.nthreads() > 1
+        big = MIN_BATCH_WORK_FOR_PARALLEL
+        @test _should_thread_batch(Eye(big), Threads.nthreads()) == true
+        @test _should_thread_batch(Eye(big), 1) == !is_threaded(Eye(big))
+        serial = DiagOp(randn(big); threaded = false)
+        threaded = DiagOp(randn(big); threaded = true)
+        @test _should_thread_batch(serial, 1) == true
+        @test _should_thread_batch(threaded, 1) == !is_threaded(threaded)
+    end
+    # A storage type is not a batch count: the storage form keeps its own meaning.
+    @test _should_thread(Eye(4), Array{Float64}) == false
+
     # Scale's threading threshold sits at its measured 2^22 crossover, so a 1e5-element
     # operator (well below that) must stay serial.
     @test is_threaded(Scale(2.0, DiagOp(randn(100_000); threaded = false))) == false
@@ -167,9 +182,9 @@ end
     # A single-domain operator's storage is used as-is.
     @test _policy_storage(Array{Float64}) === Array{Float64}
 
-    # A multi-domain operator reports an `ArrayPartition`, which `_should_thread`'s CPU-storage
-    # check cannot use directly -- `_policy_storage` reduces it to a plain CPU array of the
-    # partition's element type instead.
+    # A multi-domain operator reports an `ArrayPartition`, which the size policy's CPU-storage
+    # check cannot use directly -- `_policy_storage` reduces it to a plain array of the
+    # partition's element type instead: `Array` when every part is on the CPU.
     @test _policy_storage(ArrayPartition{Float64, Tuple{Vector{Float64}, Vector{Float64}}}) === Array{Float64}
     @test _storage_eltype_or_float(ArrayPartition{Float32, Tuple{Vector{Float32}}}) == Float32
     # An unparameterized/unrelated type falls back to Float64.
@@ -181,6 +196,18 @@ end
     op = HCAT(MatrixOp(randn(4, 3)), MatrixOp(randn(4, 5)))
     @test domain_array_type(op) <: ArrayPartition
     @test _should_thread(op) isa Bool
+
+    # One device part makes the whole partition device storage: the policy must not see a
+    # plain CPU array then, or a batch over a mixed operator would thread host tasks around a
+    # device `mul!`.
+    using JLArrays: JLArray
+    mixed = ArrayPartition{Float64, Tuple{JLArray{Float64, 1}, Vector{Float64}}}
+    @test !AbstractOperators._is_cpu_storage(_policy_storage(mixed))
+    @test !AbstractOperators._is_cpu_domain(mixed)
+    big = AbstractOperators.MIN_BATCH_WORK_FOR_PARALLEL
+    dev = HCAT(DiagOp(JLArray(randn(big))), DiagOp(JLArray(randn(big))))
+    @test _should_thread(dev) == false
+    @test _should_thread(dev, Array) == (Threads.nthreads() > 1)
 end
 
 @testitem "threading policy: threaded=true is a permission, threaded=false a veto" tags = [

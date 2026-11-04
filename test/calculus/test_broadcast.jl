@@ -302,3 +302,62 @@ end
         @test x_back ≈ A' * dropdims(sum(y_test, dims = 2), dims = 2)
     end
 end
+
+@testitem "BroadCast: threaded forward keeps the operator's threading" tags = [
+    :calculus, :BroadCast, :threading,
+] setup = [TestUtils] begin
+    using AbstractOperators, LinearAlgebra, Random
+    const AO = AbstractOperators
+    Random.seed!(0)
+    n = 1 << 16
+    A = FiniteDiff((n,))
+    R = BroadCast(A, (n - 1, 3))
+    Rs = BroadCast(A, (n - 1, 3); threaded = false)
+    if Threads.nthreads() > 1
+        @test AO.is_block_threaded(R)
+        # The forward pass runs the operator as given, which may thread itself; only the
+        # adjoint loop needs serial per-thread instances, and at most one per slice.
+        @test R.Af === A
+        @test length(R.A) == min(Threads.nthreads(), 3)
+        @test all(!is_threaded, R.A)
+        @test is_threaded(R)
+    end
+    x = randn(n)
+    b = randn(n - 1, 3)
+    @test R * x ≈ Rs * x
+    # The per-thread sums and their reduction give the serial adjoint, also when the slices do
+    # not divide evenly among the threads and when there are fewer slices than threads.
+    @test R' * b ≈ Rs' * b
+    for k in (1, 2, 5, 7)
+        Rk = BroadCast(A, (n - 1, k))
+        bk = randn(n - 1, k)
+        @test Rk' * bk ≈ BroadCast(A, (n - 1, k); threaded = false)' * bk
+    end
+    # Structural transforms and copies rebuild from the operator as given.
+    @test AO.remove_displacement(R) * x ≈ Rs * x
+    @test copy_operator(R) * x ≈ Rs * x
+    @test copy_operator(R; threaded = false)' * b ≈ Rs' * b
+end
+
+@testitem "Threaded OperatorBroadCast adjoint covers every slice" tags = [:calculus, :BroadCast, :threading] setup = [TestUtils] begin
+    using AbstractOperators, LinearAlgebra, Random
+    # The split of slices among loop threads must cover `1:n` exactly for every thread
+    # count, not only the powers of two CI runs with: a floating-point split lost the last
+    # of 15 slices over 11 threads.
+    for n in 1:64, k in 1:n
+        ranges = [AbstractOperators._balanced_range(n, k, t) for t in 1:k]
+        @test reduce(vcat, collect.(ranges)) == 1:n
+        @test all(!isempty, ranges)
+        @test maximum(length, ranges) - minimum(length, ranges) <= 1
+    end
+    # End to end, with a slice count that no thread count divides evenly.
+    rng = Xoshiro(0)
+    A = MatrixOp(randn(rng, 3, 4))
+    for nslices in (5, 15)
+        R = BroadCast(A, (3, nslices); threaded = true)
+        Rs = BroadCast(A, (3, nslices); threaded = false)
+        b = randn(rng, 3, nslices)
+        @test R' * b ≈ Rs' * b
+        @test R' * b ≈ A' * vec(sum(b; dims = 2))
+    end
+end

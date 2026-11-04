@@ -52,10 +52,9 @@ end
 # `mul!` is two reductions (the stabilizing `maximum`, then the normalizing `sum`) around
 # an elementwise `exp`, and the Jacobian adjoint has a third (a `dot` product) -- not a
 # plain elementwise map, so the `@..`-based split every other nonlinear operator uses does
-# not apply directly. Polyester's `@batch reduction=((op, var), ...)` (`+`, `max` here) is
-# exactly the "multi-pass rewrite with its own reductions" that used to make this look
-# infeasible: each reduction becomes its own `@batch` loop over a plain local accumulator,
-# isbits and initialized before the loop as the macro requires.
+# not apply directly. Each reduction is a Polyester `@batch reduction=((op, var), ...)` loop
+# (`+`, `max` here) over a plain local accumulator, isbits and initialized before the loop
+# as the macro requires.
 
 function mul!(y::AbstractArray, L::SoftMax{T, N, B, false}, x::AbstractArray) where {T, N, B}
     check(y, L, x)
@@ -88,12 +87,13 @@ function mul!(
     ) where {T, N, B}
     check(y, J, b)
     L = J.A
+    # With `e = exp.(x .- max(x))` and `s = sum(e)`, `σ = e / s` and the adjoint is
+    # `σ .* (b .- σ ⋅ b) = e .* (b .- (e ⋅ b) / s) ./ s`, so `σ` itself is never formed.
     mx = maximum(L.x)
     @.. thread = false L.A.buf = exp(L.x - mx)
-    s = sum(L.A.buf)
-    @.. thread = false L.A.buf = L.A.buf / s
-    d = dot(L.A.buf, b)
-    @.. thread = false y = L.A.buf * (b - d)
+    inv_s = inv(sum(L.A.buf))
+    d = dot(L.A.buf, b) * inv_s
+    @.. thread = false y = L.A.buf * inv_s * (b - d)
     return y
 end
 
@@ -108,20 +108,19 @@ function mul!(
     @batch reduction = ((max, mx),) for i in eachindex(Lx)
         mx = max(mx, Lx[i])
     end
+    # As in the serial method, `σ` is never formed: one pass takes `e`, its sum and `e ⋅ b`.
     s = zero(T)
-    @batch reduction = ((+, s),) for i in eachindex(Lx, buf)
-        buf[i] = exp(Lx[i] - mx)
-        s += buf[i]
-    end
-    @batch for i in eachindex(buf)
-        buf[i] /= s
-    end
     d = zero(T)
-    @batch reduction = ((+, d),) for i in eachindex(buf, b)
-        d += buf[i] * b[i]
+    @batch reduction = ((+, s), (+, d)) for i in eachindex(Lx, buf, b)
+        e = exp(Lx[i] - mx)
+        buf[i] = e
+        s += e
+        d += e * b[i]
     end
-    @batch for i in eachindex(y)
-        y[i] = buf[i] * (b[i] - d)
+    inv_s = inv(s)
+    dn = d * inv_s
+    @batch for i in eachindex(y, buf, b)
+        y[i] = buf[i] * inv_s * (b[i] - dn)
     end
     return y
 end
@@ -145,9 +144,9 @@ supports_threading(::SoftMax) = true
 # PROVENANCE: measured, with the size policy bypassed to find the true crossover (sweeping
 # through the exported `threaded = true` keyword alone would only ever reproduce whatever
 # this constant already was, since `threaded` is a permission the policy can decline).
-# Real `mul!` crossover: Float64 2^9, Float32 2^11. Real Jacobian-adjoint crossover (one
-# more reduction pass than forward -- max, exp+sum, divide, dot, then the final elementwise
-# product): Float64 2^12, Float32 2^11. Taking the latest of all four, as the package does
+# Real `mul!` crossover: Float64 2^9, Float32 2^11. Real Jacobian-adjoint crossover
+# (measured when it made five passes -- max, exp+sum, divide, dot, product -- instead of the
+# three it makes now): Float64 2^12, Float32 2^11. Taking the latest of all four, as the package does
 # everywhere a single threshold has to cover multiple directions/element types: whichever
 # crosses over last decides.
 threading_threshold(::Type{<:SoftMax}) = 2^12
@@ -161,3 +160,6 @@ function _copy_operator_impl(
     new_at = storage_type === nothing ? _array_wrapper_type(B) : storage_type
     return SoftMax(T, op.dim; array_type = new_at, threaded = new_threaded)
 end
+
+# A Jacobian of a SoftMax writes this array too; see `_scratch_buffers`.
+_scratch_buffers(L::SoftMax) = (L.buf,)

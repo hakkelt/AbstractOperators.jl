@@ -950,8 +950,13 @@ end
 """
     copy_operator(op::AbstractOperator; storage_type=nothing, threaded=nothing)
 
-Create a copy of `op` suitable for parallel use. **Always returns a new object**; use
-[`adapt_operator`](@ref) when sharing `op` is acceptable provided it meets the constraints.
+Create a copy of `op` suitable for parallel use: one that shares no mutable state with `op`,
+so the two can run concurrently. Use [`adapt_operator`](@ref) when sharing `op` is acceptable
+provided it meets the constraints.
+
+An operator with no mutable state at all (an immutable struct whose fields are read-only, such
+as a `DFT` whose requested threading and storage already match) may come back as `op` itself:
+a copy would be `===` to it anyway. Every operator that owns a buffer returns a new object.
 
 - Immutable fields (operator arrays, type params) are **shared** (no copy).
 - Mutable buffer fields are **deep-copied**.
@@ -966,9 +971,9 @@ could not preserve an explicitly serial operator, since it would re-derive threa
 the policy. As everywhere else, a `threaded = true` request is a permission the policy may
 still decline; `threaded = false` is honoured absolutely.
 
-The "return `op` itself when it is already thread-safe" short-circuit that used to live
-here now lives in `adapt_operator`, so that the two functions have crisp contracts: one
-always copies, the other never copies needlessly.
+Returning `op` merely because it is thread-safe is `adapt_operator`'s job, not this
+function's: `copy_operator` always gives independent state, `adapt_operator` never copies
+needlessly.
 """
 function copy_operator(op::AbstractOperator; storage_type = nothing, threaded = nothing)
     return _copy_operator_impl(op; storage_type = _normalize_storage_request(storage_type), threaded)
@@ -1017,10 +1022,6 @@ function _convert_buffer(buf::AbstractArray{T}, storage_type::Type) where {T}
     return similar(storage_type{T}, size(buf))
 end
 
-_should_thread(::Number) = false
-_should_thread(d::AbstractArray) = length(d) >= THRESHOLD_MEMORY_BOUND && Threads.nthreads() > 1
-_should_thread(S::Type{<:AbstractArray}) = Threads.nthreads() > 1 && _is_cpu_storage(S)
-
 """
 	_should_thread(op::AbstractOperator)
 
@@ -1037,26 +1038,24 @@ only the per-item half of the condition.
 # `storage_type`: the decision for a copy of `op` moved there (`nothing`: unchanged).
 function _should_thread(op::AbstractOperator, storage_type = nothing)
     Threads.nthreads() > 1 || return false
-    if storage_type === nothing
-        _is_cpu_storage(_policy_storage(domain_array_type(op))) || return false
-    else
-        _is_cpu_domain(storage_type) || return false
-    end
+    _is_cpu_domain(storage_type === nothing ? domain_array_type(op) : storage_type) || return false
     return _total_elements(size(op, 2)) >= MIN_BATCH_WORK_FOR_PARALLEL
 end
 
 """
-	_should_thread(op::AbstractOperator, batch_length::Integer)
+	_should_thread_batch(op::AbstractOperator, batch_length::Integer)
 
-Whether a batch loop of `batch_length` calls to `op` should thread.
+Whether a batch loop of `batch_length` calls to `op` should thread. Named apart from
+`_should_thread(op, storage_type)`, whose second argument is a storage type, so neither can be
+called by mistake for the other.
 
-Besides the per-item condition above, a batch with fewer items than threads stays serial
-when `op` threads itself: the loop could keep only `batch_length` threads busy, while each
-call can use all of them. For two frames of a 2-D wavelet transform (db2, 3 levels,
+Besides the per-item condition of `_should_thread(op)`, a batch with fewer items than threads
+stays serial when `op` threads itself: the loop could keep only `batch_length` threads busy,
+while each call can use all of them. For two frames of a 2-D wavelet transform (db2, 3 levels,
 ComplexF32, 128² to 512², one EPYC 7763 NUMA domain), threading inside each frame took
 0.39-0.63 of the time of threading across the frames at 8 threads, and 0.26-0.57 at 16.
 """
-function _should_thread(op::AbstractOperator, batch_length::Integer)
+function _should_thread_batch(op::AbstractOperator, batch_length::Integer)
     _should_thread(op) || return false
     return batch_length >= Threads.nthreads() || !is_threaded(op)
 end

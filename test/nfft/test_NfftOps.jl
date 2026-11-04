@@ -222,6 +222,57 @@ end
     @test results[1] ≈ results[2]
 end
 
+@testitem "NfftNormalOp threading traits and copy" tags = [:nfft, :NfftNormalOp, :threading] begin
+    using AbstractOperators, NFFTOperators, FFTW, LinearAlgebra, Random, NestedThreading
+    rigor(p) = p.flags & (FFTW.ESTIMATE | FFTW.PATIENT | FFTW.EXHAUSTIVE | FFTW.WISDOM_ONLY)
+    traj = rand(Xoshiro(1), 2, 64, 16) .- 0.5
+    image = randn(Xoshiro(2), ComplexF64, 32, 32)
+    for threaded in (false, true)
+        op = NFFTOp((32, 32), traj, ones(64, 16); threaded, fftflags = FFTW.MEASURE)
+        N = AbstractOperators.get_normal_op(op)
+        # The normal operator threads exactly when its NFFTOp does, and owns scratch buffers.
+        @test is_threaded(N) == is_threaded(op)
+        @test supports_threading(N)
+        @test !is_thread_safe(N)
+        y = N * image
+        for C in (copy_operator(N), copy_operator(N; storage_type = Array))
+            # A copy has its own buffer and plans, at the original rigor, and the same result.
+            @test C.buf !== N.buf
+            @test C.fftplan !== N.fftplan
+            @test is_threaded(C) == is_threaded(N)
+            @test C * image ≈ y
+        end
+        @test rigor(copy_operator(N).fftplan) == FFTW.MEASURE
+        # ...also when the storage is given but stays on the host, where the kernel is shared.
+        @test rigor(copy_operator(N; storage_type = Array).fftplan) == FFTW.MEASURE
+        @test copy_operator(N; storage_type = Array).λ === N.λ
+        # The kernel is read-only and shared by a same-storage copy.
+        @test copy_operator(N).λ === N.λ
+        serial = adapt_operator(N; threaded = false)
+        @test !is_threaded(serial)
+        @test serial * image ≈ y
+    end
+
+    # Built under a restriction, the embedding's FFTs are planned serial, and the normal operator
+    # says so even though its NFFTOp asked for threads; a copy made outside it plans threaded again.
+    op = NFFTOp((32, 32), traj, ones(64, 16); threaded = true)
+    N = NestedThreading.with_restricted_threads(() -> AbstractOperators.get_normal_op(op))
+    unrestricted = AbstractOperators.get_normal_op(copy_operator(op))
+    @test !is_threaded(N)
+    @test is_threaded(copy_operator(N; threaded = true)) == is_threaded(unrestricted)
+    @test N * image ≈ unrestricted * image
+
+    # A stacked operator transformed along trailing dimensions permutes through `xbuf`, which
+    # a copy must not share.
+    op = NFFTOp((3, 32, 32), rand(Xoshiro(3), 2, 64, 16) .- 0.5; dims = 2:3, threaded = false)
+    N = AbstractOperators.get_normal_op(op)
+    x = randn(Xoshiro(4), ComplexF64, 3, 32, 32)
+    C = copy_operator(N)
+    @test N.perm !== nothing
+    @test C.xbuf !== N.xbuf
+    @test C * x ≈ N * x
+end
+
 @testitem "NfftNormalOp (GPU)" tags = [:gpu, :nfft, :NfftNormalOp] setup = [TestUtils, GpuEnvSetup] begin
     using AbstractOperators, NFFTOperators, NFFT, GPUEnv, LinearAlgebra, Random
     using AbstractOperators: get_normal_op
@@ -240,6 +291,11 @@ end
         @test y isa typeof(x_gpu)
         @test collect(y) ≈ host rtol = 1.0e-4
         @test collect(y) ≈ collect(op' * (op * x_gpu)) rtol = 1.0e-4
+        # A device copy of a threaded host normal operator is not threaded.
+        Nh = get_normal_op(NFFTOp((32, 32), traj, dcf; threaded = true))
+        Nd = copy_operator(Nh; storage_type = Base.typename(typeof(x_gpu)).wrapper)
+        @test !is_threaded(Nd)
+        @test collect(Nd * x_gpu) ≈ host rtol = 1.0e-4
     end
 end
 

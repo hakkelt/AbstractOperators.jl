@@ -71,9 +71,8 @@ export is_threaded, adapt_operator, supports_threading
 # A `@batch` kernel is silently serial inside any scope that has narrowed the thread budget,
 # because switching Polyester off is how a `GuardedPool` implements a restriction. A caller
 # that wraps a whole solve in one -- MRT does -- therefore never runs the threaded path these
-# thresholds were swept for, whatever they say. That is how `BroadCast`'s threshold came to be
-# 2^18 for a kernel that never ran; it is now `Threads.@threads`, and its sweep was re-run.
-# The same question is open for every other `@batch`/`@..` kernel here.
+# thresholds were swept for, whatever they say. `BroadCast`'s kernels use `Threads.@threads`
+# for that reason; the question is open for every other `@batch`/`@..` kernel here.
 
 """
 Transcendental elementwise kernels (`Sin`, `Cos`, `Exp`, `Atan`, `Tanh`, `Sech`, `Sigmoid`,
@@ -299,14 +298,11 @@ parallel layer, and copied when a block shares an operator that is not thread-sa
 another block (`DCAT(C, C)`, `DCAT(C, 2 * C)`). Other blocks stay the caller's objects, so
 state the caller updates (e.g. `update!` on an `LBFGS`) still reaches them.
 """
-function _block_loop_operators(blocks::Tuple)
-    nodes = map(b -> _thread_unsafe_nodes!(Base.IdSet{Any}(), b), blocks)
-    counts = IdDict{Any, Int}()
-    for ns in nodes, o in ns
-        counts[o] = get(counts, o, 0) + 1
-    end
-    return map(blocks, nodes) do b, ns
-        if any(o -> counts[o] > 1, ns)
+function _block_loop_operators(blocks::NTuple{N, Any}) where {N}
+    groups = _shared_node_groups(blocks)
+    return ntuple(Val(N)) do i
+        b = blocks[i]
+        if count(==(groups[i]), groups) > 1
             copy_operator(b; threaded = false)
         else
             adapt_operator(b; threaded = false)
@@ -314,9 +310,59 @@ function _block_loop_operators(blocks::Tuple)
     end
 end
 
-# The operators in the tree of `op` that are not thread-safe.
+"""
+	_shared_node_groups(ops) -> Vector{Int}
+
+A group label for each operator of `ops`, in iteration order. Two operators get the same
+label when their trees share a node that is not thread-safe, directly or through a chain of
+other operators, so a loop that runs different groups concurrently never runs one such node
+on two threads.
+"""
+function _shared_node_groups(ops)
+    parent = collect(1:length(ops))
+    function root(i)
+        while parent[i] != i
+            i = parent[i] = parent[parent[i]]
+        end
+        return i
+    end
+    owner = IdDict{Any, Int}()
+    for (i, op) in enumerate(ops), o in _thread_unsafe_nodes!(Base.IdSet{Any}(), op)
+        ri, rj = root(i), root(get!(owner, o, i))
+        ri == rj || (parent[ri] = rj)
+    end
+    return map(root, 1:length(ops))
+end
+
+# The scope of a task-based threaded region (`@sync`/`@spawn`) that cannot use
+# `@budgeted_threads`: it parks Polyester's spinning workers first, as `@budgeted_threads`
+# does, since the spawned tasks would otherwise wait for them, and restricts the nested
+# pools for the whole region.
+function _with_restricted_tasks(f::F) where {F}
+    quiesce_foreign_pools()
+    return with_restricted_threads(f)
+end
+
+"""
+	_scratch_buffers(L::AbstractOperator)
+
+The scratch arrays `L` writes in `mul!` that an operator derived from it may hold too, `()` by
+default. A `Compose`, `VCAT`, `HCAT` or `Sum` built from another one reuses its buffers rather
+than allocating new ones (`a * C` and `b * C` both write `C`'s, `M + S` writes the Sum `S`'s),
+and so does a Jacobian of `Ax_mul_Bx`, `HadamardProd` or `SoftMax`, so two distinct operators
+can still race on one array; the shared-node checks compare these arrays as well as the
+operators. An operator that hands its buffers to the operators derived from it defines this.
+"""
+_scratch_buffers(::AbstractOperator) = ()
+
+# The operators in the tree of `op` that are not thread-safe, and their scratch arrays.
 function _thread_unsafe_nodes!(nodes::Base.IdSet{Any}, op::AbstractOperator)
-    is_thread_safe(op) || push!(nodes, op)
+    if !is_thread_safe(op)
+        push!(nodes, op)
+        for b in _scratch_buffers(op)
+            b isa AbstractArray && push!(nodes, b)
+        end
+    end
     for c in _children(op)
         _thread_unsafe_nodes!(nodes, c)
     end
@@ -324,9 +370,14 @@ function _thread_unsafe_nodes!(nodes::Base.IdSet{Any}, op::AbstractOperator)
 end
 
 # Multi-domain operators report an ArrayPartition, which the size policy cannot use
-# directly; fall back to a plain CPU array of the promoted element type.
+# directly: it becomes a plain array of the promoted element type, `Array` when every part
+# lives on the CPU and the (non-CPU) `AbstractArray` otherwise, so the CPU check gives the
+# same answer as `_is_cpu_domain` on the partition.
 _policy_storage(S::Type{<:AbstractArray}) = S
-_policy_storage(S::Type{<:ArrayPartition}) = Array{_storage_eltype_or_float(S)}
+function _policy_storage(S::Type{<:ArrayPartition})
+    T = _storage_eltype_or_float(S)
+    return _is_cpu_domain(S) ? Array{T} : AbstractArray{T}
+end
 _storage_eltype_or_float(::Type{<:ArrayPartition{T}}) where {T} = T
 _storage_eltype_or_float(::Type) = Float64
 
@@ -351,9 +402,31 @@ Consequently `is_threaded(copy_operator(L; threaded = true))` is **not** guarant
 `true`; `is_threaded(copy_operator(L; threaded = false))` *is* guaranteed to be `false`,
 which is the direction nesting safety depends on.
 
-Defaults to whether any of `_children(L)` is threaded, so `false` for a leaf.
+Defaults to `_self_threaded(L) || any(is_threaded, _children(L))`: a forwarder is threaded
+if its own loop threads or any child does, and a leaf without a threaded path is not.
 """
-is_threaded(L::AbstractOperator) = _is_threaded_from_children(L)
+is_threaded(L::AbstractOperator) = _self_threaded(L) || any(is_threaded, _children(L))
+
+"""
+	_self_threaded(L::AbstractOperator) -> Bool
+
+Whether `L`'s own loop threads -- a block loop, a batch loop, or a broadcast -- regardless of
+its children. `false` by default. A forwarder with a threaded loop of its own defines this
+instead of `is_threaded`, which adds the children itself.
+
+Structural transforms (slicing, permuting, combining) read it to rebuild a forwarder with the
+same loop threading, which `is_threaded` cannot tell them: that is also true when only a child
+threads.
+"""
+_self_threaded(::AbstractOperator) = false
+
+"""
+	is_block_threaded(L::AbstractOperator) -> Bool
+
+Alias of `_self_threaded` under the name the block combinators (VCAT, HCAT, DCAT) and
+the benchmarks use.
+"""
+is_block_threaded(L::AbstractOperator) = _self_threaded(L)
 
 """
 	_resolve_threaded(policy, threaded::Bool) -> Bool
@@ -405,10 +478,6 @@ threaded. That is a silent nesting bug, not a missing optimization.
 """
 _children(::AbstractOperator) = ()
 
-# A forwarder is threaded if any child is: that is the property callers actually care
-# about ("will running this spawn Julia threads?").
-_is_threaded_from_children(L::AbstractOperator) = any(is_threaded, _children(L))
-
 """
 	supports_threading(L::AbstractOperator) -> Bool
 
@@ -425,8 +494,7 @@ memory-bound `Eye` would copy the `Eye` forever without ever satisfying the cons
 Defaults to whether any of `_children(L)` supports threading, so `false` for a leaf;
 leaf operators with a threaded path override it.
 """
-supports_threading(L::AbstractOperator) = _supports_threading_from_children(L)
-_supports_threading_from_children(L::AbstractOperator) = any(supports_threading, _children(L))
+supports_threading(L::AbstractOperator) = any(supports_threading, _children(L))
 
 # ─── FastBroadcast bridge ─────────────────────────────────────────────────────
 #
@@ -475,6 +543,10 @@ Run `f()` with BLAS restricted to a single thread when `threaded` is `false`, or
 left at whatever budget is in force when it is `true`. For non-CPU storage `S` it runs
 `f()` directly: the scope restricts nothing a device `gemm` uses and would only add its
 lock to every call (5.4 us against 0.06 us for a 2x2 `JLArray` `MatrixOp`).
+
+The restricted branch costs little inside a saturated batch loop: there an enclosing scope
+already holds BLAS at one thread, and NestedThreading (0.1.4 and later, Julia 1.11 and later)
+then runs the body without entering a new scope -- 0.25 us against 3.2 us.
 
 The permitted branch deliberately opens **no** scope. Any outer `NestedThreading`
 restriction is process-global and already applied by the time it is reached, so re-asserting
@@ -577,6 +649,31 @@ function _blas_threaded(threaded::Bool, ::Type{S}) where {S <: AbstractArray}
     end
 end
 
+"""
+	_with_fftw_plan_threads(f, num_threads, get_num_threads) -> (f(), threads)
+
+Run the FFTW planning callable `f` with FFTW at `num_threads` threads, and return its result
+with the thread count FFTW actually planned with, read by `get_num_threads()` inside the scope
+(FFTWOperators and DSPOperators pass `FFTW.get_num_threads`; this package does not load FFTW).
+
+The count is set through NestedThreading (`with_thread_budget`, FFTW only) rather than a raw
+`FFTW.set_num_threads` save and restore. FFTW's count is process-global, so a raw restore
+could undo a restriction another task opened meanwhile, and a raw set ignored a restriction
+already open around the constructor: inside a saturated batch loop an operator was planned
+with every thread. Now an enclosing restriction wins, and the returned count reflects it, so
+an operator records -- and `is_threaded` reports -- the threads its plan really has.
+
+FFTW's count is one per process, so the restriction that applies is any open in the process,
+not only those around the constructor: an operator built while another task holds a
+restriction is planned serial for good, and reports it. A raw set would instead have raised
+FFTW under that other task. Build threaded FFTW operators outside such regions.
+"""
+function _with_fftw_plan_threads(f::F, num_threads::Int, get_num_threads::G) where {F, G}
+    return with_thread_budget(num_threads; only = (:fftw,)) do
+        f(), Int(get_num_threads())
+    end
+end
+
 # ─── adapt_operator ───────────────────────────────────────────────────────────
 
 """
@@ -585,7 +682,7 @@ end
 Return an operator equivalent to `op` that satisfies the requested constraints, **without
 copying when `op` already satisfies them**.
 
-This is the counterpart to [`copy_operator`](@ref), which always produces a new object:
+This is the counterpart to [`copy_operator`](@ref), which always produces independent state:
 
 - `adapt_operator` returns `op` itself (`===`) when every requested constraint already
   holds, and delegates to `copy_operator` otherwise.

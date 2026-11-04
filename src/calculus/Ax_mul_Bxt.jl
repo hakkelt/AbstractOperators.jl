@@ -143,3 +143,7 @@ function _copy_operator_impl(op::Ax_mul_Bxt; storage_type = nothing, threaded = 
     new_B = copy_operator(op.B; storage_type, threaded)
     return Ax_mul_Bxt(new_A, new_B, new_bufA, new_bufB, new_bufC, new_bufD)
 end
+
+# Derived operators (Jacobians, nested constructions) reuse these arrays; see `_scratch_buffers`.
+_scratch_buffers(L::Ax_mul_Bxt) = (L.bufA, L.bufB, L.bufC, L.bufD)
+_scratch_buffers(L::Ax_mul_BxtJac) = (L.bufA, L.bufB, L.bufC, L.bufD)

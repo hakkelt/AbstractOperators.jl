@@ -295,9 +295,8 @@ for (S1, S2) in Iterators.product(
     @eval can_be_combined(T1::$S1, T2::$S2) = _matrix_diag_combinable(T1, T2)
     @eval can_be_combined(T1::$S2, T2::$S1) = _matrix_diag_combinable(T1, T2)
 end
-# Only a vector diagonal turns into a matrix factor. The `(AbstractMatrix, AbstractMatrix)`
-# method that used to sit here existed solely to serve a matrix-valued diagonal, which
-# `_has_matrix_diagonal` now keeps out of `combine` altogether.
+# Only a vector diagonal turns into a matrix factor: `_has_matrix_diagonal` keeps a
+# matrix-valued diagonal out of `combine` altogether.
 combine_matrix(L::AbstractMatrix, R::AbstractVector) = L * Diagonal(R)
 combine_matrix(L::AbstractVector, R::AbstractMatrix) = Diagonal(L) * R
 function combine(T1::DiagOp, T2::MatrixOp)

@@ -220,3 +220,6 @@ function _copy_operator_impl(op::Sum; storage_type = nothing, threaded = nothing
 end
 
 _children(L::Sum) = L.A
+
+# Derived operators (Jacobians, nested constructions) reuse these arrays; see `_scratch_buffers`.
+_scratch_buffers(L::Sum) = (L.bufC, L.bufD)

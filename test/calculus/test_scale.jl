@@ -374,7 +374,7 @@ end
     @test S * x ≈ S2 * x
 
     # Multi-codomain operator: `codomain_type`/`codomain_array_type` come back as a Tuple /
-    # ArrayPartition, exercised through `codomain_type_for_policy`/`codomain_array_type_for_policy`.
+    # ArrayPartition, exercised through `codomain_type_for_policy` and `_policy_storage`.
     m1, m2, k = 3, 5, 2
     D = DCAT(MatrixOp(randn(m1, k)), MatrixOp(randn(m2, k)))
     S_multi = Scale(2.0, D)

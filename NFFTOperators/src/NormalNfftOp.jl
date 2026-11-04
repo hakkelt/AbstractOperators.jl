@@ -74,8 +74,22 @@ records no FFTW flags (a GPU plan) gets `ESTIMATE`.
 """
 function _planner_rigor(plan)
     fft = hasproperty(plan, :forwardFFT) ? plan.forwardFFT : nothing
-    fft isa FFTW.FFTWPlan || return FFTW.ESTIMATE
-    return fft.flags & (FFTW.ESTIMATE | FFTW.PATIENT | FFTW.EXHAUSTIVE | FFTW.WISDOM_ONLY)
+    return fft isa FFTW.FFTWPlan ? _rigor_flags(fft) : FFTW.ESTIMATE
+end
+
+_rigor_flags(fft::FFTW.FFTWPlan) =
+    fft.flags & (FFTW.ESTIMATE | FFTW.PATIENT | FFTW.EXHAUSTIVE | FFTW.WISDOM_ONLY)
+
+# The embedding's in-place forward and inverse FFT plans over `region` of `buf`, which they
+# leave zeroed (planning with a rigor above `ESTIMATE` overwrites it), and whether they were
+# planned threaded. Called inside `with_nfft_threading(threaded)`, where an enclosing
+# restriction may have held FFTW at one thread even though `threaded` asked for more: the
+# operator then records the serial plan it really has, as `_with_fftw_plan_threads` does for
+# FFTWOperators and DSPOperators.
+function _embedding_fft_plans(buf, region, kw, threaded::Bool)
+    fftplan, ifftplan = FFTW.plan_fft!(buf, region; kw...), FFTW.plan_bfft!(buf, region; kw...)
+    fill!(buf, 0)
+    return fftplan, ifftplan, threaded && FFTW.get_num_threads() > 1
 end
 
 # The planner keywords of the embedding's FFTs: FFTW's planner rigor on the host, none for a
@@ -106,13 +120,11 @@ function _get_normal_op(op::NFFTOp{T, D, N}) where {T, D, N}
     λ = reshape(λ, shape_ext..., map(_ -> 1, stack[1:(end - op.nframe)])..., frame_size...)
     buf = similar(op.ksp_buffer, (shape_ext..., stack...))
     kw = _embedding_fft_kwargs(op)
-    fftplan = FFTW.plan_fft!(buf, 1:D; kw...)
-    ifftplan = FFTW.plan_bfft!(buf, 1:D; kw...)
-    fill!(buf, 0)
+    fftplan, ifftplan, threaded = _embedding_fft_plans(buf, 1:D, kw, op.threaded)
     xbuf = op.img_buffer === nothing ? nothing : similar(op.img_buffer)
     return NfftNormalOp(
         domain_array_type(op), op.dim_in, λ, fftplan, ifftplan, buf,
-        op.img_buffer === nothing ? nothing : perm, xbuf, op.threaded,
+        op.img_buffer === nothing ? nothing : perm, xbuf, threaded,
     )
 end
 
@@ -149,3 +161,38 @@ domain_array_type(op::NfftNormalOp{N, T}) where {N, T} = op.array_type
 codomain_array_type(op::NfftNormalOp{N, T}) where {N, T} = op.array_type
 is_symmetric(::NfftNormalOp) = true
 AdjointOperator(op::NfftNormalOp) = op
+
+# ─── Threading and copying ────────────────────────────────────────────────────
+#
+# The FFT plans are built under `with_nfft_threading(threaded)`, like the NFFTOp's own, and the
+# operator is threaded when the NFFTOp it came from was and the plans really got more than one
+# thread (an enclosing restriction can hold FFTW at one). `buf` and `xbuf` are scratch
+# written by every `mul!`, so it is not thread-safe; a copy gets its own buffers and plans
+# for them, and shares the read-only kernel `λ`.
+is_threaded(op::NfftNormalOp) = op.threaded
+supports_threading(::NfftNormalOp) = true
+is_thread_safe(::NfftNormalOp) = false
+
+# The kernel is read-only, so a copy on the same storage shares it.
+_copied_kernel(λ, ::Nothing) = λ
+_copied_kernel(λ, S::Type) =
+    _array_wrapper_type(typeof(λ)) === S ? λ : copyto!(similar(S{eltype(λ)}, size(λ)), λ)
+
+function _copy_operator_impl(
+        op::NfftNormalOp{N, T}; storage_type = nothing, threaded = nothing
+    ) where {N, T}
+    array_type = storage_type === nothing ? op.array_type : storage_type{eltype(T)}
+    wrapper = _array_wrapper_type(array_type)
+    λ = _copied_kernel(op.λ, storage_type)
+    # A host copy plans as carefully as the original; a device FFT takes no flags.
+    kw = op.fftplan isa FFTW.FFTWPlan && wrapper === Array ? (flags = _rigor_flags(op.fftplan),) : NamedTuple()
+    # `nothing` keeps the original's request, re-resolved for the target storage: a device copy
+    # of a threaded host operator is not threaded.
+    new_threaded = _nfft_threaded(threaded === nothing ? op.threaded : threaded, wrapper)
+    buf = AbstractOperators._convert_buffer(op.buf, storage_type)
+    xbuf = op.xbuf === nothing ? nothing : AbstractOperators._convert_buffer(op.xbuf, storage_type)
+    fftplan, ifftplan, planned_threaded = with_nfft_threading(new_threaded) do
+        _embedding_fft_plans(buf, FFTW.fftdims(op.fftplan), kw, new_threaded)
+    end
+    return NfftNormalOp(array_type, op.shape, λ, fftplan, ifftplan, buf, op.perm, xbuf, planned_threaded)
+end

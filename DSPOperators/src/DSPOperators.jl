@@ -22,6 +22,7 @@ import AbstractOperators:
     is_threaded,
     _resolve_threaded,
     _is_cpu_array,
+    _with_fftw_plan_threads,
     _copy_operator_impl
 
 # ─── Threading ────────────────────────────────────────────────────────────────
@@ -32,9 +33,8 @@ import AbstractOperators:
 # `_dsp_fftw_num_threads` below and each operator's `num_threads`/`threaded` constructor
 # keywords. `Filt` and `MIMOFilt`, by contrast, genuinely have no threaded path at any
 # level: IIR filtering is a sequential recursion (each output sample depends on the
-# previous one), not an FFT, so there is nothing for either Julia or FFTW to parallelize
-# -- their `is_threaded`/`supports_threading = false` declarations are right after their
-# `include`s below.
+# previous one), not an FFT, so there is nothing for either Julia or FFTW to parallelize,
+# and they keep the leaf defaults `is_threaded`/`supports_threading == false`.
 
 const THRESHOLD_C2C = 2^19
 
@@ -56,13 +56,10 @@ PROVENANCE: measured. `Xcorr` `mul!` sweep over the padded length, Float64, AMD 
 Threading is a *loss* below 2^19, so the threshold is the first swept length that actually
 wins rather than a round number near it.
 
-The earlier value, 2^13, was borrowed from FFTWOperators' `fftw_threading_threshold(:c2c)`
-on the theory that a padded convolution is the same cost class as a bare transform. The
-sweep says otherwise, which is why this constant is measured here rather than shared: a
-`Conv`/`Xcorr` `mul!` is two transforms plus a pointwise product over an array that FFTW's
-threaded plan must synchronize on twice, so its crossover sits several powers of two above
-a single `plan_fft` of the same length. Borrowing it cost ~18% on the 2-thread `Xcorr`
-forward benchmark, plus a per-call allocation that the serial plan does not make.
+It is measured here rather than shared with FFTWOperators' `fftw_threading_threshold(:c2c)`
+(2^13): a `Conv`/`Xcorr` `mul!` is two transforms plus a pointwise product over an array that
+FFTW's threaded plan must synchronize on twice, so its crossover sits several powers of two
+above a single `plan_fft` of the same length.
 """
 function _dsp_fftw_num_threads(num_threads, threaded::Bool, n::Int, ref::AbstractArray)
     _is_cpu_array(ref) || return 1
@@ -73,28 +70,13 @@ function _dsp_fftw_num_threads(num_threads, threaded::Bool, n::Int, ref::Abstrac
     return use ? Threads.nthreads() : 1
 end
 
-function _dsp_with_fftw_threads(f, num_threads::Int)
-    prev = FFTW.get_num_threads()
-    FFTW.set_num_threads(num_threads)
-    try
-        return f()
-    finally
-        FFTW.set_num_threads(prev)
-    end
-end
+# Plans with `f` at `num_threads` FFTW threads, returning the plans and the thread count they
+# really have; see `AbstractOperators._with_fftw_plan_threads`.
+_dsp_with_fftw_threads(f, num_threads::Int) = _with_fftw_plan_threads(f, num_threads, FFTW.get_num_threads)
 
 include("Conv.jl")
 include("Filt.jl")
 include("MIMOFilt.jl")
 include("Xcorr.jl")
-
-# `Filt`/`MIMOFilt` have no threaded path at any level -- see the module docstring above.
-# Declaring `supports_threading = false` is what lets a threaded batch operator wrap them
-# (`threaded = false` then asks nothing of them, so `copy_operator`'s fallback can answer
-# with a plain deepcopy instead of refusing); without it, batching either of them raises.
-for OpType in (:AbstractFilt, :AbstractMIMOFilt)
-    @eval AbstractOperators.is_threaded(::$OpType) = false
-    @eval AbstractOperators.supports_threading(::$OpType) = false
-end
 
 end # module DSPOperators

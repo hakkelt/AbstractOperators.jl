@@ -145,7 +145,7 @@ function create_BatchOp(
     batch_size, dType, cdType = prepare_batch_op(
         operator, domain_size, domain_batch_dim_mask, codomain_size, codomain_batch_dim_mask
     )
-    threaded = _resolve_threaded(() -> _should_thread(operator, prod(batch_size)), threaded)
+    threaded = _resolve_threaded(() -> _should_thread_batch(operator, prod(batch_size)), threaded)
     return if threaded
         batch_length = prod(batch_size)
         operators = tuple(
@@ -233,14 +233,12 @@ end
 
 # Properties
 
-# The batch loop's threading (`_loop_threaded`) is encoded in the struct type. The serial
-# variant uses the default `is_threaded`, which asks the wrapped operator via `_children`.
-is_threaded(::SimpleBatchOpMultiThreaded) = true
+# The batch loop's threading is encoded in the struct type; the default `is_threaded` adds
+# the wrapped operator's through `_children`.
+_self_threaded(::SimpleBatchOpMultiThreaded) = true
 supports_threading(::SimpleBatchOp) = true
 _children(L::SimpleBatchOpSingleThreaded) = (L.operator,)
 _children(L::SimpleBatchOpMultiThreaded) = L.operator
-_loop_threaded(::SimpleBatchOpSingleThreaded) = false
-_loop_threaded(::SimpleBatchOpMultiThreaded) = true
 
 _wrapped_operator(L::SimpleBatchOpSingleThreaded) = L.operator
 _wrapped_operator(L::SimpleBatchOpMultiThreaded) = L.operator[1]
@@ -262,7 +260,7 @@ function _copy_operator_impl(
         op::SimpleBatchOp; storage_type = nothing, threaded = nothing
     )
     inner = _wrapped_operator(op)
-    loop = threaded === nothing ? _loop_threaded(op) : threaded
+    loop = threaded === nothing ? _self_threaded(op) : threaded
     th = _resolve_threaded(() -> _should_thread(inner, storage_type), loop)
     # A threaded loop needs a serial inner operator, so copy it that way directly.
     new_inner = copy_operator(inner; storage_type, threaded = th ? false : threaded)

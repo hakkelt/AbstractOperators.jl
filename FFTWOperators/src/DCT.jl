@@ -86,7 +86,7 @@ DCT(T::Type, dim_in::Vararg{Int64}; kwargs...) = DCT(T, dim_in; kwargs...)
 
 function DCT(x::AbstractArray{C, N}; num_threads = nothing, threaded::Bool = true) where {N, C}
     nthr = _fftw_num_threads(:r2r, num_threads, threaded, x)
-    A, At = _with_fftw_threads(nthr) do
+    (A, At), nthr = _with_fftw_threads(nthr) do
         plan_dct(x), plan_idct(x)
     end
     buf = similar(x)
@@ -103,7 +103,7 @@ IDCT(T::Type, dim_in::Vararg{Int64}; kwargs...) = IDCT(T, dim_in; kwargs...)
 
 function IDCT(x::AbstractArray{C, N}; num_threads = nothing, threaded::Bool = true) where {N, C}
     nthr = _fftw_num_threads(:r2r, num_threads, threaded, x)
-    A, At = _with_fftw_threads(nthr) do
+    (A, At), nthr = _with_fftw_threads(nthr) do
         plan_idct(x), plan_dct(x)
     end
     buf = similar(x)

@@ -140,8 +140,8 @@ size(A::LBFGS) = (size(A.s), size(A.s))
 fun_name(A::LBFGS) = "LBFGS"
 
 # `update!` and `mul!` mutate `s`, `y`, the history and the scalars, so LBFGS is not
-# thread-safe and has no threaded path. A copy gets its own buffers, holding the same history.
-is_threaded(::LBFGS) = false
+# thread-safe and has no threaded path (the default traits). A copy gets its own buffers,
+# holding the same history.
 
 function _copy_operator_impl(
         op::LBFGS{R, T, M, I}; storage_type = nothing, threaded = nothing

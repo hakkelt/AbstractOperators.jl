@@ -400,14 +400,8 @@ estimate_opnorm(L::DCAT; kwargs...) = maximum(estimate_opnorm(A; kwargs...) for 
 # and 8 blocks (1.9x); at 2^12 per block it loses badly (0.26x).
 block_threading_threshold(::Type{<:DCAT}) = THRESHOLD_BLOCK_PARALLEL
 
-# Whether the *block loop itself* threads, as distinct from `is_threaded`, which is also
-# true when merely a child threads. Mirrors the VCAT/HCAT accessors.
-is_block_threaded(::DCAT{N, L, P1, P2, DS, CS, Th}) where {N, L, P1, P2, DS, CS, Th} = Th
-
+_self_threaded(::DCAT{N, L, P1, P2, DS, CS, Th}) where {N, L, P1, P2, DS, CS, Th} = Th
 _children(L::DCAT) = L.A
-# Threaded if the block loop itself threads, or any block does.
-is_threaded(L::DCAT{N, Ls, P1, P2, DS, CS, Th}) where {N, Ls, P1, P2, DS, CS, Th} =
-    Th || _is_threaded_from_children(L)
 supports_threading(::DCAT) = true
 
 function _copy_operator_impl(

@@ -41,7 +41,7 @@ function RDFT(
     nthr = _fftw_num_threads(:r2c, num_threads, threaded, x)
     b2 = similar(x, complex(T), size(x))
     y2 = similar(x, complex(T), size(x))
-    A, At = _with_fftw_threads(nthr) do
+    (A, At), nthr = _with_fftw_threads(nthr) do
         plan_rfft(x, dims), plan_bfft(y2, dims)
     end
     dim_in = size(x)

@@ -989,3 +989,23 @@ end
     @test collect(L * X) ≈ collect(X) * collect(L.b)
 end
 
+
+@testitem "Threading contract: block loops copy blocks that share a scratch buffer" tags = [
+    :calculus, :threading, :VCAT,
+] setup = [TestUtils] begin
+    using AbstractOperators, Random
+    const AO = AbstractOperators
+    Random.seed!(0)
+    n = 1 << 12
+    inner = DiagOp(rand(n - 1)) * FiniteDiff((n,))
+    a, b = Scale(2.0, inner), Scale(3.0, inner)
+    @test a.buf === b.buf
+    d = DiagOp(rand(n))
+    blocks = AO._block_loop_operators((a, b, d))
+    # The two blocks writing one buffer are copied apart; the thread-safe block is kept.
+    @test blocks[1].buf !== blocks[2].buf
+    @test blocks[3] === d
+    x = rand(n)
+    @test blocks[1] * x ≈ a * x
+    @test blocks[2] * x ≈ b * x
+end

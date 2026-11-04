@@ -25,14 +25,20 @@ struct NoOperatorBroadCast{T, N, M, Threaded, S, Flat} <: AbstractBroadCast{T, N
     end
 end
 
-struct OperatorBroadCast{T, N, M, Threaded, Compact, Imask, L, C, D, K} <: AbstractBroadCast{T, N, M, Threaded}
+# `A` is what the adjoint loop calls: the operator itself when the broadcast is serial, and
+# one serial instance per loop thread when it threads. `Af` is the operator as given, which the
+# forward pass and every property use, so a threaded broadcast keeps the operator's own
+# threading in the forward pass, where it runs once and not inside a loop.
+struct OperatorBroadCast{T, N, M, Threaded, Compact, Imask, L, C, D, K, F, S} <: AbstractBroadCast{T, N, M, Threaded}
     A::L
     dim_out::NTuple{M, Int}
-    idxs::CartesianIndices{K}
+    idxs::CartesianIndices{K, NTuple{K, Base.OneTo{Int}}}
     bufC::C
     bufD::D
+    Af::F
+    bufS::S  # threaded: the accumulators of loop threads 2, 3, ... (thread 1 sums into `y`)
     function OperatorBroadCast(
-            A, dim_out::NTuple{M, Int}; threaded::Bool = true
+            A::AbstractOperator, dim_out::NTuple{M, Int}; threaded::Bool = true
         ) where {M}
         Base.Broadcast.check_broadcast_shape(dim_out, size(A, 1))
         threaded = _elementwise_threaded(
@@ -48,19 +54,25 @@ struct OperatorBroadCast{T, N, M, Threaded, Compact, Imask, L, C, D, K} <: Abstr
         compact = all(Imask[1:N])
         bufC = allocate_in_codomain(A)
         if threaded
-            bufD = [allocate_in_domain(A) for _ in 1:Threads.nthreads()]
+            # The adjoint loop runs on at most one thread per slice; a thread needs scratch
+            # only when it sums more than one slice.
+            k = min(Threads.nthreads(), length(idxs))
+            bufD = [allocate_in_domain(A) for _ in 1:(length(idxs) > k ? k : 0)]
+            bufS = [allocate_in_domain(A) for _ in 2:k]
             # Nesting safety: the adjoint loop below threads over `idxs` and calls the
             # wrapped operator inside it, so every per-thread instance -- including the
             # first -- must be non-threaded.
-            A = _per_thread_operators(A, Threads.nthreads())
+            As = _per_thread_operators(A, k)
         else
             bufD = allocate_in_domain(A)
+            bufS = nothing
+            As = A
         end
-        L = typeof(A)
-        C = typeof(bufC)
-        D = typeof(bufD)
         K = length(broadcast_dims)
-        return new{T, N, M, threaded, compact, Imask, L, C, D, K}(A, dim_out, idxs, bufC, bufD)
+        return new{
+            T, N, M, threaded, compact, Imask, typeof(As), typeof(bufC), typeof(bufD), K,
+            typeof(A), typeof(bufS),
+        }(As, dim_out, idxs, bufC, bufD, A, bufS)
     end
 end
 
@@ -293,7 +305,7 @@ end
 
 function mul!(y, R::OperatorBroadCast{T, N, M, true, Compact}, b) where {T, N, M, Compact} # Threaded
     check(y, R, b)
-    mul!(R.bufC, R.A[1], b)
+    mul!(R.bufC, R.Af, b)
     if Compact
         return tbroadcast!(y, R.bufC) # threaded broadcasting
     else
@@ -322,22 +334,100 @@ end
 function mul!(y, A::AdjointOperator{<:OperatorBroadCast{T, N, M, true}}, b) where {T, N, M} # Threaded
     check(y, A, b)
     R = A.A
-    fill!(y, 0)
-    lock = ReentrantLock()
-    thread_count = min(Threads.nthreads(), length(R.idxs))
-    batch_size = length(R.idxs) / thread_count
+    thread_count = length(R.A)
+    # Each loop thread sums its slices into its own accumulator (thread 1 into `y`), and the
+    # accumulators are added once at the end, instead of every slice being added to `y`
+    # under one lock. `thread_count <= length(R.idxs)`, so no thread's range is empty.
     # Budgeted: the body calls `mul!` on arbitrary sub-operators, which may themselves use
     # BLAS/FFTW, so without budgeting this loop is a genuine oversubscription source.
     @budgeted_threads for t in 1:thread_count
-        idx_start = max(1, floor(Int, (t - 1) * batch_size + 1))
-        idx_end = min(length(R.idxs), floor(Int, t * batch_size))
-        for i in idx_start:idx_end
+        acc = t == 1 ? y : R.bufS[t - 1]
+        slices = _balanced_range(length(R.idxs), thread_count, t)
+        idx_start = first(slices)
+        for i in slices
             b_slice = get_input_slice(R, R.idxs[i], b)
             if size(b_slice) != size(R.A[t], 1)
                 b_slice = reshape(b_slice, size(R.A[t], 1))
             end
-            mul!(R.bufD[t], R.A[t]', b_slice)
-            @lock lock _store!(y, R.bufD[t], true, true)
+            if i == idx_start
+                mul!(acc, R.A[t]', b_slice)
+            else
+                add_mul!(acc, R.A[t]', b_slice, R.bufD[t])
+            end
+        end
+    end
+    return _add_accumulators!(y, R.bufS)
+end
+
+# The `t`-th of `k` contiguous ranges that split `1:n` as evenly as possible: the first
+# `n % k` get one element more. Integer arithmetic, so the ranges always cover `1:n` exactly
+# and none is empty when `k <= n`. The floating-point split this replaces, `floor(t * n / k)`,
+# lost the last slice whenever `n / k * k` rounded below `n` (15 slices over 11 threads, say).
+function _balanced_range(n::Int, k::Int, t::Int)
+    q, r = divrem(n, k)
+    start = (t - 1) * q + min(t - 1, r) + 1
+    return start:(start + q - (t > r))
+end
+
+"""
+    ACCUMULATOR_THREAD_LENGTH
+
+Length of `y` from which the threaded `OperatorBroadCast` adjoint adds its per-thread
+accumulators into `y` on several threads rather than one. Each thread takes at least a
+quarter of it (`2^13` elements), so a short `y` is not split into chunks too small to pay
+for their task.
+
+PROVENANCE: measured. `Float64`, `k` accumulators, 4 threads, AMD EPYC 7352, Julia 1.13.1,
+2026-11-04; the old per-accumulator `y .+= acc` against this kernel, serial and threaded:
+
+| length | k  | `.+=` each | blocked, serial | blocked, threaded |
+|--------|----|-----------:|----------------:|------------------:|
+| 2^12   | 15 |    10.6 us |          8.9 us |                 — |
+| 2^14   | 15 |    52.7 us |         47.8 us |                 — |
+| 2^16   | 3  |    40.2 us |         32.9 us |           12.9 us |
+| 2^16   | 15 |     210 us |          167 us |             45 us |
+| 2^18   | 15 |    1957 us |         2158 us |            577 us |
+| 2^20   | 15 |    8938 us |         8242 us |           3197 us |
+
+Threading already wins 2.5x at 2^16, the first length measured past 2^14, so the threshold
+sits between them.
+"""
+const ACCUMULATOR_THREAD_LENGTH = 2^15
+
+# `y .+= sum(accs)` in one pass over `y` rather than one per accumulator, threaded over
+# chunks of `y` when the arrays are large. With as many slices as threads there are
+# `nthreads() - 1` accumulators, and adding them one `.+=` at a time read and wrote `y` that
+# many times on one thread; see `ACCUMULATOR_THREAD_LENGTH` for the measurement. Other
+# storage (an `ArrayPartition`, a device array) keeps the per-accumulator broadcast.
+function _add_accumulators!(y, accs)
+    for acc in accs
+        y .+= acc
+    end
+    return y
+end
+function _add_accumulators!(y::Array, accs::Vector{<:Array})
+    isempty(accs) && return y
+    if length(y) < ACCUMULATOR_THREAD_LENGTH
+        _add_accumulators_range!(y, accs, 1, length(y))
+        return y
+    end
+    nchunks = min(Threads.nthreads(), cld(length(y), ACCUMULATOR_THREAD_LENGTH ÷ 4))
+    # Budgeted like the slice loop before it, so an enclosing thread budget holds for both.
+    @budgeted_threads for t in 1:nchunks
+        lo, hi = _chunk_range(length(y), nchunks, t)
+        _add_accumulators_range!(y, accs, lo, hi)
+    end
+    return y
+end
+# Block by block, so `y`'s block stays in cache while every accumulator is added to it, each
+# with a SIMD loop; summing all accumulators per element instead defeats vectorisation.
+function _add_accumulators_range!(y, accs, lo, hi)
+    for blo in lo:2048:hi
+        bhi = min(hi, blo + 2047)
+        for acc in accs
+            @inbounds @simd for i in blo:bhi
+                y[i] += acc[i]
+            end
         end
     end
     return y
@@ -350,71 +440,50 @@ end
 function Base.:(==)(
         R1::OperatorBroadCast{T, N, M}, R2::OperatorBroadCast{T, N, M}
     ) where {T, N, M}
-    return R1.A == R2.A && R1.dim_out == R2.dim_out
+    return R1.Af == R2.Af && R1.dim_out == R2.dim_out
 end
 
 size(R::NoOperatorBroadCast) = (R.dim_out, R.dim_in)
-size(R::OperatorBroadCast{T, N, M, false}) where {T, N, M} = (R.dim_out, size(R.A, 2))
-size(R::OperatorBroadCast{T, N, M, true}) where {T, N, M} = (R.dim_out, size(R.A[1], 2))
+size(R::OperatorBroadCast) = (R.dim_out, size(R.Af, 2))
 
 domain_type(::NoOperatorBroadCast{T}) where {T} = T
-domain_type(R::OperatorBroadCast{T, N, M, false}) where {T, N, M} = domain_type(R.A)
-domain_type(R::OperatorBroadCast{T, N, M, true}) where {T, N, M} = domain_type(R.A[1])
+domain_type(R::OperatorBroadCast) = domain_type(R.Af)
 codomain_type(::NoOperatorBroadCast{T}) where {T} = T
-codomain_type(R::OperatorBroadCast{T, N, M, false}) where {T, N, M} = codomain_type(R.A)
-codomain_type(R::OperatorBroadCast{T, N, M, true}) where {T, N, M} = codomain_type(R.A[1])
+codomain_type(R::OperatorBroadCast) = codomain_type(R.Af)
 domain_array_type(::NoOperatorBroadCast{T, N, M, Threaded, S}) where {T, N, M, Threaded, S} = S
-domain_array_type(R::OperatorBroadCast{T, N, M, false}) where {T, N, M} = domain_array_type(R.A)
-domain_array_type(R::OperatorBroadCast{T, N, M, true}) where {T, N, M} = domain_array_type(R.A[1])
+domain_array_type(R::OperatorBroadCast) = domain_array_type(R.Af)
 codomain_array_type(::NoOperatorBroadCast{T, N, M, Threaded, S}) where {T, N, M, Threaded, S} = S
-codomain_array_type(R::OperatorBroadCast{T, N, M, false}) where {T, N, M} = codomain_array_type(R.A)
-codomain_array_type(R::OperatorBroadCast{T, N, M, true}) where {T, N, M} = codomain_array_type(R.A[1])
+codomain_array_type(R::OperatorBroadCast) = codomain_array_type(R.Af)
 
 is_thread_safe(::NoOperatorBroadCast) = true
 is_thread_safe(::OperatorBroadCast) = false
 
 is_linear(::NoOperatorBroadCast) = true
-is_linear(R::OperatorBroadCast{T, N, M, false}) where {T, N, M} = is_linear(R.A)
-is_linear(R::OperatorBroadCast{T, N, M, true}) where {T, N, M} = is_linear(R.A[1])
+is_linear(R::OperatorBroadCast) = is_linear(R.Af)
 is_affine(::NoOperatorBroadCast) = true
-is_affine(R::OperatorBroadCast{T, N, M, false}) where {T, N, M} = is_affine(R.A)
-is_affine(R::OperatorBroadCast{T, N, M, true}) where {T, N, M} = is_affine(R.A[1])
+is_affine(R::OperatorBroadCast) = is_affine(R.Af)
 is_null(R::NoOperatorBroadCast) = false
-is_null(R::OperatorBroadCast{T, N, M, false}) where {T, N, M} = is_null(R.A)
-is_null(R::OperatorBroadCast{T, N, M, true}) where {T, N, M} = is_null(R.A[1])
+is_null(R::OperatorBroadCast) = is_null(R.Af)
 
 fun_name(::NoOperatorBroadCast) = ".I"
-fun_name(R::OperatorBroadCast{T, N, M, false}) where {T, N, M} = "." * fun_name(R.A)
-fun_name(R::OperatorBroadCast{T, N, M, true}) where {T, N, M} = "." * fun_name(R.A[1])
+fun_name(R::OperatorBroadCast) = "." * fun_name(R.Af)
 remove_displacement(R::NoOperatorBroadCast) = R
-function remove_displacement(R::OperatorBroadCast{T, N, M, false, Imask}) where {T, N, M, Imask}
-    new_A = remove_displacement(R.A)
-    return OperatorBroadCast(new_A, R.dim_out; threaded = false)
-end
-function remove_displacement(R::OperatorBroadCast{T, N, M, true, Imask}) where {T, N, M, Imask}
-    new_A = remove_displacement(R.A[1])
-    return OperatorBroadCast(new_A, R.dim_out; threaded = true)
+function remove_displacement(R::OperatorBroadCast{T, N, M, Th}) where {T, N, M, Th}
+    return OperatorBroadCast(remove_displacement(R.Af), R.dim_out; threaded = Th)
 end
 
 has_fast_opnorm(::NoOperatorBroadCast) = true
-has_fast_opnorm(R::OperatorBroadCast{T, N, M, false}) where {T, N, M} = has_fast_opnorm(R.A)
-has_fast_opnorm(R::OperatorBroadCast{T, N, M, true}) where {T, N, M} = has_fast_opnorm(R.A[1])
+has_fast_opnorm(R::OperatorBroadCast) = has_fast_opnorm(R.Af)
 function LinearAlgebra.opnorm(R::NoOperatorBroadCast{T, N, M}) where {T, N, M}
     # No replicated dimension (a single coil, say) makes it the identity.
     return real(T)(sqrt(prod((R.dim_out[d] for d in 1:M if R.dim_out[d] != R.reshaped_dim_in[d]); init = 1)))
 end
-function LinearAlgebra.opnorm(R::OperatorBroadCast{T, N, M, false}) where {T, N, M}
-    return _replication_factor(R) * LinearAlgebra.opnorm(R.A)
-end
-function LinearAlgebra.opnorm(R::OperatorBroadCast{T, N, M, true}) where {T, N, M}
-    return _replication_factor(R) * LinearAlgebra.opnorm(R.A[1])
+function LinearAlgebra.opnorm(R::OperatorBroadCast)
+    return _replication_factor(R) * LinearAlgebra.opnorm(R.Af)
 end
 
-function opnorm_bound(R::OperatorBroadCast{T, N, M, false}) where {T, N, M}
-    return _replication_factor(R) * opnorm_bound(R.A)
-end
-function opnorm_bound(R::OperatorBroadCast{T, N, M, true}) where {T, N, M}
-    return _replication_factor(R) * opnorm_bound(R.A[1])
+function opnorm_bound(R::OperatorBroadCast)
+    return _replication_factor(R) * opnorm_bound(R.Af)
 end
 
 """
@@ -503,11 +572,8 @@ _bound_after_leading_diagonal(C::Compose) = _chain_opnorm_bound(Base.tail(C.A))
 
 # utils
 
-function permute(R::OperatorBroadCast{T, N, M, false}, p::AbstractVector{Int}) where {T, N, M}
-    return BroadCast(permute(R.A, p), R.dim_out; threaded = false)
-end
-function permute(R::OperatorBroadCast{T, N, M, true}, p::AbstractVector{Int}) where {T, N, M}
-    return BroadCast(permute(R.A[1], p), R.dim_out; threaded = true)
+function permute(R::OperatorBroadCast{T, N, M, Th}, p::AbstractVector{Int}) where {T, N, M, Th}
+    return BroadCast(permute(R.Af, p), R.dim_out; threaded = Th)
 end
 
 function _copy_operator_impl(
@@ -522,8 +588,7 @@ function _copy_operator_impl(
         op::OperatorBroadCast{T, N, M, Th}; storage_type = nothing, threaded = nothing
     ) where {T, N, M, Th}
     new_threaded = threaded === nothing ? Th : threaded
-    inner_op = Th ? op.A[1] : op.A
-    new_op = copy_operator(inner_op; storage_type, threaded)
+    new_op = copy_operator(op.Af; storage_type, threaded)
     return BroadCast(new_op, op.dim_out; threaded = new_threaded)
 end
 
@@ -536,11 +601,9 @@ end
 end
 
 """
-Broadcasting is pure data movement, so it used to inherit `THRESHOLD_MEMORY_BOUND` (2^18). That
-constant was swept for `Polyester.@batch` against FastBroadcast; the kernels here now use
-`Threads.@threads` (see the note above `_copy_flat!`), whose crossover is two powers of two
-earlier, and the serial side got faster at the same time, so the sweep was re-run for the pair
-that actually ships.
+Broadcasting is pure data movement, but its kernels use `Threads.@threads` (see the note above
+`_copy_flat!`) rather than `Polyester.@batch`, so it has its own sweep instead of
+`THRESHOLD_MEMORY_BOUND`, which was measured for the latter.
 
 PROVENANCE: measured. AMD EPYC 7352 24-Core, 8 Julia threads, OPENBLAS_NUM_THREADS=1,
 Julia 1.13.0, 2026-09-21, in a process that never runs a `Polyester.@batch` -- an image
@@ -562,12 +625,8 @@ adjoint, which cannot act on it separately.
 threading_threshold(::Type{<:AbstractBroadCast}) = 2^16
 supports_threading(::AbstractBroadCast) = true
 
-# The `Threaded` type parameter was already there; without these methods the trait fell
-# through to the `false` default and contradicted the operator's own dispatch.
-is_threaded(::NoOperatorBroadCast{T, N, M, Th}) where {T, N, M, Th} = Th
-# For the operator flavour the wrapped operator can thread independently of the broadcast.
-is_threaded(R::OperatorBroadCast{T, N, M, Th}) where {T, N, M, Th} =
-    Th || any(is_threaded, _broadcast_children(R))
-_broadcast_children(R::OperatorBroadCast{T, N, M, false}) where {T, N, M} = (R.A,)
-_broadcast_children(R::OperatorBroadCast{T, N, M, true}) where {T, N, M} = R.A
-_children(R::OperatorBroadCast) = _broadcast_children(R)
+# The broadcast's own threading is its `Threaded` type parameter; for the operator flavour the
+# default `is_threaded` adds the wrapped operator's through `_children`.
+_self_threaded(::AbstractBroadCast{T, N, M, Th}) where {T, N, M, Th} = Th
+_children(R::OperatorBroadCast{T, N, M, false}) where {T, N, M} = (R.Af,)
+_children(R::OperatorBroadCast{T, N, M, true}) where {T, N, M} = Iterators.flatten(((R.Af,), R.A))

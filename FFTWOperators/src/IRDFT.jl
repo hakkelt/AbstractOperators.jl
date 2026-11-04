@@ -36,7 +36,7 @@ function IRDFT(
         num_threads = nothing, threaded::Bool = true
     ) where {T <: Number, N}
     nthr = _fftw_num_threads(:r2c, num_threads, threaded, x)
-    A = _with_fftw_threads(() -> plan_irfft(x, d, dims), nthr)
+    A, nthr = _with_fftw_threads(() -> plan_irfft(x, d, dims), nthr)
     dim_in = size(x)
     dim_out = ()
     idx = ()
@@ -44,7 +44,7 @@ function IRDFT(
         dim_out = i == dims ? (dim_out..., d) : (dim_out..., dim_in[i])
         idx = i == dims ? (idx..., 2:ceil(Int, d / 2)) : (idx..., Colon())
     end
-    At = _with_fftw_threads(() -> plan_rfft(similar(x, T, dim_out), dims), nthr)
+    At, nthr = _with_fftw_threads(() -> plan_rfft(similar(x, T, dim_out), dims), nthr)
     S = _array_wrapper_type(typeof(x isa SubArray ? parent(x) : x))
     return IRDFT{T, N, dims, typeof(A), typeof(At), typeof(idx), S}(
         dim_in, dim_out, A, At, idx, nthr
