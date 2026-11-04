@@ -93,8 +93,11 @@ function Xcorr(
         end
     else
         buf_fwd_c = similar(buf_fwd)
-        R_fwd, nthr = _dsp_with_fftw_threads(() -> plan_fft(buf_fwd; plan_kw...), nthr)
-        I_fwd = inv(R_fwd)
+        # `inv` plans the inverse at once, at FFTW's current count, so it belongs inside too.
+        (R_fwd, I_fwd), nthr = _dsp_with_fftw_threads(nthr) do
+            p = plan_fft(buf_fwd; plan_kw...)
+            p, inv(p)
+        end
     end
 
     # Adjoint pass: CPU uses tiled FIR — no FFT state needed.
@@ -107,8 +110,10 @@ function Xcorr(
         end
     else
         buf_adj_c = similar(buf_adj)
-        R_adj, nthr = _dsp_with_fftw_threads(() -> plan_fft(buf_adj; plan_kw...), nthr)
-        I_adj = inv(R_adj)
+        (R_adj, I_adj), nthr = _dsp_with_fftw_threads(nthr) do
+            p = plan_fft(buf_adj; plan_kw...)
+            p, inv(p)
+        end
     end
 
     fill!(buf_fwd, zero(domain_type))

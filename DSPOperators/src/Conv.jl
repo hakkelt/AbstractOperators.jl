@@ -67,8 +67,11 @@ function Conv(
         end
     else
         buf_c1 = similar(buf)
-        R, nthr = _dsp_with_fftw_threads(() -> plan_fft(buf), nthr)
-        I = inv(R)
+        # `inv` plans the inverse at once, at FFTW's current count, so it belongs inside too.
+        (R, I), nthr = _dsp_with_fftw_threads(nthr) do
+            p = plan_fft(buf)
+            p, inv(p)
+        end
     end
     buf_c2 = similar(buf_c1)
     return Conv{domain_type, N, H, typeof(buf_c1), typeof(R), typeof(I)}(
