@@ -357,8 +357,52 @@ function mul!(y, A::AdjointOperator{<:OperatorBroadCast{T, N, M, true}}, b) wher
             end
         end
     end
-    for acc in R.bufS
+    return _add_accumulators!(y, R.bufS)
+end
+
+"""
+    ACCUMULATOR_THREAD_LENGTH
+
+Length of `y` from which the threaded `OperatorBroadCast` adjoint adds its per-thread
+accumulators into `y` on several threads rather than one.
+"""
+const ACCUMULATOR_THREAD_LENGTH = 2^15
+
+# `y .+= sum(accs)` in one pass over `y` rather than one per accumulator, threaded over
+# chunks of `y` when the arrays are large. With as many slices as threads there are
+# `nthreads() - 1` accumulators, and adding them one `.+=` at a time read and wrote `y` that
+# many times on one thread; see `ACCUMULATOR_THREAD_LENGTH` for the measurement. Other
+# storage (an `ArrayPartition`, a device array) keeps the per-accumulator broadcast.
+function _add_accumulators!(y, accs)
+    for acc in accs
         y .+= acc
+    end
+    return y
+end
+function _add_accumulators!(y::Array, accs::Vector{<:Array})
+    isempty(accs) && return y
+    if length(y) < ACCUMULATOR_THREAD_LENGTH
+        _add_accumulators_range!(y, accs, 1, length(y))
+        return y
+    end
+    nchunks = min(Threads.nthreads(), cld(length(y), ACCUMULATOR_THREAD_LENGTH ÷ 4))
+    quiesce_foreign_pools()
+    Threads.@threads for t in 1:nchunks
+        lo, hi = _chunk_range(length(y), nchunks, t)
+        _add_accumulators_range!(y, accs, lo, hi)
+    end
+    return y
+end
+# Block by block, so `y`'s block stays in cache while every accumulator is added to it, each
+# with a SIMD loop; summing all accumulators per element instead defeats vectorisation.
+function _add_accumulators_range!(y, accs, lo, hi)
+    for blo in lo:2048:hi
+        bhi = min(hi, blo + 2047)
+        for acc in accs
+            @inbounds @simd for i in blo:bhi
+                y[i] += acc[i]
+            end
+        end
     end
     return y
 end
