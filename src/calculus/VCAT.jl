@@ -45,6 +45,11 @@ struct VCAT{
     # forward block loop, to avoid nesting each block's own threading inside that loop.
     # Blocks that share a non-thread-safe operator are copied; see `_block_loop_operators`.
     # Aliases `A` (LP === L, no extra copy) whenever the forward loop itself is not threaded.
+    # Keeping `A` beside it is deliberate: the adjoint loop is serial over blocks, and through
+    # `A` each block still threads internally. Measured on 4/8 blocks of `DiagOp * DiagOp`,
+    # 4 threads, 2026-11-04: the adjoint through `A` took 105/307 us at 2^18 and 10.1/20.2 ms
+    # at 2^22, against 590/1506 us and 17.1/33.7 ms through `A_par`, while the second copy
+    # costs 20-35 us in `copy_operator` (read-only data is shared).
     function VCAT(
             A::L, idxs::P, buf::C; threaded::Bool = true
         ) where {N, L <: NTuple{N, AbstractOperator}, P <: Tuple, C <: AbstractArray}
