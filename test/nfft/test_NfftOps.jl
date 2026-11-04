@@ -223,7 +223,7 @@ end
 end
 
 @testitem "NfftNormalOp threading traits and copy" tags = [:nfft, :NfftNormalOp, :threading] begin
-    using AbstractOperators, NFFTOperators, FFTW, LinearAlgebra, Random
+    using AbstractOperators, NFFTOperators, FFTW, LinearAlgebra, Random, NestedThreading
     rigor(p) = p.flags & (FFTW.ESTIMATE | FFTW.PATIENT | FFTW.EXHAUSTIVE | FFTW.WISDOM_ONLY)
     traj = rand(Xoshiro(1), 2, 64, 16) .- 0.5
     image = randn(Xoshiro(2), ComplexF64, 32, 32)
@@ -249,6 +249,15 @@ end
         @test !is_threaded(serial)
         @test serial * image ≈ y
     end
+
+    # Built under a restriction, the embedding's FFTs are planned serial, and the normal operator
+    # says so even though its NFFTOp asked for threads; a copy made outside it plans threaded again.
+    op = NFFTOp((32, 32), traj, ones(64, 16); threaded = true)
+    N = NestedThreading.with_restricted_threads(() -> AbstractOperators.get_normal_op(op))
+    unrestricted = AbstractOperators.get_normal_op(copy_operator(op))
+    @test !is_threaded(N)
+    @test is_threaded(copy_operator(N; threaded = true)) == is_threaded(unrestricted)
+    @test N * image ≈ unrestricted * image
 
     # A stacked operator transformed along trailing dimensions permutes through `xbuf`, which
     # a copy must not share.

@@ -81,11 +81,15 @@ _rigor_flags(fft::FFTW.FFTWPlan) =
     fft.flags & (FFTW.ESTIMATE | FFTW.PATIENT | FFTW.EXHAUSTIVE | FFTW.WISDOM_ONLY)
 
 # The embedding's in-place forward and inverse FFT plans over `region` of `buf`, which they
-# leave zeroed (planning with a rigor above `ESTIMATE` overwrites it).
-function _embedding_fft_plans(buf, region, kw)
-    plans = FFTW.plan_fft!(buf, region; kw...), FFTW.plan_bfft!(buf, region; kw...)
+# leave zeroed (planning with a rigor above `ESTIMATE` overwrites it), and whether they were
+# planned threaded. Called inside `with_nfft_threading(threaded)`, where an enclosing
+# restriction may have held FFTW at one thread even though `threaded` asked for more: the
+# operator then records the serial plan it really has, as `_with_fftw_plan_threads` does for
+# FFTWOperators and DSPOperators.
+function _embedding_fft_plans(buf, region, kw, threaded::Bool)
+    fftplan, ifftplan = FFTW.plan_fft!(buf, region; kw...), FFTW.plan_bfft!(buf, region; kw...)
     fill!(buf, 0)
-    return plans
+    return fftplan, ifftplan, threaded && FFTW.get_num_threads() > 1
 end
 
 # The planner keywords of the embedding's FFTs: FFTW's planner rigor on the host, none for a
@@ -116,11 +120,11 @@ function _get_normal_op(op::NFFTOp{T, D, N}) where {T, D, N}
     λ = reshape(λ, shape_ext..., map(_ -> 1, stack[1:(end - op.nframe)])..., frame_size...)
     buf = similar(op.ksp_buffer, (shape_ext..., stack...))
     kw = _embedding_fft_kwargs(op)
-    fftplan, ifftplan = _embedding_fft_plans(buf, 1:D, kw)
+    fftplan, ifftplan, threaded = _embedding_fft_plans(buf, 1:D, kw, op.threaded)
     xbuf = op.img_buffer === nothing ? nothing : similar(op.img_buffer)
     return NfftNormalOp(
         domain_array_type(op), op.dim_in, λ, fftplan, ifftplan, buf,
-        op.img_buffer === nothing ? nothing : perm, xbuf, op.threaded,
+        op.img_buffer === nothing ? nothing : perm, xbuf, threaded,
     )
 end
 
@@ -160,8 +164,9 @@ AdjointOperator(op::NfftNormalOp) = op
 
 # ─── Threading and copying ────────────────────────────────────────────────────
 #
-# The FFT plans are built under `with_nfft_threading(threaded)`, like the NFFTOp's own, so the
-# operator is threaded exactly when the NFFTOp it came from was. `buf` and `xbuf` are scratch
+# The FFT plans are built under `with_nfft_threading(threaded)`, like the NFFTOp's own, and the
+# operator is threaded when the NFFTOp it came from was and the plans really got more than one
+# thread (an enclosing restriction can hold FFTW at one). `buf` and `xbuf` are scratch
 # written by every `mul!`, so it is not thread-safe; a copy gets its own buffers and plans
 # for them, and shares the read-only kernel `λ`.
 is_threaded(op::NfftNormalOp) = op.threaded
@@ -183,8 +188,8 @@ function _copy_operator_impl(
     new_threaded = threaded === nothing ? op.threaded : _nfft_threaded(threaded, _array_wrapper_type(array_type))
     buf = AbstractOperators._convert_buffer(op.buf, storage_type)
     xbuf = op.xbuf === nothing ? nothing : AbstractOperators._convert_buffer(op.xbuf, storage_type)
-    fftplan, ifftplan = with_nfft_threading(new_threaded) do
-        _embedding_fft_plans(buf, FFTW.fftdims(op.fftplan), kw)
+    fftplan, ifftplan, planned_threaded = with_nfft_threading(new_threaded) do
+        _embedding_fft_plans(buf, FFTW.fftdims(op.fftplan), kw, new_threaded)
     end
-    return NfftNormalOp(array_type, op.shape, λ, fftplan, ifftplan, buf, op.perm, xbuf, new_threaded)
+    return NfftNormalOp(array_type, op.shape, λ, fftplan, ifftplan, buf, op.perm, xbuf, planned_threaded)
 end

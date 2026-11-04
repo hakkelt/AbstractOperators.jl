@@ -498,6 +498,10 @@ end
 # flipped on an existing plan -- but it does not need a full replan either: `copy_operator`
 # copies the plan under the target budget, which rebuilds only its FFT plans (see
 # `_copy_operator_impl`).
+#
+# Unlike `NfftNormalOp`, `threaded` is not lowered when an enclosing restriction held FFTW at one
+# thread while the plan was built: the gridding, NFFT's own threaded loops, is not planned for a
+# count but switched on per call by `with_nfft_threading`, so such an operator still threads.
 is_threaded(op::NFFTOp) = op.threaded
 supports_threading(::NFFTOp) = true
 
