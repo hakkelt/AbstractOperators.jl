@@ -88,13 +88,12 @@ end
         @test_call target_modules = (AO,) is_threaded(op)
         @test_call target_modules = (AO,) supports_threading(op)
     end
-    # The SpreadingBatchOp structs store `operators::Array{opT}` without a dimension. The
-    # threaded variants are threaded by their own loop, so `is_threaded` never reaches the
-    # field; the serial one asks its operators and dispatches once at runtime on it.
-    # `@test_call` still holds there, and `mul!` is unaffected (it only reads elements,
-    # whose type is known).
+    # The serial SpreadingBatchOp is threaded only through its operators, so `is_threaded`
+    # walks the `operators` field. That field is concrete (`Array{opT, K}`), which makes the
+    # walk statically resolved.
     serial = BatchOp([MatrixOp(randn(n, n)) for _ in 1:3], (3,), (:s, :_))
     @test serial isa AO.SpreadingBatchOpSingleThreaded
+    @test_opt target_modules = (AO,) is_threaded(serial)
     @test_call target_modules = (AO,) is_threaded(serial)
     @test_opt target_modules = (AO,) supports_threading(serial)
     if Threads.nthreads() > 1
