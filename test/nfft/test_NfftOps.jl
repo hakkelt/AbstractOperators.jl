@@ -243,6 +243,9 @@ end
             @test C * image ≈ y
         end
         @test rigor(copy_operator(N).fftplan) == FFTW.MEASURE
+        # ...also when the storage is given but stays on the host, where the kernel is shared.
+        @test rigor(copy_operator(N; storage_type = Array).fftplan) == FFTW.MEASURE
+        @test copy_operator(N; storage_type = Array).λ === N.λ
         # The kernel is read-only and shared by a same-storage copy.
         @test copy_operator(N).λ === N.λ
         serial = adapt_operator(N; threaded = false)
@@ -288,6 +291,11 @@ end
         @test y isa typeof(x_gpu)
         @test collect(y) ≈ host rtol = 1.0e-4
         @test collect(y) ≈ collect(op' * (op * x_gpu)) rtol = 1.0e-4
+        # A device copy of a threaded host normal operator is not threaded.
+        Nh = get_normal_op(NFFTOp((32, 32), traj, dcf; threaded = true))
+        Nd = copy_operator(Nh; storage_type = Base.typename(typeof(x_gpu)).wrapper)
+        @test !is_threaded(Nd)
+        @test collect(Nd * x_gpu) ≈ host rtol = 1.0e-4
     end
 end
 

@@ -173,19 +173,22 @@ is_threaded(op::NfftNormalOp) = op.threaded
 supports_threading(::NfftNormalOp) = true
 is_thread_safe(::NfftNormalOp) = false
 
+# The kernel is read-only, so a copy on the same storage shares it.
+_copied_kernel(λ, ::Nothing) = λ
+_copied_kernel(λ, S::Type) =
+    _array_wrapper_type(typeof(λ)) === S ? λ : copyto!(similar(S{eltype(λ)}, size(λ)), λ)
+
 function _copy_operator_impl(
         op::NfftNormalOp{N, T}; storage_type = nothing, threaded = nothing
     ) where {N, T}
-    if storage_type === nothing
-        array_type, λ = op.array_type, op.λ
-        # The copy plans as carefully as the original; a device FFT takes no flags.
-        kw = op.fftplan isa FFTW.FFTWPlan ? (flags = _rigor_flags(op.fftplan),) : NamedTuple()
-    else
-        array_type = storage_type{eltype(T)}
-        λ = copyto!(similar(storage_type{eltype(op.λ)}, size(op.λ)), op.λ)
-        kw = NamedTuple()
-    end
-    new_threaded = threaded === nothing ? op.threaded : _nfft_threaded(threaded, _array_wrapper_type(array_type))
+    array_type = storage_type === nothing ? op.array_type : storage_type{eltype(T)}
+    wrapper = _array_wrapper_type(array_type)
+    λ = _copied_kernel(op.λ, storage_type)
+    # A host copy plans as carefully as the original; a device FFT takes no flags.
+    kw = op.fftplan isa FFTW.FFTWPlan && wrapper === Array ? (flags = _rigor_flags(op.fftplan),) : NamedTuple()
+    # `nothing` keeps the original's request, re-resolved for the target storage: a device copy
+    # of a threaded host operator is not threaded.
+    new_threaded = _nfft_threaded(threaded === nothing ? op.threaded : threaded, wrapper)
     buf = AbstractOperators._convert_buffer(op.buf, storage_type)
     xbuf = op.xbuf === nothing ? nothing : AbstractOperators._convert_buffer(op.xbuf, storage_type)
     fftplan, ifftplan, planned_threaded = with_nfft_threading(new_threaded) do
