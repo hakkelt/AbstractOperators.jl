@@ -542,6 +542,10 @@ left at whatever budget is in force when it is `true`. For non-CPU storage `S` i
 `f()` directly: the scope restricts nothing a device `gemm` uses and would only add its
 lock to every call (5.4 us against 0.06 us for a 2x2 `JLArray` `MatrixOp`).
 
+The restricted branch costs little inside a saturated batch loop: there an enclosing scope
+already holds BLAS at one thread, and NestedThreading (0.1.4 and later, Julia 1.11 and later)
+then runs the body without entering a new scope -- 0.25 us against 3.2 us.
+
 The permitted branch deliberately opens **no** scope. Any outer `NestedThreading`
 restriction is process-global and already applied by the time it is reached, so re-asserting
 it would only add a lock and a round trip through every registered pool's setter to each
