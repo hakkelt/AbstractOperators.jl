@@ -16,6 +16,7 @@ include("linearoperators/getindex.jl")
 include("linearoperators/zeropad.jl")
 include("linearoperators/variation.jl")
 include("cpuwrapper.jl")
+include("pointwise.jl")
 include("guards.jl")
 
 end # module GpuExt
