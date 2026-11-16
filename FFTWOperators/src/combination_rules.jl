@@ -45,9 +45,9 @@ end
 function _absorb_input_shift(F, S)
     dirs = _shift_dirs(S)
     if _all_even(size(F, 2), dirs)
-        return SignAlternation(codomain_type(F), size(F, 1), dirs; array_type = codomain_array_type(F)) * F
+        return SignAlternation(codomain_type(F), size(F, 1), dirs; threaded = is_threaded(F), array_type = codomain_array_type(F)) * F
     end
-    return _phase_ramp_op(allocate_in_codomain(F), dirs, n -> _shift_amount(S, n), _dft_sign(F)) * F
+    return _phase_ramp_op(allocate_in_codomain(F), dirs, n -> _shift_amount(S, n), _dft_sign(F); threaded = is_threaded(F)) * F
 end
 # `S ∘ F`: a shift of the DFT's output.
 function _can_absorb_output_shift(S, F)
@@ -57,9 +57,9 @@ end
 function _absorb_output_shift(S, F)
     dirs = _shift_dirs(S)
     if _all_even(size(F, 1), dirs)
-        return F * SignAlternation(domain_type(F), size(F, 2), dirs; array_type = domain_array_type(F))
+        return F * SignAlternation(domain_type(F), size(F, 2), dirs; threaded = is_threaded(F), array_type = domain_array_type(F))
     end
-    return F * _phase_ramp_op(allocate_in_domain(F), dirs, n -> _shift_amount(S, n), -_dft_sign(F))
+    return F * _phase_ramp_op(allocate_in_domain(F), dirs, n -> _shift_amount(S, n), -_dft_sign(F); threaded = is_threaded(F))
 end
 # Every shifted length even and every shifted dimension transformed: the rules with a
 # `SignAlternation` between the shift and the DFT below need both.

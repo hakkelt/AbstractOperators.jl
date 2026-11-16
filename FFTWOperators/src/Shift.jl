@@ -493,8 +493,9 @@ _ramp_vector(n, s, σ, offset) = [cispi(2 * σ * mod(s * (k - offset), n) / n) f
 
 # The phase ramp along `dirs` as a `DiagOp` on an array like `like` (allocated with its type and
 # size). `amount(n)` is the shift along a dimension of length `n`, `offsets[i]` an index offset
-# along `dirs[i]`.
-function _phase_ramp_op(like::AbstractArray, dirs, amount, σ, offsets = map(_ -> 0, dirs))
+# along `dirs[i]`. A ramp standing in for a shift threads exactly when the operator it sits
+# next to does (`threaded`), so a transform built with `threaded = false` stays serial.
+function _phase_ramp_op(like::AbstractArray, dirs, amount, σ, offsets = map(_ -> 0, dirs); threaded::Bool)
     host = ones(eltype(like), size(like))
     for (dir, offset) in zip(dirs, offsets)
         n = size(like, dir)
@@ -502,7 +503,7 @@ function _phase_ramp_op(like::AbstractArray, dirs, amount, σ, offsets = map(_ -
         host .*= reshape(v, ntuple(i -> i == dir ? n : 1, ndims(like)))
     end
     d = copyto!(like, host)
-    return DiagOp(eltype(like), size(like), d)
+    return DiagOp(eltype(like), size(like), d; threaded)
 end
 
 # Whether a shift by `dirs` on `side` of the DFT-like `F` can become a ramp on its other side.
@@ -521,8 +522,9 @@ function _shift_both_sides(shift_op_type, F, domain_shifts, codomain_shifts)
     σ = _dft_sign(F)
     amount = n -> _shift_amount(shift_op_type, n)
     offsets = map(d -> d in codomain_shifts ? amount(size(F, 1)[d]) : 0, domain_shifts)
-    D = _phase_ramp_op(allocate_in_codomain(F), domain_shifts, amount, σ, offsets)
-    M = _phase_ramp_op(allocate_in_domain(F), codomain_shifts, amount, -σ)
+    threaded = is_threaded(F)
+    D = _phase_ramp_op(allocate_in_codomain(F), domain_shifts, amount, σ, offsets; threaded)
+    M = _phase_ramp_op(allocate_in_domain(F), codomain_shifts, amount, -σ; threaded)
     return D * F * M
 end
 
@@ -547,7 +549,7 @@ function _shift_op(
             op = domain_op * op
         elseif _is_dft_op(op, :domain) && _ramp_absorbs(_dft_part(op, :domain), domain_shifts, :domain)
             σ = _dft_sign(_dft_part(op, :domain))
-            op = _phase_ramp_op(allocate_in_codomain(op), domain_shifts, n -> _shift_amount(shift_op_type, n), σ) * op
+            op = _phase_ramp_op(allocate_in_codomain(op), domain_shifts, n -> _shift_amount(shift_op_type, n), σ; threaded = is_threaded(op)) * op
         else
             domain_op = shift_op_type(domain_type(op), size(op, 2), domain_shifts; array_type = domain_array_type(op))
             op = op * domain_op
@@ -562,7 +564,7 @@ function _shift_op(
             op = op * codomain_op
         elseif _is_dft_op(op, :codomain) && _ramp_absorbs(_dft_part(op, :codomain), codomain_shifts, :codomain)
             σ = _dft_sign(_dft_part(op, :codomain))
-            op = op * _phase_ramp_op(allocate_in_domain(op), codomain_shifts, n -> _shift_amount(shift_op_type, n), -σ)
+            op = op * _phase_ramp_op(allocate_in_domain(op), codomain_shifts, n -> _shift_amount(shift_op_type, n), -σ; threaded = is_threaded(op))
         else
             codomain_op = shift_op_type(codomain_type(op), size(op, 1), codomain_shifts; array_type = codomain_array_type(op))
             op = codomain_op * op

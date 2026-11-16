@@ -261,6 +261,16 @@ end
         end
     end
 
+    # the ramp may thread only when the transform it sits next to does; `threaded = true` leaves
+    # the decision to DiagOp's own size threshold
+    for threaded in (false, true)
+        F = DFT(ComplexF64, (301, 301); threaded)
+        ramps = filter(op -> op isa DiagOp, collect(AbstractOperators.get_operators(fftshift_op(F; domain_shifts = (1, 2)))))
+        @test length(ramps) == 1
+        expected = AbstractOperators.is_threaded(DiagOp(ComplexF64, (301, 301), ones(ComplexF64, 301, 301); threaded = AbstractOperators.is_threaded(F)))
+        @test AbstractOperators.is_threaded(only(ramps)) == expected
+    end
+
     # the ramp merges with a diagonal next to it
     n = 9
     F = DFT(ComplexF64, n)
