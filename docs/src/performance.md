@@ -6,6 +6,8 @@ For end users, the main performance recommendations are:
 2. Preallocate with `allocate_in_domain(op)` / `allocate_in_codomain(op)`.
 3. Use operator constructors with array inputs to preserve storage type (CPU vs GPU).
 
+Developer-oriented performance internals (threading heuristics, storage traits, backend caveats) were moved to [Custom Operators](@ref) to keep this page concise.
+
 ## Fused element-wise operators
 
 Inside a `Compose`, consecutive element-wise operators (diagonals, masks, broadcasts and their
@@ -22,5 +24,3 @@ AbstractOperators.POINTWISE_FUSION[] = true    # the default
 ```@docs
 AbstractOperators.POINTWISE_FUSION
 ```
-
-Developer-oriented performance internals (threading heuristics, storage traits, backend caveats) were moved to [Custom Operators](@ref) to keep this page concise.
