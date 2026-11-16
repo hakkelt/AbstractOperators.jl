@@ -287,6 +287,26 @@ end
     @test T * x ≈ F * fftshift(x)
 end
 
+@testitem "Even-length shifts on both sides of a DFT" tags = [:fftw, :FFTShift, :CombinationRules] setup = [TestUtils] begin
+    using AbstractOperators, FFTW, FFTWOperators, Random
+    Random.seed!(4)
+    # a shift by N/2 and a sign alternation along a dimension of length N anticommute when N/2 is
+    # odd, so these sizes are where a dropped sign shows
+    for dims in ((4,), (6,), (10,), (6, 8), (6, 6), (4, 6)), (shift_op, f) in ((fftshift_op, fftshift), (ifftshift_op, ifftshift))
+        nd = length(dims)
+        F = DFT(ComplexF64, dims)
+        T = shift_op(F; domain_shifts = Tuple(1:nd), codomain_shifts = Tuple(1:nd))
+        x = randn(ComplexF64, dims)
+        @test T * x ≈ f(F * f(x))
+        @test T' * x ≈ (f === fftshift ? ifftshift : fftshift)(F' * (f === fftshift ? ifftshift : fftshift)(x))
+    end
+    # the DFT does not transform the shifted (even) dimension: the shift stays
+    F = DFT(ComplexF64, (6, 4), (2,))
+    x = randn(ComplexF64, 6, 4)
+    @test fftshift_op(F; domain_shifts = (1,)) * x ≈ F * fftshift(x, 1)
+    @test fftshift_op(F; codomain_shifts = (1,)) * x ≈ fftshift(F * x, 1)
+end
+
 @testitem "FFTShift/IFFTShift (GPU)" tags = [:gpu, :fftw, :FFTShift] setup = [TestUtils, GpuEnvSetup] begin
     using FFTWOperators, GPUEnv, LinearAlgebra
 

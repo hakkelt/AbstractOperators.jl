@@ -541,7 +541,8 @@ function _shift_op(
     if !isempty(domain_shifts)
         _check_shift_dirs(size(op, 2), domain_shifts)
         shifted_domain_dims_shape = size(op, 2)[collect(domain_shifts)]
-        if all(iseven, shifted_domain_dims_shape) && _is_dft_op(op, :domain)
+        if all(iseven, shifted_domain_dims_shape) && _is_dft_op(op, :domain) &&
+                all(in(_dft_dirs(_dft_part(op, :domain))), domain_shifts)
             domain_op = SignAlternation(codomain_type(op), size(op, 1), domain_shifts; array_type = codomain_array_type(op))
             op = domain_op * op
         elseif _is_dft_op(op, :domain) && _ramp_absorbs(_dft_part(op, :domain), domain_shifts, :domain)
@@ -555,7 +556,8 @@ function _shift_op(
     if !isempty(codomain_shifts)
         _check_shift_dirs(size(op, 1), codomain_shifts)
         shifted_codomain_dims_shape = size(op, 1)[collect(codomain_shifts)]
-        if all(iseven, shifted_codomain_dims_shape) && _is_dft_op(op, :codomain)
+        if all(iseven, shifted_codomain_dims_shape) && _is_dft_op(op, :codomain) &&
+                all(in(_dft_dirs(_dft_part(op, :codomain))), codomain_shifts)
             codomain_op = SignAlternation(domain_type(op), size(op, 2), codomain_shifts; array_type = domain_array_type(op))
             op = op * codomain_op
         elseif _is_dft_op(op, :codomain) && _ramp_absorbs(_dft_part(op, :codomain), codomain_shifts, :codomain)

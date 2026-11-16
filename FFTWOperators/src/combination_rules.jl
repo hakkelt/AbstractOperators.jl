@@ -68,6 +68,13 @@ function _even_shift_next_to_dft(F, S)
     return all(in(_dft_dirs(F)), dirs) && _all_even(size(F, 1), dirs)
 end
 
+# Moving a shift by N/2 past a sign alternation along the same dimension of even length N
+# multiplies by (-1)^(N/2): the rules below that swap the two carry this sign.
+function _sign_past_alternation(S, A::SignAlternation, op)
+    m = sum((A.dim_in[d] ÷ 2 for d in _shift_dirs(S) if d in A.dirs); init = 0)
+    return iseven(m) ? op : -one(real(codomain_type(op))) * op
+end
+
 for TF in (DFT, AdjointOperator{<:DFT}), TS in (ShiftOp, AdjointOperator{<:ShiftOp})
     @eval begin
         can_be_combined(T1::$TF, T2::$TS) = _can_absorb_input_shift(T1, T2)
@@ -103,28 +110,28 @@ function can_be_combined(T1::AdjointOperator{<:DFT}, ::SignAlternation, T3::Adjo
     return _even_shift_next_to_dft(T1, T3)
 end
 function combine(T1::ShiftOp, T2::SignAlternation, T3::DFT)
-    return T2 * combine(T1, T3)
+    return _sign_past_alternation(T1, T2, T2 * combine(T1, T3))
 end
 function combine(T1::DFT, T2::SignAlternation, T3::ShiftOp)
-    return combine(T1, T3) * T2
+    return _sign_past_alternation(T3, T2, combine(T1, T3) * T2)
 end
 function combine(T1::AdjointOperator{<:ShiftOp}, T2::SignAlternation, T3::DFT)
-    return T2 * combine(T1, T3)
+    return _sign_past_alternation(T1, T2, T2 * combine(T1, T3))
 end
 function combine(T1::DFT, T2::SignAlternation, T3::AdjointOperator{<:ShiftOp})
-    return combine(T1, T3) * T2
+    return _sign_past_alternation(T3, T2, combine(T1, T3) * T2)
 end
 function combine(T1::ShiftOp, T2::SignAlternation, T3::AdjointOperator{<:DFT})
-    return T2 * combine(T1, T3)
+    return _sign_past_alternation(T1, T2, T2 * combine(T1, T3))
 end
 function combine(T1::AdjointOperator{<:DFT}, T2::SignAlternation, T3::ShiftOp)
-    return combine(T1, T3) * T2
+    return _sign_past_alternation(T3, T2, combine(T1, T3) * T2)
 end
 function combine(T1::AdjointOperator{<:ShiftOp}, T2::SignAlternation, T3::AdjointOperator{<:DFT})
-    return T2 * combine(T1, T3)
+    return _sign_past_alternation(T1, T2, T2 * combine(T1, T3))
 end
 function combine(T1::AdjointOperator{<:DFT}, T2::SignAlternation, T3::AdjointOperator{<:ShiftOp})
-    return combine(T1, T3) * T2
+    return _sign_past_alternation(T3, T2, combine(T1, T3) * T2)
 end
 
 # FFTShift/IFFTShift with FFTShift/IFFTShift
