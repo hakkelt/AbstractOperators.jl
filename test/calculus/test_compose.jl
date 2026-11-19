@@ -509,3 +509,47 @@ end
     @test length(L * x) == n - 2
     @test L * x ≈ fd_nm1 * (diag2 * (diag1 * (fd_n * x)))
 end
+
+@testitem "Compose: AAᴴ/AᴴA diagonal only when the Gram product is" tags = [:calculus, :Compose] setup = [TestUtils] begin
+    using Random, LinearAlgebra, AbstractOperators, FFTWOperators, WaveletOperators, Wavelets
+    Random.seed!(0)
+    n = (8, 8)
+    d = randn(ComplexF64, n)
+    D = DiagOp(d)
+    F = DFT(ComplexF64, n)
+    G = GetIndex(ComplexF64, n, (1:2:8, :))
+    Z = ZeroPad(ComplexF64, (7, 7), (1, 1))
+    W = WaveletOp(ComplexF64, wavelet(WT.db2), n, 2)
+    cases = Dict(
+        "D*F" => D * F, "F*D" => F * D, "G*F" => G * F, "F'*G'" => F' * G',
+        "D*G'" => D * G', "W*Z" => W * Z, "Z'*W'" => Z' * W', "2(D*F)" => 2 * (D * F), "FFTShift*F*D" => FFTShift(ComplexF64, n) * F * D,
+    )
+    # Whatever the traits claim must hold: AAᴴy = diag_AAc .* y, AᴴAx = diag_AcA .* x.
+    for (name, L) in cases
+        y = randn(ComplexF64, size(L, 1))
+        x = randn(ComplexF64, size(L, 2))
+        if is_AAc_diagonal(L)
+            @test L * (L' * y) ≈ diag_AAc(L) .* y
+        end
+        if is_AcA_diagonal(L)
+            @test L' * (L * x) ≈ diag_AcA(L) .* x
+        end
+    end
+    # A non-scalar inner Gram product followed by a non-diagonal factor is not diagonal.
+    @test !is_AAc_diagonal(cases["F*D"])
+    @test !is_AAc_diagonal(cases["W*Z"])
+    @test !is_AcA_diagonal(cases["D*F"])
+    @test_throws ErrorException diag_AAc(cases["W*Z"])
+    @test_throws ErrorException diag_AcA(cases["D*F"])
+    # A scalar inner Gram product keeps the outer factor's diagonal.
+    @test is_AAc_diagonal(cases["D*F"])
+    @test is_AAc_diagonal(cases["G*F"])
+    @test is_AcA_diagonal(cases["F*D"])
+    @test is_AcA_diagonal(cases["W*Z"])
+    @test diag_AcA(cases["W*Z"]) ≈ 1
+end
+@testitem "ZeroPad: diag_AAc is the mask of the unpadded region" tags = [:linearoperator, :ZeroPad] setup = [TestUtils] begin
+    using AbstractOperators
+    Z = ZeroPad((3, 2), (1, 2))
+    @test diag_AAc(Z) == [ones(3, 2) zeros(3, 2); zeros(1, 4)]
+end

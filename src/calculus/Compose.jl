@@ -251,8 +251,8 @@ function is_diagonal(L::Compose)
     return all(is_diagonal.(L.A[is_sliced(L) ? (2:end) : (1:end)]))
 end
 is_invertible(L::Compose) = all(is_invertible.(L.A))
-is_AAc_diagonal(L::Compose) = all(is_AAc_diagonal.(L.A))
-is_AcA_diagonal(L::Compose) = all(is_AcA_diagonal.(L.A))
+is_AAc_diagonal(L::Compose) = _compose_gram_diag(L, Val(:AAc)) !== nothing
+is_AcA_diagonal(L::Compose) = _compose_gram_diag(L, Val(:AcA)) !== nothing
 
 is_sliced(L::Compose) = is_sliced(L.A[1])
 get_slicing_expr(L::Compose) = get_slicing_expr(L.A[1])
@@ -283,11 +283,38 @@ end
 
 diag(L::Compose) = is_sliced(L) ? diag(L.A[2]) : prod(diag.(L.A))
 function diag_AAc(L::Compose)
-    return if is_AAc_diagonal(L)
-        diag_AAc(L.A[2])
-    else
-        error("is_AAc_diagonal( $(typeof(L)) ) == false")
+    d = _compose_gram_diag(L, Val(:AAc))
+    d === nothing && error("is_AAc_diagonal( $(typeof(L)) ) == false")
+    return d
+end
+function diag_AcA(L::Compose)
+    d = _compose_gram_diag(L, Val(:AcA))
+    d === nothing && error("is_AcA_diagonal( $(typeof(L)) ) == false")
+    return d
+end
+
+# The diagonal of AAᴴ (or AᴴA) of the composition, or `nothing` when it is not diagonal.
+# Every factor having a diagonal AAᴴ is not enough: for A = A₂A₁, AAᴴ = A₂(A₁A₁ᴴ)A₂ᴴ, and
+# A₂DA₂ᴴ is diagonal for a general diagonal D only when A₂ is itself diagonal. The Gram
+# product is therefore built from the factor applied first (last, for AᴴA) outwards: while it
+# is a scalar c, the next factor contributes c·diag(AₖAₖᴴ) if its own AAᴴ is diagonal; once it
+# is an array, only a square diagonal factor keeps it diagonal, contributing |dₖ|² elementwise.
+function _compose_gram_diag(L::Compose, ::Val{side}) where {side}
+    is_gram_diag, gram_diag = side === :AAc ? (is_AAc_diagonal, diag_AAc) : (is_AcA_diagonal, diag_AcA)
+    ops = side === :AAc ? L.A : reverse(L.A)
+    is_gram_diag(ops[1]) || return nothing
+    d = gram_diag(ops[1])
+    for A in Base.tail(ops)
+        if d isa Number
+            is_gram_diag(A) || return nothing
+            d = d * gram_diag(A)
+        elseif d isa AbstractArray && is_diagonal(A) && size(A, 1) == size(A, 2)
+            d = gram_diag(A) .* d
+        else
+            return nothing
+        end
     end
+    return d
 end
 
 # utils
