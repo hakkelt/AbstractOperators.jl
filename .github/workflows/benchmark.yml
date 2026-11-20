@@ -71,7 +71,7 @@ jobs:
         # ubuntu-latest runner that is 2 BLAS threads at both `-t 1` and `-t 2`, which is why
         # these two rows are comparable for the BLAS-backed operators. A `mul!` on those
         # operators leaves that setting alone unless it was constructed `threaded = false`,
-        # in which case it runs inside `with_restricted_threads` (see the BLAS bridge section
+        # in which case it runs inside `with_threads_disabled` (see the BLAS bridge section
         # of `threading_policy.jl` for why the permitted branch opens no scope at all).
         #
         # Oversubscription at `-t 2` is therefore bounded by the runner having 4 vCPUs, not
