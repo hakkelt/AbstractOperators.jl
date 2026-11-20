@@ -408,7 +408,7 @@ _supports_threading_from_children(L::AbstractOperator) = any(supports_threading,
 # So `threaded = true` means "leave BLAS at its own budget" and costs nothing at all, while
 # `threaded = false` is the veto that nesting safety depends on and is the only case that
 # opens a scope. The veto goes through NestedThreading's refcounted budget scope
-# (`with_restricted_threads`), not a raw `BLAS.set_num_threads` save/restore: a `mul!` can
+# (`with_threads_disabled`), not a raw `BLAS.set_num_threads` save/restore: a `mul!` can
 # run concurrently with other `mul!`s (e.g. several `MatrixOp` blocks inside a threaded
 # `HCAT`/`VCAT` block loop), and a naive save/restore of a process-global from concurrent
 # callers is exactly the interleaving bug NestedThreading exists to prevent.
@@ -428,8 +428,8 @@ it would only add a lock and a round trip through every registered pool's setter
 whole job may be a few microseconds of `gemv`: `calculus/Ax_mul_Bx/forward` wraps two
 `MatrixOp`s and paid 28.6 -> 34.1 us for exactly those two scopes.
 
-A `with_full_threads` here would additionally *raise* BLAS past a count the caller had
-deliberately set, which the `with_thread_budget` docstring calls out as the one thing a
+A `with_threads_enabled` here would additionally *raise* BLAS past a count the caller had
+deliberately set, which the `with_thread_limit` docstring calls out as the one thing a
 full-throttle scope does that a plain call does not.
 
 !!! note "What BLAS's own budget actually is"
@@ -451,7 +451,7 @@ full-throttle scope does that a plain call does not.
     skip its default entirely.
 """
 function _with_blas_threading(f::F, threaded::Bool, ::Type{S}) where {F, S <: AbstractArray}
-    return threaded || !_is_cpu_storage(S) ? f() : with_restricted_threads(f)
+    return threaded || !_is_cpu_storage(S) ? f() : with_threads_disabled(f)
 end
 
 """

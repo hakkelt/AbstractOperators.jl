@@ -531,7 +531,7 @@ function mul!(out::AbstractArray, op::SpreadingBatchOpLocking, inp::AbstractArra
     check(out, op, inp)
     # Not a plain `for` loop shape, so this uses the function form rather than
     # `@budgeted_threads`; the budget scope covers the whole `@sync` block.
-    with_restricted_threads() do
+    with_threads_disabled() do
         @sync for idx in op.batch_indices
             op_lock = get_lock(op, idx)
             @spawn begin
@@ -556,7 +556,7 @@ function mul!(
     )
     check(out, op, inp)
     op = op.A
-    with_restricted_threads() do
+    with_threads_disabled() do
         @sync for idx in op.batch_indices
             op_lock = get_lock(op, idx)
             @spawn begin
