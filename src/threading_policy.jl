@@ -487,7 +487,7 @@ function _with_blas_threading(
         f::F, threaded::Bool, ::Type{S}, work::Integer
     ) where {F, S <: AbstractArray}
     _is_cpu_storage(S) || return f()
-    threaded || return with_restricted_threads(f)
+    threaded || return with_threads_disabled(f)
     work < BLAS3_THREAD_WORK[] && return f()
     return with_thread_grant(f, typemax(Int); only = (:blas, :mkl))
 end

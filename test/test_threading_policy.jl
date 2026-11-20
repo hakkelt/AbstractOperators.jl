@@ -293,7 +293,7 @@ end
         @test counted(true, big - 1) == 1           # below the gate: the default stands
         @test counted(true, big) == blas            # at the gate: BLAS's own count back
         @test counted(false, big) == 1              # `threaded = false` still vetoes
-        NestedThreading.with_thread_budget(1) do    # a hard limit is never granted past
+        NestedThreading.with_thread_limit(1) do    # a hard limit is never granted past
             @test counted(true, big) == 1
         end
         @test BLAS.get_num_threads() == 1
