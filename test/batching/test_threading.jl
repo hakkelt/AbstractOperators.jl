@@ -47,8 +47,8 @@ end
     Random.seed!(0)
 
     observed = Ref(0)
-    NestedThreading.with_thread_budget(1) do
-        NestedThreading.with_thread_budget(Threads.nthreads()) do
+    NestedThreading.with_thread_limit(1) do
+        NestedThreading.with_thread_limit(Threads.nthreads()) do
             observed[] = BLAS.get_num_threads()
         end
     end

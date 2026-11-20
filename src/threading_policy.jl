@@ -408,7 +408,7 @@ _supports_threading_from_children(L::AbstractOperator) = any(supports_threading,
 # So `threaded = true` means "leave BLAS at its own budget" and costs nothing at all, while
 # `threaded = false` is the veto that nesting safety depends on and is the only case that
 # opens a scope. The veto goes through NestedThreading's refcounted budget scope
-# (`with_restricted_threads`), not a raw `BLAS.set_num_threads` save/restore: a `mul!` can
+# (`with_threads_disabled`), not a raw `BLAS.set_num_threads` save/restore: a `mul!` can
 # run concurrently with other `mul!`s (e.g. several `MatrixOp` blocks inside a threaded
 # `HCAT`/`VCAT` block loop), and a naive save/restore of a process-global from concurrent
 # callers is exactly the interleaving bug NestedThreading exists to prevent.
@@ -428,8 +428,8 @@ it would only add a lock and a round trip through every registered pool's setter
 whole job may be a few microseconds of `gemv`: `calculus/Ax_mul_Bx/forward` wraps two
 `MatrixOp`s and paid 28.6 -> 34.1 us for exactly those two scopes.
 
-A `with_full_threads` here would additionally *raise* BLAS past a count the caller had
-deliberately set, which the `with_thread_budget` docstring calls out as the one thing a
+A `with_threads_enabled` here would additionally *raise* BLAS past a count the caller had
+deliberately set, which the `with_thread_limit` docstring calls out as the one thing a
 full-throttle scope does that a plain call does not.
 
 !!! note "What BLAS's own budget actually is"
@@ -451,7 +451,56 @@ full-throttle scope does that a plain call does not.
     skip its default entirely.
 """
 function _with_blas_threading(f::F, threaded::Bool, ::Type{S}) where {F, S <: AbstractArray}
-    return threaded || !_is_cpu_storage(S) ? f() : with_restricted_threads(f)
+    return threaded || !_is_cpu_storage(S) ? f() : with_threads_disabled(f)
+end
+
+"""
+    BLAS3_THREAD_WORK
+
+The multiply-add count (`m·n·k`, a complex multiply-add counting as four) from which a
+BLAS-backed operator with `threaded = true` asks for BLAS's threads *back* when a caller has
+lowered them with a soft default (`NestedThreading.with_thread_default`). A `Ref{Int}`;
+set it to `typemax(Int)` to never ask.
+
+A caller such as an iterative solver may run a whole computation at serial BLAS by default,
+because most of its BLAS calls are level-1 vector updates too small to thread. A large
+`gemm` inside it is not: it is a grant (`NestedThreading.with_thread_grant`) that restores
+the unrestricted count for that one call, though never past a hard limit open around it, so
+a `MatrixOp` inside a saturated batch loop still runs serial.
+
+The default, 2^25 (a 320³ real `gemm`, about 4 ms on one core), is set by what a grant costs
+on OpenBLAS rather than by where threading starts to pay: closing a grant shuts OpenBLAS's
+workers down (0.35 ms) and the next threaded call starts them again (0.5–1 ms), so a grant
+must save several milliseconds to be worth opening. Below the threshold no scope opens at
+all, so small `gemv`s pay nothing.
+"""
+const BLAS3_THREAD_WORK = Ref(2^25)
+
+"""
+    _with_blas_threading(f, threaded::Bool, ::Type{S}, work::Integer)
+
+As `_with_blas_threading(f, threaded, S)`, and additionally run `f()` under a BLAS grant when
+`threaded` and `work` reaches [`BLAS3_THREAD_WORK`](@ref). `work` is the call's
+multiply-add count, from [`_matmul_work`](@ref).
+"""
+function _with_blas_threading(
+        f::F, threaded::Bool, ::Type{S}, work::Integer
+    ) where {F, S <: AbstractArray}
+    _is_cpu_storage(S) || return f()
+    threaded || return with_threads_disabled(f)
+    work < BLAS3_THREAD_WORK[] && return f()
+    return with_thread_grant(f, typemax(Int); only = (:blas, :mkl))
+end
+
+"""
+    _matmul_work(A, B) -> Int
+
+Multiply-add count of `A * B` for a matrix `A` whose column count is `B`'s leading
+dimension: `size(A, 1) · length(B)`, times four when either operand is complex.
+"""
+function _matmul_work(A::AbstractArray, B::AbstractArray)
+    weight = (eltype(A) <: Complex || eltype(B) <: Complex) ? 4 : 1
+    return weight * size(A, 1) * length(B)
 end
 
 """

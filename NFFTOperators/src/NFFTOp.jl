@@ -178,7 +178,7 @@ loop stays single-threaded, and the save/restore bookkeeping is refcounted rathe
 per-call.
 """
 with_nfft_threading(f::F, threaded::Bool) where {F} =
-    threaded ? with_full_threads(f) : with_restricted_threads(f)
+    threaded ? with_threads_enabled(f) : with_threads_disabled(f)
 
 function mul!(ksp::AbstractArray, op::NFFTOp, img::AbstractArray)
     AbstractOperators.check(ksp, op, img)
@@ -318,7 +318,7 @@ end
 # ─── Threading ────────────────────────────────────────────────────────────────
 #
 # NFFT is a *counted* pool in NestedThreading: the plan itself is built for a thread count
-# and `mul!` runs under `with_full_threads`/`with_restricted_threads` (see `_nfft_run`).
+# and `mul!` runs under `with_threads_enabled`/`with_threads_disabled` (see `_nfft_run`).
 # So `threaded` here selects a plan-time thread count, not a Julia loop, and it cannot be
 # flipped after construction -- switching it rebuilds the plan.
 is_threaded(op::NFFTOp) = op.threaded
