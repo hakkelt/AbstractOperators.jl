@@ -814,10 +814,10 @@ end
     using Random
 
     # The power iteration starts from a fixed-seed vector, not from the global RNG.  It
-    # regularly exhausts `maxit` without meeting `tol` (a near-degenerate top of the spectrum
-    # converges linearly and slowly), so the start vector leaks into the *result*, not merely
-    # into how many iterations it takes — and anything normalized by that number then differs
-    # from run to run.
+    # regularly exhausts `maxit` without reaching its margin (a near-degenerate top of the
+    # spectrum converges linearly and slowly), so the start vector leaks into the *result*, not
+    # merely into how many iterations it takes — and anything normalized by that number then
+    # differs from run to run.
     M = randn(MersenneTwister(3), 40, 25)
     L = MatrixOp(M)
 
@@ -842,5 +842,5 @@ end
 
     # the iterates approach ‖A‖ from below, so a truncated run under-estimates it
     @test estimate_opnorm(L) <= exact * (1 + 1.0e-8)
-    @test isapprox(powerit(L; maxit = 500, tol = 1.0e-12), exact, rtol = 1.0e-6)
+    @test isapprox(powerit(L; maxit = 500, rel_margin = 1.0e-12), exact, rtol = 1.0e-6)
 end
