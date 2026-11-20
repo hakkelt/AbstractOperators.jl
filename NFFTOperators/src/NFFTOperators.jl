@@ -5,7 +5,7 @@ export NFFTOp
 using LinearAlgebra
 using AbstractOperators
 using FastBroadcast
-using NestedThreading: with_full_threads, with_restricted_threads
+using NestedThreading: with_threads_enabled, with_threads_disabled
 import LinearAlgebra: mul!
 import Base: size
 import NFFT: NFFT
