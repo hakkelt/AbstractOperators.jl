@@ -117,9 +117,9 @@ size(L::ZeroPad) = L.dim_in .+ L.zp, L.dim_in
 fun_name(L::ZeroPad) = "[I;0]"
 is_AAc_diagonal(L::ZeroPad) = true
 function diag_AAc(L::ZeroPad)
-    input = allocate_in_domain(L)
-    fill!(input, 1)
-    return L * L' * input
+    ones_out = allocate_in_codomain(L)
+    fill!(ones_out, 1)
+    return L * (L' * ones_out)
 end
 is_AcA_diagonal(L::ZeroPad) = true
 diag_AcA(L::ZeroPad) = one(real(domain_type(L)))
