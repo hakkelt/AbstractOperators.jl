@@ -309,7 +309,11 @@ has_fast_opnorm(L) = false
 """
 	displacement(A::AbstractOperator)
 
-Returns the displacement of the operator.
+Returns the displacement of the operator: `A * 0`, as a scalar when all its entries are equal.
+
+A linear operator (see [`is_linear`](@ref)) returns zero without being applied. Anything else is
+applied to zeros, so a new operator needs a method only when it is affine or nonlinear and its
+displacement is cheaper to state than to compute, as `AffineAdd` does.
 
 ```jldoctest
 julia> A = AffineAdd(Eye(4),[1.;2.;3.;4.])
@@ -325,6 +329,7 @@ julia> displacement(A)
 ```
 """
 function displacement(S::AbstractOperator)
+    is_linear(S) && return _zero_of(codomain_type(S))
     x = allocate_in_domain(S)
     fill!(x, 0)
     d = S * x
@@ -342,6 +347,10 @@ _first_element(d::ArrayPartition) = _first_element(first(d.x))
 
 _all_equal_to(d::AbstractArray, v) = all(==(v), d)
 _all_equal_to(d::ArrayPartition, v) = all(b -> _all_equal_to(b, v), d.x)
+
+# The first entry of `S * 0` for a linear `S`: of the first block's type for a block codomain.
+_zero_of(T::Type) = zero(T)
+_zero_of(T::Tuple) = _zero_of(first(T))
 
 """
 	remove_displacement(A::AbstractOperator)
