@@ -50,6 +50,20 @@ function add_mul!(y::AbstractArray, L::_AccumulatingMul, b, ::AbstractArray, α:
     return mul!(y, L, b, α, β)
 end
 
+# A `Scale` of an accumulating operator applies its coefficient in the operator's own pass instead
+# of scaling the output afterwards.
+function mul!(y::AbstractArray, L::Scale{Th, T, <:_AccumulatingMul}, x::AbstractArray) where {Th, T <: Number}
+    check(y, L, x)
+    return mul!(y, L.A, x, L.coeff, false)
+end
+
+function mul!(
+        y::AbstractArray, S::AdjointOperator{<:Scale{Th, T, <:_AccumulatingMul}}, x::AbstractArray
+    ) where {Th, T <: Number}
+    check(y, S, x)
+    return mul!(y, S.A.A', x, S.A.coeff_conj, false)
+end
+
 # `Scale` and `Reshape` hand the buffer on with the operator they wrap, which may not accumulate.
 function add_mul!(y::AbstractArray, L::Scale, b, buf::AbstractArray, α::Number = true, β::Number = true)
     return add_mul!(y, L.A, b, buf, α * L.coeff, β)

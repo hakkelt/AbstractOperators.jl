@@ -176,6 +176,15 @@ function _hcat_mul!(y, H::HCAT, b::Tuple)
     return _mul_hcat_indexed!(y, H, b)
 end
 
+function mul!(y::AbstractArray, H::HCAT, b::ArrayPartition, α::Number, β::Number)
+    check(y, H, b)
+    iszero(β) && isone(α) && return mul!(y, H, b.x)
+    if _hcat_has_natural_idxs(H)
+        return _mul_hcat_natural!(y, H, b.x, α, β, Val(false))
+    end
+    return _mul_hcat_indexed!(y, H, b.x, α, β, Val(false))
+end
+
 function mul!(y::ArrayPartition, A::AdjointOperator{<:HCAT}, b::AbstractArray)
     check(y, A, b)
     _hcat_adj_mul!(y.x, A, b)
@@ -185,6 +194,22 @@ end
 function mul!(y::Tuple, A::AdjointOperator{<:HCAT}, b::AbstractArray)
     check(ArrayPartition(y...), A, b)
     return _hcat_adj_mul!(y, A, b)
+end
+
+# Every block owns its part of `y`, so each accumulates there by itself.
+@generated function mul!(
+        y::ArrayPartition, A::AdjointOperator{<:HCAT{N, L, P}}, b::AbstractArray, α::Number, β::Number
+    ) where {N, L, P}
+    function output_expr(i)
+        Pi = fieldtype(P, i)
+        Pi <: Integer && return :(y.x[H.idxs[$i]])
+        return :(ArrayPartition($((:(y.x[H.idxs[$i][$j]]) for j in 1:fieldcount(Pi))...)))
+    end
+    ex = :(check(y, A, b); H = A.A)
+    for i in 1:N
+        ex = :($ex; mul!($(output_expr(i)), H.A[$i]', b, α, β))
+    end
+    return :($ex; return y)
 end
 
 @generated function _hcat_adj_mul!(
@@ -290,7 +315,20 @@ _hcat_has_natural_idxs(H::HCAT{N, L, P}) where {N, L, P} = H.idxs == _hcat_natur
     return Expr(:tuple, idx_exprs...)
 end
 
-@generated function _mul_hcat_natural!(y, H::HCAT{N, L, P}, b::Tuple) where {N, L, P}
+# `y = α * Σᵢ Aᵢ bᵢ + β * y`: the first block applies `β`, unless `plain` (`α = 1`, `β = 0`) lets it
+# write `y` directly, and every further block adds into `y`, through `H.buf` only when the block
+# cannot accumulate by itself. Defined before the generated functions that call it.
+function _hcat_forward_expr(N, input_expr, plain)
+    ex = plain ? :(mul!(y, H.A[1], $(input_expr(1)))) : :(add_mul!(y, H.A[1], $(input_expr(1)), H.buf, α, β))
+    for i in 2:N
+        ex = :($ex; add_mul!(y, H.A[$i], $(input_expr(i)), H.buf, α, true))
+    end
+    return :($ex; return y)
+end
+
+@generated function _mul_hcat_natural!(
+        y, H::HCAT{N, L, P}, b::Tuple, α = true, β = false, ::Val{plain} = Val(true)
+    ) where {N, L, P, plain}
     K = 0
     function input_expr(i)
         Pi = fieldtype(P, i)
@@ -305,16 +343,12 @@ end
         end
     end
 
-    ex = :(mul!(y, H.A[1], $(input_expr(1))))
-    for i in 2:N
-        ex = :($ex; mul!(H.buf, H.A[$i], $(input_expr(i))))
-        ex = :($ex; y .+= H.buf)
-    end
-    ex = :($ex; return y)
-    return ex
+    return _hcat_forward_expr(N, input_expr, plain)
 end
 
-@generated function _mul_hcat_indexed!(y, H::HCAT{N, L, P}, b::Tuple) where {N, L, P}
+@generated function _mul_hcat_indexed!(
+        y, H::HCAT{N, L, P}, b::Tuple, α = true, β = false, ::Val{plain} = Val(true)
+    ) where {N, L, P, plain}
     function input_expr(i)
         Pi = fieldtype(P, i)
         if Pi <: Integer
@@ -326,14 +360,7 @@ end
         end
     end
 
-    ex = :(mul!(y, H.A[1], $(input_expr(1))))
-
-    for i in 2:N
-        ex = :($ex; mul!(H.buf, H.A[$i], $(input_expr(i))))
-        ex = :($ex; y .+= H.buf)
-    end
-    ex = :($ex; return y)
-    return ex
+    return _hcat_forward_expr(N, input_expr, plain)
 end
 
 # Properties

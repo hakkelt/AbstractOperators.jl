@@ -106,3 +106,47 @@ end
     AbstractOperators.add_mul!(y, R, x, vec(buf), 1, 1)
     @test y ≈ vec(F * x) + vec(y0)
 end
+
+@testitem "Accumulating mul!: combinators add their blocks in place" tags = [:calculus, :HCAT, :VCAT, :Sum, :AccumulatingMul] setup = [TestUtils] begin
+    using AbstractOperators, FFTWOperators, LinearAlgebra, Random
+    Random.seed!(0)
+    const AO = AbstractOperators
+
+    D1, D2 = FiniteDiff((64, 48), 1), FiniteDiff((64, 48), 2)
+    F = DFT(ComplexF64, (32, 32))
+    ops = Any[
+        HCAT(Eye(64), DiagOp(randn(64)), MatrixOp(randn(64, 20))),
+        HCAT(D1', D2'),
+        VCAT(D1, D2)',
+        VCAT(FiniteDiff((2, 300, 10), 2), HigherOrderDiff(Float64, (2, 300, 10), 2, 2))',
+        Sum(Eye(64), DiagOp(randn(64)), MatrixOp(randn(64, 64))),
+        Sum(F, Eye(ComplexF64, (32, 32))),
+        Compose(DiagOp(randn(63, 48)), D1),
+        DiagOp(randn(ComplexF64, 32, 32)) * F,
+        2.0 * D1,
+    ]
+    function allocations(L, f!)
+        x = AO.allocate_in_domain(L)
+        x .= 1
+        y = AO.allocate_in_codomain(L)
+        y .= 1
+        f!(y, L, x)
+        return @allocated f!(y, L, x)
+    end
+    for A in ops, L in (A, A')
+        x = AO.allocate_in_domain(L)
+        x .= randn.(eltype(x))
+        y0 = AO.allocate_in_codomain(L)
+        y0 .= randn.(eltype(y0))
+        Lx = L * x
+        @test mul!(copy(y0), L, x, 0.7, -1.3) ≈ 0.7 .* Lx .+ -1.3 .* y0
+        yn = copy(y0)
+        fill!(yn, NaN)
+        @test mul!(yn, L, x, 2.0, false) ≈ 2 .* Lx
+        # Accumulating adds no work arrays to what the plain product needs; a last `Compose` stage
+        # that does not accumulate takes its array from the pool.
+        with_operator_pool(OperatorPool()) do
+            @test allocations(L, (y, L, x) -> mul!(y, L, x, 0.7, -1.3)) <= allocations(L, mul!)
+        end
+    end
+end

@@ -84,6 +84,9 @@
     @test_opt target_modules = (AO,) mul!(y, Scale(2.0, Eye(n)), x, 0.5, 2.0)
     @test_opt target_modules = (AO,) mul!(zeros(2, n ÷ 2), Reshape(Eye(n), 2, n ÷ 2), x, 0.5, 2.0)
     @test_opt target_modules = (AO,) mul!(y, Compose(Eye(n), DiagOp(d)), x, 0.5, 2.0)
+    @test_opt target_modules = (AO,) mul!(y, Sum(Eye(n), DiagOp(d)), x, 0.5, 2.0)
+    @test_opt target_modules = (AO,) mul!(y, HCAT(Eye(n), DiagOp(d)), ArrayPartition(randn(n), randn(n)), 0.5, 2.0)
+    @test_opt target_modules = (AO,) mul!(ArrayPartition(zeros(n), zeros(n)), VCAT(Eye(n), DiagOp(d)), x, 0.5, 2.0)
 
     # HCAT: ArrayPartition → Vector (forward)
     @test_opt target_modules = (AO,) mul!(y, HCAT(Eye(n), DiagOp(d)), ArrayPartition(randn(n), randn(n)))
