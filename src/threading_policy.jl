@@ -69,7 +69,7 @@ export is_threaded, adapt_operator, supports_threading
 # 2. IS THE LIBRARY EVEN ENABLED AT THE CALL SITE?
 #
 # A `@batch` kernel is silently serial inside any scope that has narrowed the thread budget,
-# because switching Polyester off is how a `GuardedPool` implements a restriction. A caller
+# because switching Polyester off is how a pool registered with a `guard` implements a restriction. A caller
 # that wraps a whole solve in one -- MRT does -- therefore never runs the threaded path these
 # thresholds were swept for, whatever they say. That is how `BroadCast`'s threshold came to be
 # 2^18 for a kernel that never ran; it is now `Threads.@threads`, and its sweep was re-run.

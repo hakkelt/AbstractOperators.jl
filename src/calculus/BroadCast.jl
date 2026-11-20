@@ -117,7 +117,7 @@ end
 # kernel calls `quiesce_foreign_pools()` first. Two reasons, in that order:
 #
 #   * A caller that has narrowed the thread budget switches Polyester off for the duration
-#     (that is what a `GuardedPool` does), and a `@batch` kernel then runs *serially* without
+#     (that is what a pool registered with a `guard` does), and a `@batch` kernel then runs *serially* without
 #     saying so. MRT's solver does exactly this around a whole solve, which is how the 2^18
 #     threshold below came to be measured on a path that never ran. `Threads.@threads` is not
 #     guarded, so what the policy says about this operator is what happens.
