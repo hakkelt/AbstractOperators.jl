@@ -10,7 +10,7 @@
 # count. It has no knowledge of how many times the batch `mul!` will be called -- and in a
 # solver's inner loop (CG inside ADMM inside an outer loop) that can be hundreds of times.
 # Each threaded call pays a fixed cost this proxy kernel does not: `Task` allocation,
-# `with_thread_budget`'s NestedThreading scope guard, and the join. This script measures the
+# `with_thread_limit`'s NestedThreading scope guard, and the join. This script measures the
 # batch `mul!` **as actually called** -- one full forward + adjoint pair per sample, at the
 # batch count (8) real reconstructions use -- rather than a single isolated call, so that
 # fixed per-call overhead is not amortised away by the harness itself.

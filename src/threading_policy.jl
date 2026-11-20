@@ -114,7 +114,7 @@ This constant is necessary but not sufficient: it is blind to how many times the
 `mul!` will be called. Called once, threading a 4096-element-per-item batch is a clear win;
 called hundreds of times from inside a solver's inner loop (CG inside ADMM inside an outer
 loop), the fixed per-call cost this proxy kernel pays once -- `Task` allocation, the
-`with_thread_budget` scope guard, the join -- accumulates, and the isolated crossover
+`with_thread_limit` scope guard, the join -- accumulates, and the isolated crossover
 measured here does not by itself prove the threaded path wins in that setting. See
 `_fftw_num_threads`'s "What n cannot express" for the same caller-side gap in the FFTW gate;
 it applies here for the same reason and is left to the same remedy, `threaded = false` at
